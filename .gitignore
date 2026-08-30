@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+out/
+build/
+release/
+*.asar
+
+# Electron
+*.electron-builder/
+
+# Environment
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Packaging
+*.AppImage
+*.exe
+*.deb
+*.rpm
+repo/
+build-dir/
+
+# Tests/coverage
+coverage/
+.nyc_output/

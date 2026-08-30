@@ -1,0 +1,90 @@
+{
+  "name": "clavis",
+  "version": "0.0.0-alpha",
+  "description": "Cross-platform encrypted notes application for storing banking info, PINs, passwords, and safe codes.",
+  "main": "dist/main/index.js",
+  "author": "Marcelo Salvador",
+  "license": "MIT",
+  "keywords": [
+    "encryption",
+    "passwords",
+    "notes",
+    "electron",
+    "security"
+  ],
+  "type": "commonjs",
+  "scripts": {
+    "dev": "electron-forge start",
+    "build": "electron-forge make",
+    "make": "electron-forge make",
+    "lint": "eslint . --ext .ts,.tsx",
+    "test": "vitest run",
+    "clean": "rm -rf out/",
+    "flatpak-make": "flatpak-builder --repo=repo build-dir flatpak/com.github.marcelosalvador.Clavis.json"
+  },
+  "config": {
+    "forge": {
+      "packager": {
+        "icon": "icons/clavis-icon"
+      },
+      "makers": [
+        {
+          "name": "@electron-forge/maker-squirrel",
+          "platforms": [
+            "darwin",
+            "win32"
+          ],
+          "config": {
+            "name": "clavis"
+          }
+        },
+        {
+          "name": "@electron-forge/maker-zip",
+          "platforms": [
+            "darwin"
+          ]
+        },
+        {
+          "name": "@electron-forge/maker-deb",
+          "platforms": [
+            "linux"
+          ]
+        },
+        {
+          "name": "@electron-forge/maker-rpm",
+          "platforms": [
+            "linux"
+          ]
+        },
+        {
+          "name": "@electron-forge/maker-flatpak",
+          "platforms": [
+            "linux"
+          ]
+        }
+      ]
+    }
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.11.2",
+    "@types/node": "^26.4.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@typescript-eslint/eslint-plugin": "^8.68.0",
+    "@typescript-eslint/parser": "^8.68.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^44.0.0",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^5.8.3",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
+  },
+  "dependencies": {
+    "argon2": "^0.45.1",
+    "uuid": "^11.1.0"
+  }
+}
