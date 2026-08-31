@@ -30,11 +30,11 @@ afterEach(() => {
 });
 
 describe('HomeScreen', () => {
-  it('renders the title "Clavis" and the "Nova Gaveta" button', async () => {
+  it('renders the title "Clavis" and the "New Drawer" button', async () => {
     render(<HomeScreen />);
 
     expect(screen.getByText('Clavis')).toBeTruthy();
-    expect(screen.getByText('Nova Gaveta')).toBeTruthy();
+    expect(screen.getByText('New Drawer')).toBeTruthy();
   });
 
   it('renders a drawer title when one drawer exists', async () => {
@@ -49,6 +49,6 @@ describe('HomeScreen', () => {
     render(<HomeScreen />);
 
     expect(await screen.findByText('Banco Central')).toBeTruthy();
-    expect(screen.getByText('Nova Gaveta')).toBeTruthy();
+    expect(screen.getByText('New Drawer')).toBeTruthy();
   });
 });

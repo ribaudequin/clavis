@@ -17,7 +17,7 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
 
   async function handleSave(): Promise<void> {
     if (title.trim() === '') {
-      alert('Título não pode ser vazio.');
+      alert('Title cannot be empty.');
       return;
     }
     setSaving(true);
@@ -26,17 +26,17 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
       if (ok) {
         onBack();
       } else {
-        alert('Erro ao guardar.');
+        alert('Error saving drawer.');
       }
     } catch {
-      alert('Erro ao guardar.');
+      alert('Error saving drawer.');
     } finally {
       setSaving(false);
     }
   }
 
   function handleDelete(): void {
-    if (!confirm('Eliminar esta gaveta? Esta ação não pode ser revertida.')) return;
+    if (!confirm('Delete this drawer? This action cannot be undone.')) return;
     onDelete(drawerId);
   }
 
@@ -51,13 +51,13 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Título da gaveta"
+          placeholder="Drawer title"
           className="w-full border rounded px-3 py-2 text-sm mb-4 bg-white"
         />
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Texto da gaveta"
+          placeholder="Drawer content"
           className="flex-1 w-full border rounded px-3 py-2 text-sm bg-white resize-none min-h-[300px]"
         />
       </main>
@@ -67,14 +67,14 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
           onClick={handleDelete}
           className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
         >
-          eliminar gaveta
+          delete drawer
         </button>
         <button
           onClick={handleSave}
           disabled={saving}
           className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
         >
-          {saving ? 'A guardar...' : 'Salvar gaveta e voltar para o menu'}
+          {saving ? 'Saving...' : 'Save drawer and back to menu'}
         </button>
       </footer>
     </div>

@@ -60,7 +60,7 @@ function HomeScreen(): React.JSX.Element {
   async function handleExport(id: string): Promise<void> {
     const content = await api().exportDrawer(id);
     if (!content) {
-      alert('Erro ao exportar.');
+      alert('Error exporting.');
       return;
     }
     const blob = new Blob([content], { type: 'application/json' });
@@ -73,7 +73,7 @@ function HomeScreen(): React.JSX.Element {
   }
 
   async function handleDelete(id: string): Promise<void> {
-    if (!confirm('Eliminar esta gaveta? Esta ação não pode ser revertida.')) return;
+    if (!confirm('Delete this drawer? This action cannot be undone.')) return;
     await api().deleteDrawer(id);
     loadDrawers();
   }
@@ -84,13 +84,13 @@ function HomeScreen(): React.JSX.Element {
     try {
       const ok = await api().importDrawer(filePath);
       if (ok) {
-        alert('Importado com sucesso');
+        alert('Imported successfully');
         await loadDrawers();
       } else {
-        alert('Erro ao importar');
+        alert('Error importing');
       }
     } catch {
-      alert('Erro ao importar');
+      alert('Error importing');
     }
   }
 
@@ -105,7 +105,7 @@ function HomeScreen(): React.JSX.Element {
     try {
       const result = await api().unlockDrawer(unlockDrawerId, password);
       if (!result) {
-        setUnlockError('Password incorreta.');
+        setUnlockError('Incorrect password.');
         return;
       }
       setUnlockDrawerId(null);
@@ -116,7 +116,7 @@ function HomeScreen(): React.JSX.Element {
         content: result.content,
       });
     } catch {
-      setUnlockError('Password incorreta.');
+      setUnlockError('Incorrect password.');
     }
   }
 
@@ -157,13 +157,13 @@ function HomeScreen(): React.JSX.Element {
           onClick={() => setShowCreateModal(true)}
           className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
         >
-          Nova Gaveta
+          New Drawer
         </button>
       </header>
 
       <main className="px-6 py-6 max-w-4xl mx-auto">
         {drawers.length === 0 ? (
-          <p className="text-gray-500 text-center py-12">Nenhuma gaveta criada.</p>
+          <p className="text-gray-500 text-center py-12">No drawers created.</p>
         ) : (
           <div className="space-y-2">
             {drawers.map((drawer) => (
@@ -178,13 +178,13 @@ function HomeScreen(): React.JSX.Element {
                   onClick={(e) => { e.stopPropagation(); handleExport(drawer.id); }}
                   className="text-xs text-gray-500 hover:text-gray-700"
                 >
-                  Exportar
+                  Export
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(drawer.id); }}
                   className="text-xs text-red-500 hover:text-red-700"
                 >
-                  Eliminar
+                  Delete
                 </button>
               </div>
             ))}
@@ -223,30 +223,30 @@ function CreateDrawerModal({ onClose, onCreated }: {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   async function handleSubmit(): Promise<void> {
-    if (title.trim() === '') { alert('Título não pode ser vazio.'); return; }
-    if (password !== confirmPassword) { alert('Passwords não coincidem.'); return; }
-    if (password.length < 8) { alert('A password deve ter pelo menos 8 caracteres.'); return; }
+    if (title.trim() === '') { alert('Title cannot be empty.'); return; }
+    if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
+    if (password.length < 8) { alert('The password must be at least 8 characters long.'); return; }
     try {
       await window.electronAPI.createDrawer(title, password);
       onCreated();
     } catch {
-      alert('Erro ao criar gaveta.');
+      alert('Error creating drawer.');
     }
   }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
       <div className="bg-white rounded-lg p-6 w-80">
-        <h2 className="text-lg font-semibold mb-4">Nova Gaveta</h2>
+        <h2 className="text-lg font-semibold mb-4">New Drawer</h2>
         <div className="space-y-3">
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Título</label>
+            <label className="block text-sm text-gray-600 mb-1">Title</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full border rounded px-2 py-1 text-sm"
-              placeholder="Título da gaveta"
+              placeholder="Drawer title"
             />
           </div>
           <div>
@@ -256,17 +256,17 @@ function CreateDrawerModal({ onClose, onCreated }: {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full border rounded px-2 py-1 text-sm"
-              placeholder="Password para encriptar"
+              placeholder="Password to encrypt"
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Confirmar Password</label>
+            <label className="block text-sm text-gray-600 mb-1">Confirm Password</label>
             <input
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full border rounded px-2 py-1 text-sm"
-              placeholder="Confirmar password para encriptar"
+              placeholder="Confirm password to encrypt"
             />
           </div>
         </div>
@@ -275,7 +275,7 @@ function CreateDrawerModal({ onClose, onCreated }: {
             onClick={onClose}
             className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded"
           >
-            Cancelar
+            Cancel
           </button>
           <button
             onClick={handleSubmit}

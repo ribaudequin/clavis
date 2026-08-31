@@ -34,7 +34,7 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full border rounded px-2 py-1 text-sm"
-              placeholder="Inserir password"
+              placeholder="Enter password"
             />
             {error && (
               <p className="text-red-500 text-xs mt-1">{error}</p>
@@ -46,13 +46,13 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
               onClick={onClose}
               className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded"
             >
-              Cancelar
+              Cancel
             </button>
             <button
               type="submit"
               className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
             >
-              Abrir
+              Open
             </button>
           </div>
         </form>

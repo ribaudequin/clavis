@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import argon2 from 'argon2';
 
 const ALGORITHM = 'aes-256-gcm';
