@@ -44,3 +44,12 @@ build-dir/
 # Tests/coverage
 coverage/
 .nyc_output/
+
+# Local-only project docs (not for GitHub)
+AGENTS.md
+IDEA.md
+MEMORY.md
+PLANO.md
+SUMMARY.md
+TODO.md
+wireframes/
