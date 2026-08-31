@@ -1,0 +1,56 @@
+app-id: com.github.marcelosalvador.Clavis
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+command: clavis
+finish-args:
+  # Network access
+  - --share=network
+  # X11 + Wayland display servers
+  - --share=ipc
+  - --socket=x11
+  - --socket=wayland
+  # GPU acceleration
+  - --device=dri
+  # Audio
+  - --socket=pulseaudio
+  # Read/write the user's drawers directory
+  - --filesystem=xdg-data/Clavis
+  - --filesystem=home
+  # Electron needs to write cache/config to the home dir
+  - --persist=.config/Clavis
+modules:
+  - name: clavis
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 Clavis-0.0.2-alpha.AppImage /app/bin/clavis
+      - install -Dm644 16x16.png /app/share/icons/hicolor/16x16/apps/com.github.marcelosalvador.Clavis.png
+      - install -Dm644 24x24.png /app/share/icons/hicolor/24x24/apps/com.github.marcelosalvador.Clavis.png
+      - install -Dm644 32x32.png /app/share/icons/hicolor/32x32/apps/com.github.marcelosalvador.Clavis.png
+      - install -Dm644 48x48.png /app/share/icons/hicolor/48x48/apps/com.github.marcelosalvador.Clavis.png
+      - install -Dm644 64x64.png /app/share/icons/hicolor/64x64/apps/com.github.marcelosalvador.Clavis.png
+      - install -Dm644 128x128.png /app/share/icons/hicolor/128x128/apps/com.github.marcelosalvador.Clavis.png
+      - install -Dm644 256x256.png /app/share/icons/hicolor/256x256/apps/com.github.marcelosalvador.Clavis.png
+      - install -Dm644 512x512.png /app/share/icons/hicolor/512x512/apps/com.github.marcelosalvador.Clavis.png
+      - install -Dm644 com.github.marcelosalvador.Clavis.desktop /app/share/applications/com.github.marcelosalvador.Clavis.desktop
+    sources:
+      - type: file
+        path: ../release/Clavis-0.0.2-alpha.AppImage
+      - type: file
+        path: ../icons/linux/16x16.png
+      - type: file
+        path: ../icons/linux/24x24.png
+      - type: file
+        path: ../icons/linux/32x32.png
+      - type: file
+        path: ../icons/linux/48x48.png
+      - type: file
+        path: ../icons/linux/64x64.png
+      - type: file
+        path: ../icons/linux/128x128.png
+      - type: file
+        path: ../icons/linux/256x256.png
+      - type: file
+        path: ../icons/linux/512x512.png
+      - type: file
+        path: ../flatpak/com.github.marcelosalvador.Clavis.desktop

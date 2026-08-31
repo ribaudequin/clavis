@@ -54,18 +54,20 @@
         "artifactName": "Clavis-${version}.${ext}"
       }
     },
-  "scripts": {
-    "clean": "rm -rf dist/ out/ release/",
-    "build:main": "tsc",
-    "copy:preload": "cp src/main/preload/index.js dist/main/preload.js",
-    "build:renderer": "vite build",
-    "build": "npm run clean && npm run build:main && npm run copy:preload && npm run build:renderer",
-    "dev": "vite --config vite.config.ts",
-    "start": "electron .",
-    "test": "vitest run",
-    "lint": "eslint . --ext .ts,.tsx",
-    "flatpak-make": "flatpak-builder --repo=repo build-dir flatpak/com.github.marcelosalvador.Clavis.json"
-  },
+    "scripts": {
+      "clean": "rm -rf out/ release/",
+      "build:main": "tsc",
+      "copy:preload": "cp src/main/preload/index.js dist/main/preload.js",
+      "build:renderer": "vite build",
+      "build": "npm run clean && npm run build:main && npm run copy:preload && npm run build:renderer",
+      "make": "electron-builder --win --linux",
+      "copy-latest": "mkdir -p release/latest && cp release/*.AppImage release/*.exe release/*.deb release/*.blockmap release/latest/ 2>/dev/null || true",
+      "release": "npm run clean && npm run build && npm run make && npm run copy-latest",
+      "start": "electron .",
+      "test": "vitest run",
+      "lint": "eslint . --ext .ts,.tsx",
+      "flatpak-make": "flatpak-builder --repo=repo build-dir flatpak/com.github.marcelosalvador.Clavis.yaml"
+    },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
     "@testing-library/dom": "^10.4.1",

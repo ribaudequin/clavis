@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Clavis
+Comment=Cross-platform encrypted notes application
+Exec=clavis
+Icon=com.github.marcelosalvador.Clavis
+Terminal=false
+Type=Application
+Categories=Utility;Security;
