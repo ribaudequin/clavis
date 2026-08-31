@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { DrawerListItem } from '../../shared/types';
+import { DrawerListItem, EncryptedDrawer } from '../../shared/types';
+import PasswordModal from '../components/PasswordModal';
+import ViewDrawer from './ViewDrawer';
 
 interface ElectronAPI {
   listDrawers: () => Promise<DrawerListItem[]>;
-  createDrawer: (title: string, password: string) => Promise<void>;
+  createDrawer: (title: string, password: string) => Promise<EncryptedDrawer>;
+  unlockDrawer: (id: string, password: string) => Promise<{ title: string; content: string; iconData: string } | null>;
+  saveDrawer: (id: string, password: string, title: string, content: string) => Promise<boolean>;
   deleteDrawer: (id: string) => Promise<boolean>;
-  exportDrawer: (id: string) => Promise<string>;
-  importDrawer: (content: string) => Promise<boolean>;
-  openFile: () => Promise<void>;
-  onFileSelected: (cb: (filePath: string | null) => void) => void;
+  exportDrawer: (id: string) => Promise<string | null>;
+  importDrawer: (filePath: string) => Promise<boolean>;
+  openFile: () => Promise<string | null>;
 }
 
 declare global {
@@ -17,9 +20,20 @@ declare global {
   }
 }
 
+interface ViewState {
+  drawerId: string;
+  password: string;
+  title: string;
+  content: string;
+}
+
 function HomeScreen(): React.JSX.Element {
   const [drawers, setDrawers] = useState<DrawerListItem[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [unlockDrawerId, setUnlockDrawerId] = useState<string | null>(null);
+  const [unlockDrawerTitle, setUnlockDrawerTitle] = useState('');
+  const [unlockError, setUnlockError] = useState<string | null>(null);
+  const [viewState, setViewState] = useState<ViewState | null>(null);
 
   const api = (): ElectronAPI => window.electronAPI;
 
@@ -45,6 +59,10 @@ function HomeScreen(): React.JSX.Element {
 
   async function handleExport(id: string): Promise<void> {
     const content = await api().exportDrawer(id);
+    if (!content) {
+      alert('Erro ao exportar.');
+      return;
+    }
     const blob = new Blob([content], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -61,21 +79,74 @@ function HomeScreen(): React.JSX.Element {
   }
 
   async function handleImport(): Promise<void> {
-    api().onFileSelected(async (filePath) => {
-      if (!filePath) return;
-      try {
-        const content = await api().importDrawer(filePath);
-        if (content) {
-          alert('Importado com sucesso');
-          loadDrawers();
-        } else {
-          alert('Erro ao importar');
-        }
-      } catch {
+    const filePath = await api().openFile();
+    if (!filePath) return;
+    try {
+      const ok = await api().importDrawer(filePath);
+      if (ok) {
+        alert('Importado com sucesso');
+        await loadDrawers();
+      } else {
         alert('Erro ao importar');
       }
-    });
-    await api().openFile();
+    } catch {
+      alert('Erro ao importar');
+    }
+  }
+
+  function handleDrawerClick(id: string, title: string): void {
+    setUnlockDrawerId(id);
+    setUnlockDrawerTitle(title);
+    setUnlockError(null);
+  }
+
+  async function handleUnlockSubmit(password: string): Promise<void> {
+    if (!unlockDrawerId) return;
+    try {
+      const result = await api().unlockDrawer(unlockDrawerId, password);
+      if (!result) {
+        setUnlockError('Password incorreta.');
+        return;
+      }
+      setUnlockDrawerId(null);
+      setViewState({
+        drawerId: unlockDrawerId,
+        password,
+        title: result.title,
+        content: result.content,
+      });
+    } catch {
+      setUnlockError('Password incorreta.');
+    }
+  }
+
+  function closeUnlockModal(): void {
+    setUnlockDrawerId(null);
+    setUnlockError(null);
+  }
+
+  async function handleSaveDrawer(id: string, password: string, title: string, content: string): Promise<boolean> {
+    return api().saveDrawer(id, password, title, content);
+  }
+
+  async function handleDeleteDrawer(id: string): Promise<void> {
+    await api().deleteDrawer(id);
+    setViewState(null);
+    loadDrawers();
+  }
+
+  if (viewState) {
+    return (
+      <ViewDrawer
+        drawerId={viewState.drawerId}
+        password={viewState.password}
+        initialTitle={viewState.title}
+        initialContent={viewState.content}
+        onSave={handleSaveDrawer}
+        onDelete={handleDeleteDrawer}
+        onBack={() => { setViewState(null); loadDrawers(); }}
+      />
+    );
   }
 
   return (
@@ -98,6 +169,7 @@ function HomeScreen(): React.JSX.Element {
             {drawers.map((drawer) => (
               <div
                 key={drawer.id}
+                onClick={() => handleDrawerClick(drawer.id, drawer.title)}
                 className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm hover:bg-gray-50 cursor-pointer"
               >
                 <div>{renderIcon(drawer.iconData)}</div>
@@ -129,6 +201,15 @@ function HomeScreen(): React.JSX.Element {
           }}
         />
       )}
+
+      {unlockDrawerId && (
+        <PasswordModal
+          drawerTitle={unlockDrawerTitle}
+          onClose={closeUnlockModal}
+          onSubmit={handleUnlockSubmit}
+          error={unlockError}
+        />
+      )}
     </div>
   );
 }
@@ -142,9 +223,9 @@ function CreateDrawerModal({ onClose, onCreated }: {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   async function handleSubmit(): Promise<void> {
-    if (!title.trim()) { alert('Título não pode ser vazio.'); return; }
+    if (title.trim() === '') { alert('Título não pode ser vazio.'); return; }
     if (password !== confirmPassword) { alert('Passwords não coincidem.'); return; }
-    if (password.length === 0) { alert('Password não pode ser vazia.'); return; }
+    if (password.length < 8) { alert('A password deve ter pelo menos 8 caracteres.'); return; }
     try {
       await window.electronAPI.createDrawer(title, password);
       onCreated();

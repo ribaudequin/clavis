@@ -5,20 +5,34 @@ const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH = 32;
 const IV_LENGTH = 16;
 
-const ARGON2_OPTIONS: argon2.HashOptions = {
+const DEFAULT_ARGON2_OPTIONS: argon2.HashOptions = {
   type: argon2.argon2id,
   timeCost: 3,
   memoryCost: 2 ** 16,
   parallelism: 1,
 };
 
-export async function deriveKey(password: string, salt: Buffer): Promise<Buffer> {
-  const hash = await argon2.hash(password, {
-    ...ARGON2_OPTIONS,
+export interface KDFParams {
+  timeCost?: number;
+  memoryCost?: number;
+  parallelism?: number;
+}
+
+export async function deriveKey(password: string, salt: Buffer, params?: KDFParams): Promise<Buffer> {
+  const hash: Buffer = await argon2.hash(password, {
+    ...DEFAULT_ARGON2_OPTIONS,
+    ...(params && {
+      timeCost: params.timeCost,
+      memoryCost: params.memoryCost,
+      parallelism: params.parallelism,
+    }),
     salt,
     raw: true,
   });
-  return Buffer.from(hash.slice(0, KEY_LENGTH));
+  if (hash.length !== KEY_LENGTH) {
+    throw new Error(`Argon2 raw output length ${hash.length} != expected ${KEY_LENGTH}`);
+  }
+  return hash;
 }
 
 export function generateSalt(): Buffer {
@@ -52,14 +66,15 @@ export async function decrypt(
   saltHex: string,
   ivHex: string,
   authTagHex: string,
-  password: string
+  password: string,
+  kdfParams?: KDFParams
 ): Promise<string> {
   const salt = Buffer.from(saltHex, 'hex');
   const iv = Buffer.from(ivHex, 'hex');
   const authTag = Buffer.from(authTagHex, 'hex');
   const encryptedData = Buffer.from(encryptedDataHex, 'hex');
 
-  const key = await deriveKey(password, salt);
+  const key = await deriveKey(password, salt, kdfParams);
 
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(authTag);

@@ -7,7 +7,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveDrawer: (id, password, title, content) => ipcRenderer.invoke('save-drawer', id, password, title, content),
   deleteDrawer: (id) => ipcRenderer.invoke('delete-drawer', id),
   exportDrawer: (id) => ipcRenderer.invoke('export-drawer', id),
-  importDrawer: (fileContent) => ipcRenderer.invoke('import-drawer', fileContent),
+  importDrawer: (filePath) => ipcRenderer.invoke('import-drawer', filePath),
   openFile: () => ipcRenderer.invoke('open-file-dialog'),
-  onFileSelected: (callback) => ipcRenderer.on('file-selected', (_event, filePath) => callback(filePath)),
 });

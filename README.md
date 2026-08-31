@@ -23,25 +23,29 @@
 ### From Source
 
 1. Clone this repository:
-```bash
-git clone <repository-url>
-cd clavis
-```
+   
+   ```bash
+   git clone <repository-url>
+   cd clavis
+   ```
 
 2. Install dependencies:
-```bash
-npm install
-```
+   
+   ```bash
+   npm install
+   ```
 
 3. Build the application:
-```bash
-npm run build
-```
+   
+   ```bash
+   npm run build
+   ```
 
 4. Run the application:
-```bash
-npm start
-```
+   
+   ```bash
+   npm start
+   ```
 
 ## Usage
 
@@ -68,16 +72,19 @@ npm start
 Use Electron Forge to create platform-specific distributions:
 
 ### Linux (AppImage)
+
 ```bash
 npm run make
 ```
 
 ### Windows (NSIS + Portable)
+
 ```bash
 npm run make
 ```
 
 ### Flatpak
+
 ```bash
 npm run flatpak-make
 ```
