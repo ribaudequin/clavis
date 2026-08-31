@@ -1,6 +1,6 @@
 {
   "name": "clavis",
-  "version": "0.0.1-alpha",
+  "version": "0.0.2-alpha",
   "description": "Cross-platform encrypted notes application for storing banking info, PINs, passwords, and safe codes.",
   "main": "dist/main/index.js",
   "author": "Marcelo Salvador",
@@ -55,12 +55,15 @@
       }
     },
   "scripts": {
-    "dev": "electron-forge start",
-    "build": "electron-forge make",
-    "make": "electron-forge make",
-    "lint": "eslint . --ext .ts,.tsx",
+    "clean": "rm -rf dist/ out/ release/",
+    "build:main": "tsc",
+    "copy:preload": "cp src/main/preload/index.js dist/main/preload.js",
+    "build:renderer": "vite build",
+    "build": "npm run clean && npm run build:main && npm run copy:preload && npm run build:renderer",
+    "dev": "vite --config vite.config.ts",
+    "start": "electron .",
     "test": "vitest run",
-    "clean": "rm -rf out/",
+    "lint": "eslint . --ext .ts,.tsx",
     "flatpak-make": "flatpak-builder --repo=repo build-dir flatpak/com.github.marcelosalvador.Clavis.json"
   },
   "devDependencies": {

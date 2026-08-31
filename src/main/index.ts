@@ -32,7 +32,11 @@ function createWindow(): void {
     resizable: true,
   });
 
-  mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  if (app.isPackaged) {
+    mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  } else {
+    mainWindow.loadURL('http://localhost:3000');
+  }
 
   mainWindow.webContents.on('will-navigate', (e) => e.preventDefault());
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
