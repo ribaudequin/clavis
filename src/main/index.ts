@@ -28,7 +28,8 @@ function createWindow(): void {
       devTools: !app.isPackaged,
       preload: path.join(__dirname, 'preload.js'),
       },
-    titleBarStyle: 'hidden',
+    titleBarStyle: 'default',
+    icon: path.join(__dirname, '..', 'icons', 'linux', '512x512.png'),
     resizable: true,
   });
 

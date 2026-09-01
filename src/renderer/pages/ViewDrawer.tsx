@@ -42,7 +42,7 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-white border-b px-6 py-4 flex items-center">
+      <header className="bg-white border-b px-6 py-4 flex items-center cursor-default">
         <h1 className="text-xl font-semibold text-gray-800">Clavis</h1>
       </header>
 

@@ -13,6 +13,11 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
 
   useEffect(() => {
     inputRef.current?.focus();
+    function onKeyDown(e: KeyboardEvent): void {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
 
   function handleSubmit(e: React.FormEvent): void {
@@ -22,7 +27,7 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" role="dialog" aria-modal="true">
       <div className="bg-white rounded-lg p-6 w-80">
         <h2 className="text-lg font-semibold mb-4">{drawerTitle}</h2>
         <form onSubmit={handleSubmit}>

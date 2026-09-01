@@ -151,7 +151,7 @@ function HomeScreen(): React.JSX.Element {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex justify-between items-center">
+      <header className="bg-white border-b px-6 py-4 flex justify-between items-center cursor-default">
         <h1 className="text-xl font-semibold text-gray-800">Clavis</h1>
         <button
           onClick={() => setShowCreateModal(true)}
@@ -219,6 +219,13 @@ function CreateDrawerModal({ onClose, onCreated }: {
   onCreated: () => void;
 }): React.JSX.Element {
   const [title, setTitle] = useState('');
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent): void {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -234,8 +241,16 @@ function CreateDrawerModal({ onClose, onCreated }: {
     }
   }
 
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent): void {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" role="dialog" aria-modal="true">
       <div className="bg-white rounded-lg p-6 w-80">
         <h2 className="text-lg font-semibold mb-4">New Drawer</h2>
         <div className="space-y-3">
