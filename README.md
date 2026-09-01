@@ -96,26 +96,34 @@ npm run make
 npm run flatpak-make
 ```
 
-## Support
+# Credits & support
 
-If you find this project useful, consider supporting its development:
+Clavis is an open-source, cross-platform encrypted notes app built to keep your passwords, PINs, bank details, and safe codes private and secure.
+
+Source code, issues, and contributions are welcome on [GitHub](https://github.com/ribaudequin/clavis).
+
+## Credits
+
+- **Concept, design & development:** Marcelo Salvador
+- **Thanks to:** all contributors and early testers
+
+## Support this project
+
+Clavis is free and open source. If it's useful to you, consider supporting its development — every bit helps keep it maintained and improving.
 
 **Ko-fi:** https://ko-fi.com/A0383T5
 
-**ETH:** (any EVM chain): 0x8a9D7dABf92B3F82f2c3aE5C4bF6A9d2E1aB3cCd
+**Cryptocurrency** (any EVM-compatible chain for ETH):
+- **ETH:** `0x8a9D7dABf92B3F82f2c3aE5C4bF6A9d2E1aB3cCd`
+- **SOL:** `7nQ1M4kF2eP9jB8vR3cT6yU5xW0zA2bC9dE8fG7hJ6k`
 
-**SOL:** 7nQ1M4kF2eP9jB8vR3cT6yU5xW0zA2bC9dE8fG7hJ6k
+---
+
+*From Portugal, with love.*
 
 ## License
 
 This project is open source and available under the MIT License.
-
-## Credits
-
-- **Maintained by:** Marcelo Salvador
-- **Design:** Wireframes and UI mockups documented in the `wireframes/` directory
-- **Icons:** Deterministic icon generation system documented in `wireframes/04-esquema-icones.md`
-- **Special Thanks:** All contributors and early testers
 
 ## Security Notes
 
