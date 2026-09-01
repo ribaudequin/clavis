@@ -51,7 +51,7 @@
 
 ### Creating a New Drawer
 
-1. Click the "+" button on the main screen
+1. Click the **"New Drawer"** button in the header
 2. Enter drawer title, password, and confirm password
 3. The drawer will appear in your list with a unique icon
 
@@ -60,6 +60,13 @@
 1. Click on a drawer in the list
 2. Enter the drawer's password
 3. View and edit the drawer contents
+
+### Viewing Credits and Support
+
+1. Click the **heart icon** (❤️) in the top-right of the header
+2. The Credits modal displays project info: maintainer, design, icons, security features
+3. Use the **Support** section to back the project via Ko-fi, GitHub, ETH, or SOL
+4. Click **OK** or the **close button** to dismiss
 
 ### Managing Drawers
 
@@ -117,3 +124,10 @@ This project is open source and available under the MIT License.
 - Only drawer titles and metadata are stored unencrypted
 - Use strong, unique passwords for each drawer
 - Backup your encrypted drawer files securely
+
+## UI Notes
+
+- No native menu bar (Electron menu disabled)
+- Header features: application title, "New Drawer" button, and a Credits button (❤️)
+- In-app Credits modal shows project info and support options
+- All icons use inline SVG for reliability across packaging formats
