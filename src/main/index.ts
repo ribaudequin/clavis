@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, Menu } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import {
@@ -15,6 +15,35 @@ import {
 
 let mainWindow: BrowserWindow | null = null;
 
+function createCreditsWindow(): void {
+  if (mainWindow) {
+    mainWindow.setAlwaysOnTop(true);
+  }
+  const creditsWindow = new BrowserWindow({
+    width: 380,
+    height: 300,
+    parent: mainWindow || undefined,
+    modal: true,
+    titleBarStyle: 'default',
+    resizable: false,
+    fullscreenable: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      devTools: !app.isPackaged,
+    },
+  });
+
+  creditsWindow.loadFile(path.join(__dirname, '..', 'renderer', 'credits.html'));
+
+  creditsWindow.on('closed', () => {
+    if (mainWindow) {
+      mainWindow.setAlwaysOnTop(false);
+    }
+  });
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 900,
@@ -27,7 +56,7 @@ function createWindow(): void {
       sandbox: true,
       devTools: !app.isPackaged,
       preload: path.join(__dirname, 'preload.js'),
-      },
+    },
     titleBarStyle: 'default',
     icon: path.join(__dirname, '..', 'icons', 'linux', '512x512.png'),
     resizable: true,
@@ -83,6 +112,7 @@ function handleIPC(): void {
 
 app.whenReady().then(async () => {
   await ensureDataDir();
+  Menu.setApplicationMenu(null);
   createWindow();
   handleIPC();
 });

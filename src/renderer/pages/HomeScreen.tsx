@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { DrawerListItem, EncryptedDrawer } from '../../shared/types';
 import PasswordModal from '../components/PasswordModal';
 import ViewDrawer from './ViewDrawer';
+import HeartIcon from '../../../icons/svg/heart.svg?react';
+import GithubIcon from '../../../icons/svg/github.svg?react';
+import EthIcon from '../../../icons/svg/eth.svg?react';
+import SolIcon from '../../../icons/svg/sol.svg?react';
+import KoFiIcon from '../../../icons/svg/ko-fi.svg?react';
 
 interface ElectronAPI {
   listDrawers: () => Promise<DrawerListItem[]>;
@@ -30,6 +35,7 @@ interface ViewState {
 function HomeScreen(): React.JSX.Element {
   const [drawers, setDrawers] = useState<DrawerListItem[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [unlockDrawerId, setUnlockDrawerId] = useState<string | null>(null);
   const [unlockDrawerTitle, setUnlockDrawerTitle] = useState('');
   const [unlockError, setUnlockError] = useState<string | null>(null);
@@ -151,15 +157,25 @@ function HomeScreen(): React.JSX.Element {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex justify-between items-center cursor-default">
-        <h1 className="text-xl font-semibold text-gray-800">Clavis</h1>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
-        >
-          New Drawer
-        </button>
-      </header>
+       <header className="bg-white border-b px-6 py-4 flex justify-between items-center cursor-default">
+         <h1 className="text-xl font-semibold text-gray-800">Clavis</h1>
+         <div className="flex gap-2 items-center">
+           <button
+             onClick={() => setShowCreateModal(true)}
+             className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+           >
+             New Drawer
+           </button>
+             <button
+               onClick={() => setShowCreditsModal(true)}
+               className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
+               aria-label="Credits"
+               title="Credits"
+             >
+               <HeartIcon className="w-5 h-5 text-gray-600" />
+             </button>
+         </div>
+       </header>
 
       <main className="px-6 py-6 max-w-4xl mx-auto">
         {drawers.length === 0 ? (
@@ -209,6 +225,91 @@ function HomeScreen(): React.JSX.Element {
           onSubmit={handleUnlockSubmit}
           error={unlockError}
         />
+      )}
+
+      {showCreditsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-lg p-6 w-[480px] max-h-[85vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Credits &amp; support</h2>
+              <button
+                onClick={() => setShowCreditsModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Close credits"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4 text-sm text-gray-600">
+              <p>
+                Clavis is an open-source, cross-platform encrypted notes app built to keep your passwords, PINs, bank details, and safe codes private and secure.
+              </p>
+              <p>
+                Source code, issues, and contributions are welcome on{' '}
+                <a href="https://github.com/ribaudequin/clavis" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                  GitHub
+                </a>.
+              </p>
+
+              <div>
+                <h3 className="text-md font-medium text-gray-800 mb-1">Credits</h3>
+                <ul className="list-disc list-inside space-y-1">
+                  <li><span className="font-medium">Concept, design &amp; development:</span> Marcelo Salvador</li>
+                  <li><span className="font-medium">Thanks to:</span> all contributors and early testers</li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-md font-medium text-gray-800 mb-1">Support this project</h3>
+                <p className="mb-1">Clavis is free and open source. If it&apos;s useful to you, consider supporting its development — every bit helps keep it maintained and improving.</p>
+                <p>
+                  <span className="font-medium">Ko-fi:</span>{' '}
+                  <a href="https://ko-fi.com/A0383T5" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    https://ko-fi.com/A0383T5
+                  </a>
+                </p>
+                <p className="mt-2 font-medium">Cryptocurrency <span className="font-normal">(any EVM-compatible chain for ETH):</span></p>
+                <ul className="list-disc list-inside space-y-1 mt-1">
+                  <li><span className="font-medium">ETH:</span> <code className="bg-gray-100 px-1 rounded text-xs break-all">0x8a9D7dABf92B3F82f2c3aE5C4bF6A9d2E1aB3cCd</code></li>
+                  <li><span className="font-medium">SOL:</span> <code className="bg-gray-100 px-1 rounded text-xs break-all">7nQ1M4kF2eP9jB8vR3cT6yU5xW0zA2bC9dE8fG7hJ6k</code></li>
+                </ul>
+                <div className="flex gap-4 mt-3">
+                  <a href="https://ko-fi.com/A0383T5" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900">
+                    <KoFiIcon className="w-5 h-5 text-gray-600" />
+                    Ko-fi
+                  </a>
+                  <a href="https://github.com/ribaudequin/clavis" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900">
+                    <GithubIcon className="w-5 h-5 text-gray-600" />
+                    GitHub
+                  </a>
+                  <a href="https://etherscan.io/address/0x8a9D7dABf92B3F82f2c3aE5C4bF6A9d2E1aB3cCd" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900">
+                    <EthIcon className="w-5 h-5 text-gray-600" />
+                    ETH
+                  </a>
+                  <a href="https://solscan.io/account/7nQ1M4kF2eP9jB8vR3cT6yU5xW0zA2bC9dE8fG7hJ6k" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900">
+                    <SolIcon className="w-5 h-5 text-gray-600" />
+                    SOL
+                  </a>
+                </div>
+              </div>
+
+              <p className="text-center italic pt-2 border-t">From Portugal, with love.</p>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowCreditsModal(false)}
+                className="px-4 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
