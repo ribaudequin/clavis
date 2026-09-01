@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { DrawerListItem, EncryptedDrawer } from '../../shared/types';
 import PasswordModal from '../components/PasswordModal';
 import ViewDrawer from './ViewDrawer';
+import HeartIcon from '../../../icons/svg/heart.svg?react';
+import GithubIcon from '../../../icons/svg/github.svg?react';
+import EthIcon from '../../../icons/svg/eth.svg?react';
+import SolIcon from '../../../icons/svg/sol.svg?react';
+import KoFiIcon from '../../../icons/svg/ko-fi.svg?react';
 
 interface ElectronAPI {
   listDrawers: () => Promise<DrawerListItem[]>;
@@ -161,16 +166,14 @@ function HomeScreen(): React.JSX.Element {
            >
              New Drawer
            </button>
-            <button
-              onClick={() => setShowCreditsModal(true)}
-              className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
-              aria-label="Credits"
-              title="Credits"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-              </svg>
-            </button>
+             <button
+               onClick={() => setShowCreditsModal(true)}
+               className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
+               aria-label="Credits"
+               title="Credits"
+             >
+               <HeartIcon className="w-5 h-5 text-gray-600" />
+             </button>
          </div>
        </header>
 
@@ -226,9 +229,9 @@ function HomeScreen(): React.JSX.Element {
 
       {showCreditsModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-lg p-6 w-96 max-h-[80vh] overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 w-[480px] max-h-[85vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Credits</h2>
+              <h2 className="text-lg font-semibold">Credits &amp; support</h2>
               <button
                 onClick={() => setShowCreditsModal(false)}
                 className="text-gray-500 hover:text-gray-700"
@@ -240,78 +243,69 @@ function HomeScreen(): React.JSX.Element {
                 </svg>
               </button>
             </div>
-            
-            <div className="space-y-4">
+
+            <div className="space-y-4 text-sm text-gray-600">
+              <p>
+                Clavis is an open-source, cross-platform encrypted notes app built to keep your passwords, PINs, bank details, and safe codes private and secure.
+              </p>
+              <p>
+                Source code, issues, and contributions are welcome on{' '}
+                <a href="https://github.com/ribaudequin/clavis" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                  GitHub
+                </a>.
+              </p>
+
               <div>
-                <h3 className="text-md font-medium text-gray-800 mb-2">Maintained by</h3>
-                <p className="text-sm text-gray-600">Marcelo Salvador</p>
-              </div>
-              
-              <div>
-                <h3 className="text-md font-medium text-gray-800 mb-2">Design</h3>
-                <p className="text-sm text-gray-600">Wireframes and UI mockups documented in the <code className="bg-gray-100 px-1 rounded">wireframes</code> directory</p>
-              </div>
-              
-              <div>
-                <h3 className="text-md font-medium text-gray-800 mb-2">Icons</h3>
-                <p className="text-sm text-gray-600">Deterministic icon generation system documented in <code className="bg-gray-100 px-1 rounded">wireframes/04-esquema-icones.md</code></p>
-              </div>
-              
-              <div>
-                <h3 className="text-md font-medium text-gray-800 mb-2">Security Features</h3>
-                <ul className="text-sm text-gray-600 space-y-1">
-                  <li>• AES-256-GCM encryption for drawer contents</li>
-                  <li>• Argon2id memory-hard key derivation</li>
-                  <li>• Sandboxed Electron renderer</li>
-                  <li>• Content Security Policy (CSP) enforcement</li>
-                  <li>• UUID validation for drawer IDs</li>
-                  <li>• File permissions (0o600 for .clavis files)</li>
+                <h3 className="text-md font-medium text-gray-800 mb-1">Credits</h3>
+                <ul className="list-disc list-inside space-y-1">
+                  <li><span className="font-medium">Concept, design &amp; development:</span> Marcelo Salvador</li>
+                  <li><span className="font-medium">Thanks to:</span> all contributors and early testers</li>
                 </ul>
               </div>
-              
+
               <div>
-                <h3 className="text-md font-medium text-gray-800 mb-2">Architecture</h3>
-                <p className="text-sm text-gray-600">Electron + TypeScript + React + Tailwind CSS</p>
+                <h3 className="text-md font-medium text-gray-800 mb-1">Support this project</h3>
+                <p className="mb-1">Clavis is free and open source. If it&apos;s useful to you, consider supporting its development — every bit helps keep it maintained and improving.</p>
+                <p>
+                  <span className="font-medium">Ko-fi:</span>{' '}
+                  <a href="https://ko-fi.com/A0383T5" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    https://ko-fi.com/A0383T5
+                  </a>
+                </p>
+                <p className="mt-2 font-medium">Cryptocurrency <span className="font-normal">(any EVM-compatible chain for ETH):</span></p>
+                <ul className="list-disc list-inside space-y-1 mt-1">
+                  <li><span className="font-medium">ETH:</span> <code className="bg-gray-100 px-1 rounded text-xs break-all">0x8a9D7dABf92B3F82f2c3aE5C4bF6A9d2E1aB3cCd</code></li>
+                  <li><span className="font-medium">SOL:</span> <code className="bg-gray-100 px-1 rounded text-xs break-all">7nQ1M4kF2eP9jB8vR3cT6yU5xW0zA2bC9dE8fG7hJ6k</code></li>
+                </ul>
+                <div className="flex gap-4 mt-3">
+                  <a href="https://ko-fi.com/A0383T5" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900">
+                    <KoFiIcon className="w-5 h-5 text-gray-600" />
+                    Ko-fi
+                  </a>
+                  <a href="https://github.com/ribaudequin/clavis" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900">
+                    <GithubIcon className="w-5 h-5 text-gray-600" />
+                    GitHub
+                  </a>
+                  <a href="https://etherscan.io/address/0x8a9D7dABf92B3F82f2c3aE5C4bF6A9d2E1aB3cCd" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900">
+                    <EthIcon className="w-5 h-5 text-gray-600" />
+                    ETH
+                  </a>
+                  <a href="https://solscan.io/account/7nQ1M4kF2eP9jB8vR3cT6yU5xW0zA2bC9dE8fG7hJ6k" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900">
+                    <SolIcon className="w-5 h-5 text-gray-600" />
+                    SOL
+                  </a>
+                </div>
               </div>
-              
-               <div>
-                 <h3 className="text-md font-medium text-gray-800 mb-2">Support</h3>
-                 <p className="text-sm text-gray-600 mb-3">If you find this project useful, consider supporting its development:</p>
-                 <div className="flex gap-4">
-                   <a href="https://ko-fi.com/A0383T5" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" />
-                     </svg>
-                     Ko-fi
-                   </a>
-                   <a href="https://github.com/ribaudequin/clavis" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                       <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v 3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                     </svg>
-                     GitHub
-                   </a>
-                   <a href="https://etherscan.io/address/0x8a9D7dABf92B3F82f2c3aE5C4bF6A9d2E1aB3cCd" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                       <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm6.5 9h-4l2-4.5-6.5 8.5h4l-2 4.5 6.5-8.5z" />
-                     </svg>
-                     ETH
-                   </a>
-                   <a href="https://solscan.io/account/7nQ1M4kF2eP9jB8vR3cT6yU5xW0zA2bC9dE8fG7hJ6k" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                       <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm-2 16h4v2h-4zm0-8h4v8h-4zm0-4h4v4h-4z" />
-                     </svg>
-                     SOL
-                   </a>
-                 </div>
-               </div>
+
+              <p className="text-center italic pt-2 border-t">From Portugal, with love.</p>
             </div>
-            
-            <div className="mt-6 flex justify-end gap-2">
+
+            <div className="mt-6 flex justify-end">
               <button
                 onClick={() => setShowCreditsModal(false)}
-                className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+                className="px-4 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
               >
-                OK
+                Close
               </button>
             </div>
           </div>
