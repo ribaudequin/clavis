@@ -38,17 +38,25 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
   }
 
   async function handleDelete(): Promise<void> {
-    if (!confirm('Delete this drawer? This action cannot be undone.')) return;
+    if (!confirm('Delete this drawer? This action cannot be undone.')) {
+      window.focus();
+      return;
+    }
+    window.focus();
     setDeleting(true);
     try {
       const result = await onDelete(drawerId);
       if (!result.ok) {
         alert(`Error deleting: ${result.error.message}`);
+        window.focus();
         return;
       }
       onBack();
+    } catch {
+      window.focus();
     } finally {
       setDeleting(false);
+      setTimeout(() => window.focus(), 0);
     }
   }
 

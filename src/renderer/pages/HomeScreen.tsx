@@ -85,17 +85,25 @@ function HomeScreen(): React.JSX.Element {
   }
 
   async function handleDelete(id: string): Promise<void> {
-    if (!confirm('Delete this drawer? This action cannot be undone.')) return;
+    if (!confirm('Delete this drawer? This action cannot be undone.')) {
+      window.focus();
+      return;
+    }
+    window.focus();
     setDeletingId(id);
     try {
       const result = await api().deleteDrawer(id);
       if (!result.ok) {
         alert(`Error deleting: ${result.error.message}`);
+        window.focus();
         return;
       }
       await loadDrawers();
     } finally {
       setDeletingId(null);
+      window.focus();
+      // Ensure next modal can receive focus on Windows after native confirm steals it
+      setTimeout(() => window.focus(), 0);
     }
   }
 
@@ -154,23 +162,17 @@ function HomeScreen(): React.JSX.Element {
     setUnlockError(null);
   }
 
-  async function handleSaveDrawer(id: string, password: string, title: string, content: string): Promise<boolean> {
-    const result = await api().saveDrawer(id, password, title, content);
-    if (!result.ok) {
-      alert(`Error saving: ${result.error.message}`);
-      return false;
-    }
-    return true;
+  async function handleSaveDrawer(
+    id: string,
+    password: string,
+    title: string,
+    content: string
+  ): Promise<import('../../shared/types').Result<void>> {
+    return api().saveDrawer(id, password, title, content);
   }
 
-  async function handleDeleteDrawer(id: string): Promise<void> {
-    const result = await api().deleteDrawer(id);
-    if (!result.ok) {
-      alert(`Error deleting: ${result.error.message}`);
-      return;
-    }
-    setViewState(null);
-    await loadDrawers();
+  async function handleDeleteDrawer(id: string): Promise<import('../../shared/types').Result<void>> {
+    return api().deleteDrawer(id);
   }
 
   if (viewState) {
@@ -246,9 +248,14 @@ function HomeScreen(): React.JSX.Element {
 
       {showCreateModal && (
         <CreateDrawerModal
-          onClose={() => setShowCreateModal(false)}
+          key={`create-${drawers.length}`}
+          onClose={() => {
+            setShowCreateModal(false);
+            window.focus();
+          }}
           onCreated={() => {
             setShowCreateModal(false);
+            window.focus();
             loadDrawers();
           }}
         />
@@ -359,8 +366,12 @@ function CreateDrawerModal({ onClose, onCreated }: {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const titleRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Windows: after native confirm() steals focus, explicitly focus first input
+    titleRef.current?.focus();
+    window.focus();
     function onKeyDown(e: KeyboardEvent): void {
       if (e.key === 'Escape') onClose();
     }
@@ -395,6 +406,8 @@ function CreateDrawerModal({ onClose, onCreated }: {
           <div>
             <label className="block text-sm text-gray-600 mb-1">Title</label>
             <input
+              ref={titleRef}
+              autoFocus
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}

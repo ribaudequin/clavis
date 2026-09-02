@@ -1,6 +1,6 @@
 {
   "name": "clavis",
-  "version": "0.1.0-alpha",
+  "version": "0.1.1-alpha",
   "description": "Cross-platform encrypted notes application for storing banking info, PINs, passwords, and safe codes.",
   "main": "dist/main/index.js",
   "author": "Marcelo Salvador",
@@ -43,6 +43,7 @@
     "asarUnpack": [
       "**/node_modules/argon2/**/*"
     ],
+    "afterPack": "./scripts/afterPack.js",
     "linux": {
       "target": [
         "AppImage"

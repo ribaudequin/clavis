@@ -429,7 +429,19 @@ function handleIPC(): void {
 
 app.whenReady().then(async () => {
   initializeLogger();
-  logger.info('Clavis started', { version: '0.0.4', platform: process.platform, arch: process.arch });
+  logger.info('Clavis started', { version: '0.1.1-alpha', platform: process.platform, arch: process.arch });
+  // Non-fatal check: argon2 native may be unavailable on cross-built Windows artifacts
+  try {
+    const { isArgon2Available, getArgon2LoadError } = await import('./encryption.js');
+    if (!isArgon2Available()) {
+      const err = getArgon2LoadError();
+      logger.warn('Running with scrypt fallback — argon2 native unavailable', {
+        error: err?.message,
+      });
+    }
+  } catch (e) {
+    logger.error('Failed to check argon2 availability', { error: e instanceof Error ? e.message : String(e) });
+  }
   await ensureDataDir();
   Menu.setApplicationMenu(null);
   createWindow();
