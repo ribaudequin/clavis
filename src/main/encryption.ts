@@ -1,5 +1,6 @@
 import * as crypto from 'crypto';
 import argon2 from 'argon2';
+import { logger } from './logger';
 
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH = 32;
@@ -19,6 +20,7 @@ export interface KDFParams {
 }
 
 export async function deriveKey(password: string, salt: Buffer, params?: KDFParams): Promise<Buffer> {
+  const start = Date.now();
   const hash: Buffer = await argon2.hash(password, {
     ...DEFAULT_ARGON2_OPTIONS,
     ...(params && {
@@ -32,6 +34,8 @@ export async function deriveKey(password: string, salt: Buffer, params?: KDFPara
   if (hash.length !== KEY_LENGTH) {
     throw new Error(`Argon2 raw output length ${hash.length} != expected ${KEY_LENGTH}`);
   }
+  const duration = Date.now() - start;
+  logger.debug('Key derived', { duration });
   return hash;
 }
 
@@ -53,6 +57,7 @@ export async function encrypt(plainText: string, password: string): Promise<{
   const encrypted = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
   const authTag = cipher.getAuthTag();
 
+  logger.debug('Content encrypted', { size: encrypted.length });
   return {
     encryptedData: encrypted.toString('hex'),
     salt: salt.toString('hex'),
@@ -79,6 +84,12 @@ export async function decrypt(
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(authTag);
 
-  const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
-  return decrypted.toString('utf8');
+  try {
+    const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
+    logger.debug('Content decrypted', { size: decrypted.length });
+    return decrypted.toString('utf8');
+  } catch (e) {
+    logger.error('Decryption failed', { error: e instanceof Error ? e.message : String(e) });
+    throw e;
+  }
 }

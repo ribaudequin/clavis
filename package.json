@@ -16,7 +16,7 @@
   "scripts": {
     "clean": "rm -rf out/ release/",
     "build:main": "tsc",
-    "copy:preload": "cp src/main/preload/index.js dist/main/preload.js",
+    "copy:preload": "cp dist/main/preload/index.js dist/main/preload.js",
     "build:renderer": "vite build",
     "build": "npm run clean && npm run build:main && npm run copy:preload && npm run build:renderer",
     "make": "electron-forge make",
@@ -44,6 +44,7 @@
     "autoprefixer": "^10.5.4",
     "electron": "^44.0.0",
     "electron-builder": "^26.15.3",
+    "electron-log": "^5.4.4",
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "jsdom": "^30.0.1",

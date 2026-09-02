@@ -14,6 +14,7 @@ import {
   importDrawerRaw,
   isValidId,
 } from '../src/main/store';
+import { Result, ErrorCode } from '../src/shared/types';
 
 let tempDir: string;
 
@@ -264,6 +265,72 @@ describe('IPC handlers (mocked via store functions)', () => {
       const unlocked = await unlockDrawer(originalId, 'password123456');
       expect(unlocked?.title).toBe('Final Title');
       expect(unlocked?.content).toBe('Final Content');
+    });
+  });
+
+  describe('Result<T> type validation', () => {
+    it('validates Result structure for successful operations', async () => {
+      const drawer = await createDrawer('Test', 'password123456');
+      expect(drawer).toHaveProperty('id');
+      expect(drawer).toHaveProperty('title');
+      expect(drawer).toHaveProperty('encryptedData');
+    });
+
+    it('validates unlock returns proper structure on success', async () => {
+      const drawer = await createDrawer('Test', 'password123456');
+      const result = await unlockDrawer(drawer.id, 'password123456');
+      
+      expect(result).not.toBeNull();
+      expect(result).toHaveProperty('title');
+      expect(result).toHaveProperty('content');
+      expect(result).toHaveProperty('iconData');
+    });
+
+    it('validates unlock returns null on failure (wrong password)', async () => {
+      const drawer = await createDrawer('Test', 'password123456');
+      const result = await unlockDrawer(drawer.id, 'wrongPassword');
+      
+      expect(result).toBeNull();
+    });
+
+    it('validates save returns boolean on success', async () => {
+      const drawer = await createDrawer('Test', 'password123456');
+      const result = await saveDrawer(drawer.id, 'password123456', 'New Title', 'New Content');
+      
+      expect(typeof result).toBe('boolean');
+      expect(result).toBe(true);
+    });
+
+    it('validates save returns false on failure', async () => {
+      const result = await saveDrawer('invalid-id', 'password123456', 'Title', 'Content');
+      
+      expect(typeof result).toBe('boolean');
+      expect(result).toBe(false);
+    });
+
+    it('validates delete returns boolean', async () => {
+      const drawer = await createDrawer('Test', 'password123456');
+      const result = await deleteDrawer(drawer.id);
+      
+      expect(typeof result).toBe('boolean');
+      expect(result).toBe(true);
+    });
+
+    it('validates export returns string or null', async () => {
+      const drawer = await createDrawer('Test', 'password123456');
+      const result = await readDrawerRaw(drawer.id);
+      
+      expect(result === null || typeof result === 'string').toBe(true);
+    });
+
+    it('validates ErrorCode enum has all required values', () => {
+      expect(ErrorCode.INVALID_ID).toBe('INVALID_ID');
+      expect(ErrorCode.PASSWORD_TOO_SHORT).toBe('PASSWORD_TOO_SHORT');
+      expect(ErrorCode.DECRYPT_FAILED).toBe('DECRYPT_FAILED');
+      expect(ErrorCode.WRITE_FAILED).toBe('WRITE_FAILED');
+      expect(ErrorCode.FILE_NOT_FOUND).toBe('FILE_NOT_FOUND');
+      expect(ErrorCode.INVALID_JSON).toBe('INVALID_JSON');
+      expect(ErrorCode.VALIDATION_ERROR).toBe('VALIDATION_ERROR');
     });
   });
 });

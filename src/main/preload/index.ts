@@ -1,6 +1,7 @@
-const { contextBridge, ipcRenderer } = require('electron');
+import { contextBridge, ipcRenderer } from 'electron';
+import type { ElectronAPI } from '../../shared/types';
 
-contextBridge.exposeInMainWorld('electronAPI', {
+const api: ElectronAPI = {
   listDrawers: () => ipcRenderer.invoke('list-drawers'),
   createDrawer: (title, password) => ipcRenderer.invoke('create-drawer', title, password),
   unlockDrawer: (id, password) => ipcRenderer.invoke('unlock-drawer', id, password),
@@ -9,4 +10,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportDrawer: (id) => ipcRenderer.invoke('export-drawer', id),
   importDrawer: (token) => ipcRenderer.invoke('import-drawer', token),
   openFile: () => ipcRenderer.invoke('open-file-dialog'),
-});
+};
+
+contextBridge.exposeInMainWorld('electronAPI', api);

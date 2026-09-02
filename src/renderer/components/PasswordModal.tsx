@@ -3,12 +3,13 @@ import React, { useState, useEffect, useRef } from 'react';
 interface PasswordModalProps {
   drawerTitle: string;
   onClose: () => void;
-  onSubmit: (password: string) => void;
+  onSubmit: (password: string) => Promise<void>;
   error: string | null;
 }
 
 function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalProps): React.JSX.Element {
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -18,12 +19,17 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [onClose]);
 
-  function handleSubmit(e: React.FormEvent): void {
+  async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     if (password.trim() === '') return;
-    onSubmit(password);
+    setIsLoading(true);
+    try {
+      await onSubmit(password);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -38,7 +44,8 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full border rounded px-2 py-1 text-sm"
+              disabled={isLoading}
+              className="w-full border rounded px-2 py-1 text-sm disabled:opacity-50"
               placeholder="Enter password"
             />
             {error && (
@@ -49,15 +56,17 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded"
+              disabled={isLoading}
+              className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+              disabled={isLoading}
+              className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
             >
-              Open
+              {isLoading ? 'Unlocking...' : 'Open'}
             </button>
           </div>
         </form>

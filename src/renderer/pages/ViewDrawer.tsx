@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
+import { Result } from '../../shared/types';
 
 interface ViewDrawerProps {
   drawerId: string;
   password: string;
   initialTitle: string;
   initialContent: string;
-  onSave: (id: string, password: string, title: string, content: string) => Promise<boolean>;
-  onDelete: (id: string) => Promise<void>;
+  onSave: (id: string, password: string, title: string, content: string) => Promise<Result<void>>;
+  onDelete: (id: string) => Promise<Result<void>>;
   onBack: () => void;
 }
 
@@ -14,6 +15,7 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function handleSave(): Promise<void> {
     if (title.trim() === '') {
@@ -22,12 +24,12 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
     }
     setSaving(true);
     try {
-      const ok = await onSave(drawerId, password, title, content);
-      if (ok) {
-        onBack();
-      } else {
-        alert('Error saving drawer.');
+      const result = await onSave(drawerId, password, title, content);
+      if (!result.ok) {
+        alert(`Error saving drawer: ${result.error.message}`);
+        return;
       }
+      onBack();
     } catch {
       alert('Error saving drawer.');
     } finally {
@@ -35,9 +37,19 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
     }
   }
 
-  function handleDelete(): void {
+  async function handleDelete(): Promise<void> {
     if (!confirm('Delete this drawer? This action cannot be undone.')) return;
-    onDelete(drawerId);
+    setDeleting(true);
+    try {
+      const result = await onDelete(drawerId);
+      if (!result.ok) {
+        alert(`Error deleting: ${result.error.message}`);
+        return;
+      }
+      onBack();
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -51,27 +63,30 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
+          disabled={saving}
           placeholder="Drawer title"
-          className="w-full border rounded px-3 py-2 text-sm mb-4 bg-white"
+          className="w-full border rounded px-3 py-2 text-sm mb-4 bg-white disabled:opacity-50"
         />
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
+          disabled={saving}
           placeholder="Drawer content"
-          className="flex-1 w-full border rounded px-3 py-2 text-sm bg-white resize-none min-h-[300px]"
+          className="flex-1 w-full border rounded px-3 py-2 text-sm bg-white resize-none min-h-[300px] disabled:opacity-50"
         />
       </main>
 
       <footer className="bg-white border-t px-6 py-4 flex justify-between items-center">
         <button
           onClick={handleDelete}
-          className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
+          disabled={saving || deleting}
+          className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded disabled:opacity-50"
         >
-          delete drawer
+          {deleting ? 'Deleting...' : 'delete drawer'}
         </button>
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || deleting}
           className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
         >
           {saving ? 'Saving...' : 'Save drawer and back to menu'}

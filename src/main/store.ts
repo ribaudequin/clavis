@@ -4,6 +4,7 @@ import * as os from 'os';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
 import { encrypt, decrypt } from './encryption';
+import { logger } from './logger';
 import { EncryptedDrawer, DrawerListItem } from '../shared/types';
 
 const DRAWER_EXT = '.clavis';
@@ -46,7 +47,10 @@ export function generateIconData(seed: string): string {
 export async function ensureDataDir(): Promise<void> {
   try {
     await fs.mkdir(getDrawersPath(), { recursive: true, mode: 0o700 });
-  } catch (e) { console.error('ensureDataDir mkdir failed', e); }
+    logger.debug('Data directory ensured', { path: getDrawersPath() });
+  } catch (e) {
+    logger.error('ensureDataDir mkdir failed', { error: e instanceof Error ? e.message : String(e) });
+  }
 }
 
 export async function listDrawers(): Promise<DrawerListItem[]> {
@@ -67,10 +71,16 @@ export async function listDrawers(): Promise<DrawerListItem[]> {
           title: drawer.title,
           iconData: drawer.iconData,
         });
-      } catch (e) { console.error('listDrawers read failed', e); }
+      } catch (e) {
+        logger.error('listDrawers read failed', { file, error: e instanceof Error ? e.message : String(e) });
+      }
     }
+    logger.debug('Drawers listed', { count: drawers.length });
     return drawers;
-  } catch (e) { console.error('listDrawers readdir failed', e); return []; }
+  } catch (e) {
+    logger.error('listDrawers readdir failed', { error: e instanceof Error ? e.message : String(e) });
+    return [];
+  }
 }
 
 export async function createDrawer(
@@ -109,6 +119,7 @@ export async function createDrawer(
   };
 
   await fs.writeFile(getDrawerFilePath(id), JSON.stringify(drawer, null, 2), { encoding: 'utf8', mode: 0o600 });
+  logger.info('Drawer created', { id, title });
   return drawer;
 }
 
@@ -137,13 +148,14 @@ export async function unlockDrawer(
       kdfParams
     );
 
+    logger.info('Drawer unlocked', { id });
     return {
       title: drawer.title,
       content: decryptedContent,
       iconData: drawer.iconData,
     };
   } catch (e) {
-    console.error('Unlock failed:', e);
+    logger.warn('Unlock failed', { id, error: e instanceof Error ? e.message : String(e) });
     return null;
   }
 }
@@ -156,7 +168,7 @@ export async function saveDrawer(
 ): Promise<boolean> {
   if (!isValidId(id)) return false;
   if (password.length < 8) {
-    console.error('Save failed: Password must be at least 8 characters');
+    logger.warn('Save failed: password too short', { id });
     return false;
   }
   try {
@@ -177,9 +189,10 @@ export async function saveDrawer(
     };
 
     await fs.writeFile(filePath, JSON.stringify(updatedDrawer, null, 2), { encoding: 'utf8', mode: 0o600 });
+    logger.info('Drawer saved', { id, title });
     return true;
   } catch (e) {
-    console.error('Save failed:', e);
+    logger.error('Save failed', { id, error: e instanceof Error ? e.message : String(e) });
     return false;
   }
 }
@@ -188,9 +201,10 @@ export async function deleteDrawer(id: string): Promise<boolean> {
   if (!isValidId(id)) return false;
   try {
     await fs.unlink(getDrawerFilePath(id));
+    logger.info('Drawer deleted', { id });
     return true;
   } catch (e) {
-    console.error('Delete failed:', e);
+    logger.error('Delete failed', { id, error: e instanceof Error ? e.message : String(e) });
     return false;
   }
 }
@@ -200,15 +214,25 @@ export async function readDrawerRaw(id: string): Promise<string | null> {
   try {
     const filePath = getDrawerFilePath(id);
     return await fs.readFile(filePath, 'utf8');
-  } catch (e) { console.error('readDrawerRaw failed', e); return null; }
+  } catch (e) {
+    logger.error('readDrawerRaw failed', { id, error: e instanceof Error ? e.message : String(e) });
+    return null;
+  }
 }
 
 export async function importDrawerRaw(fileContent: string): Promise<boolean> {
   try {
     const drawer: EncryptedDrawer = JSON.parse(fileContent);
-    if (!drawer.id || !isValidId(drawer.id)) return false;
+    if (!drawer.id || !isValidId(drawer.id)) {
+      logger.warn('importDrawerRaw: invalid drawer ID', {});
+      return false;
+    }
     await ensureDataDir();
     await fs.writeFile(getDrawerFilePath(drawer.id), fileContent, { encoding: 'utf8', mode: 0o600 });
+    logger.info('Drawer imported', { id: drawer.id });
     return true;
-  } catch (e) { console.error('importDrawerRaw failed', e); return false; }
+  } catch (e) {
+    logger.error('importDrawerRaw failed', { error: e instanceof Error ? e.message : String(e) });
+    return false;
+  }
 }

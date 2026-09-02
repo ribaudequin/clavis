@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DrawerListItem, EncryptedDrawer } from '../../shared/types';
+import { DrawerListItem, EncryptedDrawer, ElectronAPI } from '../../shared/types';
 import PasswordModal from '../components/PasswordModal';
 import ViewDrawer from './ViewDrawer';
 import HeartIcon from '../../../icons/svg/heart.svg?react';
@@ -7,17 +7,6 @@ import GithubIcon from '../../../icons/svg/github.svg?react';
 import EthIcon from '../../../icons/svg/eth.svg?react';
 import SolIcon from '../../../icons/svg/sol.svg?react';
 import KoFiIcon from '../../../icons/svg/ko-fi.svg?react';
-
-interface ElectronAPI {
-  listDrawers: () => Promise<DrawerListItem[]>;
-  createDrawer: (title: string, password: string) => Promise<EncryptedDrawer>;
-  unlockDrawer: (id: string, password: string) => Promise<{ title: string; content: string; iconData: string } | null>;
-  saveDrawer: (id: string, password: string, title: string, content: string) => Promise<boolean>;
-  deleteDrawer: (id: string) => Promise<boolean>;
-  exportDrawer: (id: string) => Promise<string | null>;
-  importDrawer: (token: string) => Promise<boolean>;
-  openFile: () => Promise<{ token: string; fileName: string } | null>;
-}
 
 declare global {
   interface Window {
@@ -40,12 +29,24 @@ function HomeScreen(): React.JSX.Element {
   const [unlockDrawerTitle, setUnlockDrawerTitle] = useState('');
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const [viewState, setViewState] = useState<ViewState | null>(null);
+  const [loadingDrawers, setLoadingDrawers] = useState(true);
+  const [exportingId, setExportingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const api = (): ElectronAPI => window.electronAPI;
 
   async function loadDrawers(): Promise<void> {
-    const data = await api().listDrawers();
-    setDrawers(data);
+    setLoadingDrawers(true);
+    try {
+      const result = await api().listDrawers();
+      if (!result.ok) {
+        console.error('Failed to list drawers:', result.error);
+        return;
+      }
+      setDrawers(result.data);
+    } finally {
+      setLoadingDrawers(false);
+    }
   }
 
   useEffect(() => {
@@ -64,37 +65,55 @@ function HomeScreen(): React.JSX.Element {
   }
 
   async function handleExport(id: string): Promise<void> {
-    const content = await api().exportDrawer(id);
-    if (!content) {
-      alert('Error exporting.');
-      return;
+    setExportingId(id);
+    try {
+      const result = await api().exportDrawer(id);
+      if (!result.ok) {
+        alert(`Error exporting: ${result.error.message}`);
+        return;
+      }
+      const blob = new Blob([result.data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${id}.clavis`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExportingId(null);
     }
-    const blob = new Blob([content], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${id}.clavis`;
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
   async function handleDelete(id: string): Promise<void> {
     if (!confirm('Delete this drawer? This action cannot be undone.')) return;
-    await api().deleteDrawer(id);
-    loadDrawers();
+    setDeletingId(id);
+    try {
+      const result = await api().deleteDrawer(id);
+      if (!result.ok) {
+        alert(`Error deleting: ${result.error.message}`);
+        return;
+      }
+      await loadDrawers();
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   async function handleImport(): Promise<void> {
     const result = await api().openFile();
-    if (!result) return;
+    if (!result.ok) {
+      alert(`Error: ${result.error.message}`);
+      return;
+    }
+    if (!result.data) return;
     try {
-      const ok = await api().importDrawer(result.token);
-      if (ok) {
-        alert('Imported successfully');
-        await loadDrawers();
-      } else {
-        alert('Error importing');
+      const importResult = await api().importDrawer(result.data.token);
+      if (!importResult.ok) {
+        alert(`Error importing: ${importResult.error.message}`);
+        return;
       }
+      alert('Imported successfully');
+      await loadDrawers();
     } catch {
       alert('Error importing');
     }
@@ -110,16 +129,20 @@ function HomeScreen(): React.JSX.Element {
     if (!unlockDrawerId) return;
     try {
       const result = await api().unlockDrawer(unlockDrawerId, password);
-      if (!result) {
-        setUnlockError('Incorrect password.');
+      if (!result.ok) {
+        setUnlockError(result.error.message);
+        return;
+      }
+      if (result.data === null) {
+        setUnlockError('Drawer not found.');
         return;
       }
       setUnlockDrawerId(null);
       setViewState({
         drawerId: unlockDrawerId,
         password,
-        title: result.title,
-        content: result.content,
+        title: result.data.title,
+        content: result.data.content,
       });
     } catch {
       setUnlockError('Incorrect password.');
@@ -132,13 +155,22 @@ function HomeScreen(): React.JSX.Element {
   }
 
   async function handleSaveDrawer(id: string, password: string, title: string, content: string): Promise<boolean> {
-    return api().saveDrawer(id, password, title, content);
+    const result = await api().saveDrawer(id, password, title, content);
+    if (!result.ok) {
+      alert(`Error saving: ${result.error.message}`);
+      return false;
+    }
+    return true;
   }
 
   async function handleDeleteDrawer(id: string): Promise<void> {
-    await api().deleteDrawer(id);
+    const result = await api().deleteDrawer(id);
+    if (!result.ok) {
+      alert(`Error deleting: ${result.error.message}`);
+      return;
+    }
     setViewState(null);
-    loadDrawers();
+    await loadDrawers();
   }
 
   if (viewState) {
@@ -178,29 +210,33 @@ function HomeScreen(): React.JSX.Element {
        </header>
 
       <main className="px-6 py-6 max-w-4xl mx-auto">
-        {drawers.length === 0 ? (
+        {loadingDrawers ? (
+          <p className="text-gray-500 text-center py-12">Loading...</p>
+        ) : drawers.length === 0 ? (
           <p className="text-gray-500 text-center py-12">No drawers created.</p>
         ) : (
           <div className="space-y-2">
             {drawers.map((drawer) => (
               <div
                 key={drawer.id}
-                onClick={() => handleDrawerClick(drawer.id, drawer.title)}
+                onClick={() => !exportingId && !deletingId && handleDrawerClick(drawer.id, drawer.title)}
                 className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm hover:bg-gray-50 cursor-pointer"
               >
                 <div>{renderIcon(drawer.iconData)}</div>
                 <span className="flex-1 text-gray-800">{drawer.title}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleExport(drawer.id); }}
-                  className="text-xs text-gray-500 hover:text-gray-700"
+                  disabled={exportingId === drawer.id}
+                  className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50"
                 >
-                  Export
+                  {exportingId === drawer.id ? 'Exporting...' : 'Export'}
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(drawer.id); }}
-                  className="text-xs text-red-500 hover:text-red-700"
+                  disabled={deletingId === drawer.id}
+                  className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
                 >
-                  Delete
+                  {deletingId === drawer.id ? 'Deleting...' : 'Delete'}
                 </button>
               </div>
             ))}
@@ -320,6 +356,10 @@ function CreateDrawerModal({ onClose, onCreated }: {
   onCreated: () => void;
 }): React.JSX.Element {
   const [title, setTitle] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
       if (e.key === 'Escape') onClose();
@@ -327,28 +367,25 @@ function CreateDrawerModal({ onClose, onCreated }: {
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
 
   async function handleSubmit(): Promise<void> {
     if (title.trim() === '') { alert('Title cannot be empty.'); return; }
     if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
     if (password.length < 8) { alert('The password must be at least 8 characters long.'); return; }
+    setIsLoading(true);
     try {
-      await window.electronAPI.createDrawer(title, password);
+      const result = await window.electronAPI.createDrawer(title, password);
+      if (!result.ok) {
+        alert(`Error: ${result.error.message}`);
+        return;
+      }
       onCreated();
     } catch {
       alert('Error creating drawer.');
+    } finally {
+      setIsLoading(false);
     }
   }
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" role="dialog" aria-modal="true">
@@ -361,7 +398,8 @@ function CreateDrawerModal({ onClose, onCreated }: {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full border rounded px-2 py-1 text-sm"
+              disabled={isLoading}
+              className="w-full border rounded px-2 py-1 text-sm disabled:opacity-50"
               placeholder="Drawer title"
             />
           </div>
@@ -371,7 +409,8 @@ function CreateDrawerModal({ onClose, onCreated }: {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full border rounded px-2 py-1 text-sm"
+              disabled={isLoading}
+              className="w-full border rounded px-2 py-1 text-sm disabled:opacity-50"
               placeholder="Password to encrypt"
             />
           </div>
@@ -381,7 +420,8 @@ function CreateDrawerModal({ onClose, onCreated }: {
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full border rounded px-2 py-1 text-sm"
+              disabled={isLoading}
+              className="w-full border rounded px-2 py-1 text-sm disabled:opacity-50"
               placeholder="Confirm password to encrypt"
             />
           </div>
@@ -389,15 +429,17 @@ function CreateDrawerModal({ onClose, onCreated }: {
         <div className="flex justify-end gap-2 mt-5">
           <button
             onClick={onClose}
-            className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded"
+            disabled={isLoading}
+            className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
-            className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+            disabled={isLoading}
+            className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
           >
-            OK
+            {isLoading ? 'Creating...' : 'OK'}
           </button>
         </div>
       </div>
