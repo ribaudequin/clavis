@@ -1,6 +1,6 @@
 {
   "name": "clavis",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Cross-platform encrypted notes application for storing banking info, PINs, passwords, and safe codes.",
   "main": "dist/main/index.js",
   "author": "Marcelo Salvador",
@@ -60,7 +60,7 @@
     "copy:preload": "cp src/main/preload/index.js dist/main/preload.js",
     "build:renderer": "vite build",
     "build": "npm run clean && npm run build:main && npm run copy:preload && npm run build:renderer",
-    "make": "electron-builder --win --linux",
+    "make": "electron-forge make",
     "copy-latest": "mkdir -p release/latest && cp release/*.AppImage release/*.exe release/*.deb release/*.blockmap release/latest/ 2>/dev/null || true",
     "release": "npm run clean && npm run build && npm run make && npm run copy-latest",
     "start": "electron .",
@@ -70,6 +70,9 @@
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
+    "@electron-forge/maker-deb": "^7.11.2",
+    "@electron-forge/maker-squirrel": "^7.11.2",
+    "@electron-forge/maker-zip": "^7.11.2",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
@@ -96,6 +99,7 @@
   },
   "dependencies": {
     "argon2": "^0.45.1",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "zod": "^4.5.4"
   }
 }

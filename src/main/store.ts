@@ -79,6 +79,10 @@ export async function createDrawer(
 ): Promise<EncryptedDrawer> {
   await ensureDataDir();
 
+  if (password.length < 8) {
+    throw new Error('Password must be at least 8 characters');
+  }
+
   const id = uuidv4();
   const now = Date.now();
   const iconData = generateIconData(id);
@@ -151,6 +155,10 @@ export async function saveDrawer(
   content: string
 ): Promise<boolean> {
   if (!isValidId(id)) return false;
+  if (password.length < 8) {
+    console.error('Save failed: Password must be at least 8 characters');
+    return false;
+  }
   try {
     const filePath = getDrawerFilePath(id);
     const fileContent = await fs.readFile(filePath, 'utf8');

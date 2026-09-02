@@ -106,4 +106,16 @@ describe('store module', () => {
     expect(isValidId('a'.repeat(36))).toBe(false);
     expect(isValidId('123e4567-e89b-12d3-a456-426614174000')).toBe(true);
   });
+
+  it('createDrawer rejects password shorter than 8 characters', async () => {
+    await expect(createDrawer('Test', 'short')).rejects.toThrow('Password must be at least 8 characters');
+    await expect(createDrawer('Test', '')).rejects.toThrow('Password must be at least 8 characters');
+    await expect(createDrawer('Test', '1234567')).rejects.toThrow('Password must be at least 8 characters');
+  });
+
+  it('saveDrawer rejects password shorter than 8 characters', async () => {
+    const drawer = await createDrawer('Test', 'valid-password-123');
+    const result = await saveDrawer(drawer.id, 'short', 'Title', 'content');
+    expect(result).toBe(false);
+  });
 });

@@ -15,8 +15,8 @@ interface ElectronAPI {
   saveDrawer: (id: string, password: string, title: string, content: string) => Promise<boolean>;
   deleteDrawer: (id: string) => Promise<boolean>;
   exportDrawer: (id: string) => Promise<string | null>;
-  importDrawer: (filePath: string) => Promise<boolean>;
-  openFile: () => Promise<string | null>;
+  importDrawer: (token: string) => Promise<boolean>;
+  openFile: () => Promise<{ token: string; fileName: string } | null>;
 }
 
 declare global {
@@ -85,10 +85,10 @@ function HomeScreen(): React.JSX.Element {
   }
 
   async function handleImport(): Promise<void> {
-    const filePath = await api().openFile();
-    if (!filePath) return;
+    const result = await api().openFile();
+    if (!result) return;
     try {
-      const ok = await api().importDrawer(filePath);
+      const ok = await api().importDrawer(result.token);
       if (ok) {
         alert('Imported successfully');
         await loadDrawers();
