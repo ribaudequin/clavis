@@ -12,48 +12,7 @@
     "electron",
     "security"
   ],
-  "type": "commonjs",
-  "build": {
-    "appId": "com.github.marcelosalvador.Clavis",
-    "productName": "Clavis",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "package.json"
-    ],
-    "publish": [
-      {
-        "provider": "generic",
-        "url": "https://example.com/clavis/updates"
-      }
-    ],
-    "win": {
-      "target": [
-        "nsis",
-        "portable"
-      ],
-      "icon": "icons/windows/clavis.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "artifactName": "Clavis Setup ${version}.${ext}"
-    },
-    "portable": {
-      "artifactName": "Clavis Portable ${version}.${ext}"
-    },
-    "linux": {
-      "target": [
-        "AppImage"
-      ],
-      "icon": "icons/linux",
-      "category": "Utility",
-      "artifactName": "Clavis-${version}.${ext}"
-    }
-  },
+  "type": "module",
   "scripts": {
     "clean": "rm -rf out/ release/",
     "build:main": "tsc",
@@ -61,7 +20,7 @@
     "build:renderer": "vite build",
     "build": "npm run clean && npm run build:main && npm run copy:preload && npm run build:renderer",
     "make": "electron-forge make",
-    "copy-latest": "mkdir -p release/latest && cp release/*.AppImage release/*.exe release/*.deb release/*.blockmap release/latest/ 2>/dev/null || true",
+    "copy-latest": "mkdir -p release/latest && cp out/make/**/*.AppImage out/make/**/*.exe out/make/**/*.deb release/latest/ 2>/dev/null || true",
     "release": "npm run clean && npm run build && npm run make && npm run copy-latest",
     "start": "electron .",
     "test": "vitest run",
@@ -84,6 +43,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "autoprefixer": "^10.5.4",
     "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "jsdom": "^30.0.1",
