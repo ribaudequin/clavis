@@ -32,6 +32,7 @@ function HomeScreen(): React.JSX.Element {
   const [loadingDrawers, setLoadingDrawers] = useState(true);
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const api = (): ElectronAPI => window.electronAPI;
 
@@ -108,22 +109,27 @@ function HomeScreen(): React.JSX.Element {
   }
 
   async function handleImport(): Promise<void> {
-    const result = await api().openFile();
-    if (!result.ok) {
-      alert(`Error: ${result.error.message}`);
-      return;
-    }
-    if (!result.data) return;
+    setImporting(true);
     try {
-      const importResult = await api().importDrawer(result.data.token);
-      if (!importResult.ok) {
-        alert(`Error importing: ${importResult.error.message}`);
+      const result = await api().openFile();
+      if (!result.ok) {
+        alert(`Error: ${result.error.message}`);
         return;
       }
-      alert('Imported successfully');
-      await loadDrawers();
-    } catch {
-      alert('Error importing');
+      if (!result.data) return;
+      try {
+        const importResult = await api().importDrawer(result.data.token);
+        if (!importResult.ok) {
+          alert(`Error importing: ${importResult.error.message}`);
+          return;
+        }
+        alert('Imported successfully');
+        await loadDrawers();
+      } catch {
+        alert('Error importing');
+      }
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -193,22 +199,29 @@ function HomeScreen(): React.JSX.Element {
     <div className="min-h-screen bg-gray-50">
        <header className="bg-white border-b px-6 py-4 flex justify-between items-center cursor-default">
          <h1 className="text-xl font-semibold text-gray-800">Clavis</h1>
-         <div className="flex gap-2 items-center">
-           <button
-             onClick={() => setShowCreateModal(true)}
-             className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
-           >
-             New Drawer
-           </button>
-             <button
-               onClick={() => setShowCreditsModal(true)}
-               className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
-               aria-label="Credits"
-               title="Credits"
-             >
-               <HeartIcon className="w-5 h-5 text-gray-600" />
-             </button>
-         </div>
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+            >
+              New Drawer
+            </button>
+            <button
+              onClick={handleImport}
+              disabled={importing}
+              className="px-3 py-1 text-sm text-gray-700 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+            >
+              {importing ? 'Importing...' : 'Import'}
+            </button>
+              <button
+                onClick={() => setShowCreditsModal(true)}
+                className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
+                aria-label="Credits"
+                title="Credits"
+              >
+                <HeartIcon className="w-5 h-5 text-gray-600" />
+              </button>
+          </div>
        </header>
 
       <main className="px-6 py-6 max-w-4xl mx-auto">
