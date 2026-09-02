@@ -1,9 +1,11 @@
-module.exports = {
+import { MakerDeb } from '@electron-forge/maker-deb';
+import { MakerSquirrel } from '@electron-forge/maker-squirrel';
+import { MakerZIP } from '@electron-forge/maker-zip';
+
+export default {
   packagerConfig: {
     asar: true,
-    icon: 'icons/icone_base.png',
-    osxSign: {},
-    osxNotarize: {},
+    icon: 'icons/linux/512x512.png',
   },
   rebuildConfig: {},
   makers: [
@@ -12,8 +14,17 @@ module.exports = {
       platforms: ['win32'],
       config: {
         name: 'clavis',
-        iconUrl: 'icons/windows/clavis.ico',
+        iconUrl: 'https://raw.githubusercontent.com/ribaudequin/clavis/main/icons/windows/clavis.ico',
         setupIcon: 'icons/windows/clavis.ico',
+        certificateFile: process.env.WINDOWS_CERT_FILE,
+        certificatePassword: process.env.WINDOWS_CERT_PASSWORD,
+      },
+    },
+    {
+      name: '@electron-forge/maker-zip',
+      platforms: ['win32'],
+      config: {
+        artifactName: 'Clavis-${version}-portable.zip',
       },
     },
     {
@@ -21,10 +32,13 @@ module.exports = {
       platforms: ['linux'],
       config: {
         options: {
-          icon: 'icons/linux/48x48.png',
+          icon: 'icons/linux/512x512.png',
+          maintainer: 'Marcelo Salvador',
+          homepage: 'https://github.com/ribaudequin/clavis',
         },
       },
     },
   ],
   plugins: [],
 };
+

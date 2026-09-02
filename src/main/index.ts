@@ -12,7 +12,7 @@ import {
   deleteDrawer,
   readDrawerRaw,
   importDrawerRaw,
-} from './store';
+} from './store.js';
 import {
   CreateDrawerSchema,
   UnlockDrawerSchema,
@@ -20,9 +20,9 @@ import {
   DeleteDrawerSchema,
   ExportDrawerSchema,
   ImportDrawerSchema,
-} from './validation';
-import { Result, ErrorCode, AppError, DrawerListItem, EncryptedDrawer } from '../shared/types';
-import { logger, initializeLogger } from './logger';
+} from './validation.js';
+import { Result, ErrorCode, AppError, DrawerListItem, EncryptedDrawer } from '../shared/types.js';
+import { logger, initializeLogger } from './logger.js';
 
 let mainWindow: BrowserWindow | null = null;
 const allowedImportPaths = new Map<string, string>();

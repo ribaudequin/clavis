@@ -12,20 +12,60 @@
     "electron",
     "security"
   ],
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
-    "clean": "rm -rf out/ release/",
+    "clean": "rm -rf out/ release/ release_artifacts dist",
     "build:main": "tsc",
     "copy:preload": "cp dist/main/preload/index.js dist/main/preload.js",
     "build:renderer": "vite build",
     "build": "npm run clean && npm run build:main && npm run copy:preload && npm run build:renderer",
     "make": "electron-forge make",
-    "copy-latest": "mkdir -p release/latest && cp out/make/**/*.AppImage out/make/**/*.exe out/make/**/*.deb release/latest/ 2>/dev/null || true",
-    "release": "npm run clean && npm run build && npm run make && npm run copy-latest",
+    "make:all": "npm run build && npm run make && npm run make:appimage && npm run make:windows",
+    "make:appimage": "electron-builder --linux AppImage -p never",
+    "make:windows": "electron-builder --win portable nsis -p never",
+    "release": "npm run clean && npm run build && npm run make && npm run make:appimage && npm run make:windows",
     "start": "electron .",
     "test": "vitest run",
     "lint": "eslint . --ext .ts,.tsx",
     "flatpak-make": "flatpak-builder --repo=repo build-dir flatpak/com.github.marcelosalvador.Clavis.yaml"
+  },
+  "build": {
+    "appId": "com.github.ribaudequin.clavis",
+    "productName": "Clavis",
+    "directories": {
+      "buildResources": "icons",
+      "output": "release_artifacts"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/node_modules/argon2/**/*"
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "icons/linux/512x512.png",
+      "category": "Utility"
+    },
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ],
+      "icon": "icons/windows/clavis.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "artifactName": "Clavis-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Clavis-Portable-${version}.${ext}"
+    }
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
@@ -44,7 +84,6 @@
     "autoprefixer": "^10.5.4",
     "electron": "^44.0.0",
     "electron-builder": "^26.15.3",
-    "electron-log": "^5.4.4",
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "jsdom": "^30.0.1",
@@ -60,6 +99,7 @@
   },
   "dependencies": {
     "argon2": "^0.45.1",
+    "electron-log": "^5.4.4",
     "uuid": "^11.1.0",
     "zod": "^4.5.4"
   }

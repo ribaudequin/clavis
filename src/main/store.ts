@@ -3,9 +3,9 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
-import { encrypt, decrypt } from './encryption';
-import { logger } from './logger';
-import { EncryptedDrawer, DrawerListItem } from '../shared/types';
+import { encrypt, decrypt } from './encryption.js';
+import { logger } from './logger.js';
+import { EncryptedDrawer, DrawerListItem } from '../shared/types.js';
 
 const DRAWER_EXT = '.clavis';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

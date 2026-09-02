@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import argon2 from 'argon2';
-import { logger } from './logger';
+import { logger } from './logger.js';
 
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH = 32;
