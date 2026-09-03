@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DrawerListItem, EncryptedDrawer, ElectronAPI } from '../../shared/types';
 import PasswordModal from '../components/PasswordModal';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import ViewDrawer from './ViewDrawer';
 import HeartIcon from '../../../icons/svg/heart.svg?react';
 import GithubIcon from '../../../icons/svg/github.svg?react';
@@ -33,6 +34,8 @@ function HomeScreen(): React.JSX.Element {
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmDeleteTitle, setConfirmDeleteTitle] = useState('');
 
   const api = (): ElectronAPI => window.electronAPI;
 
@@ -86,11 +89,16 @@ function HomeScreen(): React.JSX.Element {
   }
 
   async function handleDelete(id: string): Promise<void> {
-    if (!confirm('Delete this drawer? This action cannot be undone.')) {
-      window.focus();
+    setConfirmDeleteId(id);
+  }
+
+  async function confirmDelete(): Promise<void> {
+    if (!confirmDeleteId) {
+      setConfirmDeleteId(null);
       return;
     }
-    window.focus();
+    const id = confirmDeleteId;
+    setConfirmDeleteId(null);
     setDeletingId(id);
     try {
       const result = await api().deleteDrawer(id);
@@ -103,7 +111,7 @@ function HomeScreen(): React.JSX.Element {
     } finally {
       setDeletingId(null);
       window.focus();
-      // Ensure next modal can receive focus on Windows after native confirm steals it
+      // Ensure next modal can receive focus on Windows after dialog closes
       setTimeout(() => window.focus(), 0);
     }
   }
@@ -247,7 +255,7 @@ function HomeScreen(): React.JSX.Element {
                   {exportingId === drawer.id ? 'Exporting...' : 'Export'}
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(drawer.id); }}
+                  onClick={(e) => { e.stopPropagation(); handleDelete(drawer.id); setConfirmDeleteTitle(drawer.title); }}
                   disabled={deletingId === drawer.id}
                   className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
                 >
@@ -280,6 +288,17 @@ function HomeScreen(): React.JSX.Element {
           onClose={closeUnlockModal}
           onSubmit={handleUnlockSubmit}
           error={unlockError}
+        />
+      )}
+
+      {confirmDeleteId && (
+        <DeleteConfirmModal
+          drawerTitle={confirmDeleteTitle}
+          onConfirm={confirmDelete}
+          onCancel={() => {
+            setConfirmDeleteId(null);
+            window.focus();
+          }}
         />
       )}
 

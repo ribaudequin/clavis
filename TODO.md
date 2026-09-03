@@ -22,10 +22,10 @@
 
 ## 🔨 Phase 0 — CRITICAL SECURITY FIXES (Immediate)
 
-- [ ] P0.1: Fix `import-drawer` filePath validation (session-based token whitelist) — 1.5h
-- [ ] P0.2: Enforce password min-length in backend (store.ts + unit tests) — 0.5h
-- [ ] P0.3: Add Zod runtime validation to IPC handlers (schema validation for 4 handlers) — 2.5h
-- [ ] Run `npm run test` — all must pass
+- [x] P0.1: Fix `import-drawer` filePath validation (session-based token whitelist) — DONE (token-based `allowedImportPaths` Map + 5-min expiry)
+- [x] P0.2: Enforce password min-length in backend (store.ts + unit tests) — DONE (min 8 chars in createDrawer, saveDrawer, Zod schemas)
+- [x] P0.3: Add Zod runtime validation to IPC handlers (schema validation for 4 handlers) — DONE (6 schemas in validation.ts, all handlers use `.parse()`)
+- [x] Run `npm run test` — all must pass (51/51)
 
 ## Phase 1 — BUILD SYSTEM & RELIABILITY (High Priority)
 
@@ -60,6 +60,6 @@
 
 ## Progress
 - **Done**: All 23 audit-2026-08-30 findings fixed, full drawer flow (+ import UI), security hardening, store extraction, 51/51 tests, **v0.1.2-alpha** (2026-09-02, `8e2bb3c`, tag `v0.1.2-alpha`): import drawer button in header, 4 targets rebuilt (deb 213M, AppImage 121M, Portable 96M, NSIS 108M, ASAR 1043), `gh release create v0.1.2-alpha` 4 assets. **v0.1.1-alpha** baseline: fixed `argon2` Win32 `PE32+` via `afterPack` + `scrypt` fallback, save/delete `Result` mismatch, Windows `confirm()` focus steal (`autoFocus` + `window.focus()`).
-- **Tested**: Encryption round-trip, wrong-password rejection, drawer CRUD, path-traversal rejection, import drawer flow, HomeScreen rendering, all build targets, ASAR content (1043 files both platforms), AppImage runtime (`Clavis started` log), Windows `PE32+` verified, save/delete `Result` flow, Windows modal focus after delete
+- **Tested**: Encryption round-trip, wrong-password rejection, drawer CRUD, path-traversal rejection, import drawer flow, HomeScreen rendering, all build targets, ASAR content (1043 files both platforms), AppImage runtime (`Clavis started` log), Windows `PE32+` verified, save/delete `Result` flow, Windows modal focus after delete, CI-built `v0.1.3-alpha` (AppImage smoke-tested on Linux, ZIP on Windows 11)
 - **Audit 2026-09-01**: 14 recommendations validated by 4 specialized sub-agents; consolidated into 4-phase roadmap (Phase 0-3, ~35h total; MVP target 18.75h)
-- **Current focus**: Testar `v0.1.2-alpha` em Windows 11 + Linux → Phase 0 security fixes (P0.1-0.3) → Flatpak → auto-updater → i18n
+- **Current focus**: Phase 0 security fixes — **ALL DONE** (P0.1 token whitelist, P0.2 password min-length, P0.3 Zod validation). Smoke tests validados via AppImage (Linux) + Windows Portable ZIP. dmg sem verificação local (sem Mac). Decisão: Windows fica com Setup.exe + ZIP portable (sem portable de ficheiro único — não complicar o build).

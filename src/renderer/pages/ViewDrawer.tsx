@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Result } from '../../shared/types';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
 interface ViewDrawerProps {
   drawerId: string;
@@ -16,7 +17,29 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
   const [content, setContent] = useState(initialContent);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  async function doDelete(): Promise<void> {
+    setShowDeleteConfirm(false);
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const result = await onDelete(drawerId);
+      if (!result.ok) {
+        setDeleteError(result.error.message);
+        window.focus();
+        return;
+      }
+      onBack();
+    } catch {
+      setDeleteError('Error deleting drawer.');
+      window.focus();
+    } finally {
+      setDeleting(false);
+      setTimeout(() => window.focus(), 0);
+    }
+  }
   async function handleSave(): Promise<void> {
     if (title.trim() === '') {
       alert('Title cannot be empty.');
@@ -37,27 +60,8 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
     }
   }
 
-  async function handleDelete(): Promise<void> {
-    if (!confirm('Delete this drawer? This action cannot be undone.')) {
-      window.focus();
-      return;
-    }
-    window.focus();
-    setDeleting(true);
-    try {
-      const result = await onDelete(drawerId);
-      if (!result.ok) {
-        alert(`Error deleting: ${result.error.message}`);
-        window.focus();
-        return;
-      }
-      onBack();
-    } catch {
-      window.focus();
-    } finally {
-      setDeleting(false);
-      setTimeout(() => window.focus(), 0);
-    }
+  function handleDelete(): void {
+    setShowDeleteConfirm(true);
   }
 
   return (
@@ -100,6 +104,30 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
           {saving ? 'Saving...' : 'Save drawer and back to menu'}
         </button>
       </footer>
+
+      {showDeleteConfirm && (
+        <DeleteConfirmModal
+          drawerTitle={title}
+          onConfirm={doDelete}
+          onCancel={() => {
+            setShowDeleteConfirm(false);
+            window.focus();
+          }}
+        />
+      )}
+      {deleteError && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-lg p-6 w-80 text-center">
+            <p className="text-sm text-red-700 mb-4">{deleteError}</p>
+            <button
+              onClick={() => { setDeleteError(null); window.focus(); }}
+              className="px-4 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
