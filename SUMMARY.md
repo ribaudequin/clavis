@@ -4,15 +4,15 @@
 
 **Project:** Clavis — Cross-platform encrypted notes app (Electron + TypeScript + React + AES-256-GCM + Argon2id)
 
-**Current version:** 0.1.3-alpha (2026-09-03, first CI-built release — published with 6 assets, AppImage + Win ZIP smoke-tested)
+**Current version:** 0.1.4-alpha (2026-09-03, CI-built with 6 assets, AppImage smoke-tested)
 
-**State:** All 23 audit findings fixed. **Phase 0 security fixes COMPLETE:** P0.1 token-based import whitelist, P0.2 password min-length, P0.3 Zod runtime validation. **Import drawer feature complete:** header button → `openFile()` → token-based `importDrawer()` → refresh list. Full drawer flow: create → list → **import** → unlock → view/edit → save/delete. Store `src/main/store.ts`. **51/51 tests pass**. tsc + eslint clean. Menu removed, Credits modal with SVG icons.
+**State:** All 23 audit findings fixed. Phase 0 security complete (token import whitelist, password min-length, Zod validation). Import feature complete; full drawer flow create → list → import → unlock → view/edit → save/delete. **UI:** native `confirm()` replaced with `DeleteConfirmModal` (red bg, biohazard `danger.svg`, irreversible warning). Store `src/main/store.ts`. **51/51 tests pass**, tsc + eslint clean.
 
-**Release 0.1.2-alpha (2026-09-02):** All 4 targets built via Wine 10 on Linux — .deb 213M, AppImage 121M, Portable 96M, NSIS 108M (ASAR 1043 files). `gh release create v0.1.2-alpha` 4 assets. `argon2` Win32 PE32+ via `afterPack.js`, `scrypt` fallback.
+**Release 0.1.4-alpha (2026-09-03):** DeleteConfirmModal + danger.svg; 6 assets (deb, AppImage, Setup.exe, zip, nupkg, dmg). Run `33790511624` green. AppImage smoke-tested.
 
-**CI/CD migration DONE (2026-09-03):** Build consolidated to **single Electron Forge** (electron-builder removed, resolves P1.1). Added `.github/workflows/release.yml` — builds 6 targets on native runners (deb/.AppImage/.rpm Linux, Portable+Squirrel Win, DMG mac) and publishes Release on tag push. First green run `33781273256` (2026-09-03, Node 22 + Squirrel 7z vendor fix) → Release `v0.1.3-alpha` with 6 assets (deb, AppImage, Setup.exe, zip, nupkg, dmg). Local Linux build validated (deb + AppImage), 51/51 tests, lint + tsc clean. `icons/mac/icon.icns` created. Old scripts in `scripts/backup/`. Docs updated.
+**CI/CD (2026-09-03):** Single Electron Forge + `release.yml` — 6 targets on native runners, publish on tag push. v0.1.3-alpha first green CI run (`33781273256`). Local Linux validated. `scripts/backup/` for old scripts.
 
-**Focus next:** Phase 1 — P1.2 (ESM/CommonJS mismatch), P1.3 (IPC handler tests). Smoke tests validated: AppImage (Linux) + Windows Portable ZIP. dmg CI-built but unverifiable (no Mac).
+**Focus next:** Phase 1 — P1.2 (ESM/CommonJS), P1.3 (IPC handler tests). Smoke tests: AppImage (Linux) + Win ZIP done; dmg CI-built but unverifiable (no Mac).
 
 **Read more if:** Technical decision → PLANO.md | Task list → TODO.md | Full history → /MEMORY/HISTORY.md
 
