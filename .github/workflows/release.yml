@@ -39,10 +39,14 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev fakeroot squashfs-tools
+          sudo apt-get install -y dpkg-dev fakeroot build-essential g++ make python3 python3-dev squashfs-tools
 
       - name: Build application
         run: npm run build
+
+      - name: Configurar msvs_version (corrigir node-gyp no Windows)
+        if: runner.os == 'Windows'
+        run: npm config set msvs_version 2017
 
       - name: Package binaries
         run: npm run make

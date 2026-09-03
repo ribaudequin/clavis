@@ -21,7 +21,10 @@ const config: ForgeConfig = {
     asar: { unpack: '**/node_modules/argon2/**/*' },
     icon: iconForPlatform,
   },
-  rebuildConfig: {},
+  rebuildConfig: {
+    disablePreGypCopy: true,
+    ignoreModules: ['argon2'],
+  },
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
