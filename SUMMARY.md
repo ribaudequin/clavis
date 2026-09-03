@@ -4,7 +4,7 @@
 
 **Project:** Clavis — Cross-platform encrypted notes app (Electron + TypeScript + React + AES-256-GCM + Argon2id)
 
-**Current version:** 0.1.2-alpha (2026-09-02, tag `v0.1.2-alpha`)
+**Current version:** 0.1.3-alpha (2026-09-03, first CI-built release — pending tag push)
 
 **State:** All 23 audit findings fixed. **Import drawer feature complete:** header button → `openFile()` → token-based `importDrawer()` → refresh list. Full drawer flow: create → list → **import** → unlock → view/edit → save/delete. Store `src/main/store.ts`. **51/51 tests pass**. tsc + eslint clean. Menu removed, Credits modal with SVG icons.
 

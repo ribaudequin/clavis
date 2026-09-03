@@ -429,7 +429,7 @@ function handleIPC(): void {
 
 app.whenReady().then(async () => {
   initializeLogger();
-  logger.info('Clavis started', { version: '0.1.1-alpha', platform: process.platform, arch: process.arch });
+  logger.info('Clavis started', { version: app.getVersion(), platform: process.platform, arch: process.arch });
   // Non-fatal check: argon2 native may be unavailable on cross-built Windows artifacts
   try {
     const { isArgon2Available, getArgon2LoadError } = await import('./encryption.js');
