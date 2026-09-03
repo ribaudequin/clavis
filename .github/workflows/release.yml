@@ -27,14 +27,19 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies
+      - name: Install dependencies (Windows — skip native rebuild, use prebuilds)
+        if: runner.os == 'Windows'
+        run: npm ci --ignore-scripts
+
+      - name: Install dependencies (Linux/macOS)
+        if: runner.os != 'Windows'
         run: npm ci
 
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm rpm2cpio
+          sudo apt-get install -y dpkg-dev fakeroot mksquashfs
 
       - name: Build application
         run: npm run build
@@ -47,7 +52,7 @@ jobs:
 
       - name: List build output
         shell: bash
-        run: find out -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.zip" \) 2>/dev/null || true
+        run: find out -type f \( -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.zip" \) 2>/dev/null || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -55,7 +60,6 @@ jobs:
           name: clavis-${{ matrix.os }}
           path: |
             out/make/**/*.deb
-            out/make/**/*.rpm
             out/make/**/*.AppImage
             out/make/**/*.dmg
             out/make/**/*.exe

@@ -1,6 +1,5 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerDeb } from '@electron-forge/maker-deb';
-import { MakerRpm } from '@electron-forge/maker-rpm';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerAppImage } from '@reforged/maker-appimage';
@@ -54,17 +53,6 @@ const config: ForgeConfig = {
       },
     },
     {
-      name: '@electron-forge/maker-rpm',
-      platforms: ['linux'],
-      config: {
-        options: {
-          icon: 'icons/linux/512x512.png',
-          maintainer: 'Marcelo Salvador',
-          homepage: 'https://github.com/ribaudequin/clavis',
-        },
-      },
-    },
-    {
       name: '@reforged/maker-appimage',
       platforms: ['linux'],
       config: {
@@ -88,3 +76,4 @@ const config: ForgeConfig = {
 };
 
 export default config;
+
