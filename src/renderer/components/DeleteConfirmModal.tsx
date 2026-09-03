@@ -26,7 +26,7 @@ function DeleteConfirmModal({ drawerTitle, onConfirm, onCancel }: DeleteConfirmM
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="delete-confirm-title">
       <div className="bg-red-50 border-2 border-red-600 rounded-lg p-6 w-96 shadow-xl">
-        <div className="w-16 h-16 mx-auto mb-4 text-red-600 flex items-center justify-center">
+        <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
           <DangerIcon className="w-16 h-16" />
         </div>
         <h2 id="delete-confirm-title" className="text-lg font-bold text-red-800 text-center mb-2">
