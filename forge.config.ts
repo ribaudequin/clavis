@@ -1,11 +1,26 @@
+import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerDeb } from '@electron-forge/maker-deb';
+import { MakerRpm } from '@electron-forge/maker-rpm';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
+import { MakerAppImage } from '@reforged/maker-appimage';
+import { MakerDMG } from '@electron-forge/maker-dmg';
 
-export default {
+const iconForPlatform: string = (() => {
+  switch (process.platform) {
+    case 'win32':
+      return 'icons/windows/clavis.ico';
+    case 'darwin':
+      return 'icons/mac/icon.icns';
+    default:
+      return 'icons/linux/512x512.png';
+  }
+})();
+
+const config: ForgeConfig = {
   packagerConfig: {
-    asar: true,
-    icon: 'icons/linux/512x512.png',
+    asar: { unpack: '**/node_modules/argon2/**/*' },
+    icon: iconForPlatform,
   },
   rebuildConfig: {},
   makers: [
@@ -38,7 +53,38 @@ export default {
         },
       },
     },
+    {
+      name: '@electron-forge/maker-rpm',
+      platforms: ['linux'],
+      config: {
+        options: {
+          icon: 'icons/linux/512x512.png',
+          maintainer: 'Marcelo Salvador',
+          homepage: 'https://github.com/ribaudequin/clavis',
+        },
+      },
+    },
+    {
+      name: '@reforged/maker-appimage',
+      platforms: ['linux'],
+      config: {
+        options: {
+          icon: 'icons/linux/512x512.png',
+          categories: ['Utility'],
+        },
+      },
+    },
+    {
+      name: '@electron-forge/maker-dmg',
+      platforms: ['darwin'],
+      config: {
+        name: 'clavis',
+        icon: 'icons/mac/icon.icns',
+        format: 'ULFO',
+      },
+    },
   ],
   plugins: [],
 };
 
+export default config;

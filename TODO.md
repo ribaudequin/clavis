@@ -29,7 +29,7 @@
 
 ## Phase 1 — BUILD SYSTEM & RELIABILITY (High Priority)
 
-- [ ] P1.1: Resolve dual build system (remove electron-builder, keep Forge) — 1.5h
+- [x] P1.1: Resolve dual build system (remove electron-builder, keep Forge) — DONE 2026-09-03 (consolidated to single Forge; electron-builder removed)
 - [ ] P1.2: Fix ESM/CommonJS mismatch (`"type": "module"`) — 0.5h
 - [ ] P1.3: Add IPC handler tests (8 handlers, vitest mocking) — 6h
 - [ ] P1.4: Code signing (deferred; document unsigned status in README) — SKIP

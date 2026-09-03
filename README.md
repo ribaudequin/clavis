@@ -7,8 +7,9 @@
 - **Encrypted Drawers**: Store data in encrypted "drawers" (passwords, PINs, bank details, etc.)
 - **Per-Drawer Passwords**: Each drawer can have its own unique password or use a global master password
 - **Easy Backup**: Export/import encrypted drawer files for secure backups
+- **Import Drawers**: Import `.clavis` files via the **Import** button in the header
 - **Deterministic Icons**: Each drawer generates a unique visual icon based on its hash
-- **Cross-Platform Support**: Native experience on Linux (AppImage), Windows (NSIS + Portable), and Flatpak
+- **Cross-Platform Support**: Native experience on Linux (.deb, AppImage), Windows (NSIS + Portable), and Flatpak
 
 ## Architecture
 
@@ -16,33 +17,33 @@
 - **React + Tailwind CSS**: Modern frontend framework
 - **AES-256-GCM**: Standard encryption for drawer contents
 - **Argon2id**: Memory-hard key derivation for password-based encryption
-- **Electron Forge**: Unified build system for all platforms
+- **Electron Forge**: Single build system for all platforms (built via GitHub Actions)
 
 ## Installation
 
 ### From Source
 
 1. Clone this repository:
-   
+
    ```bash
    git clone <repository-url>
    cd clavis
    ```
 
 2. Install dependencies:
-   
+
    ```bash
    npm install
    ```
 
 3. Build the application:
-   
+
    ```bash
    npm run build
    ```
 
 4. Run the application:
-   
+
    ```bash
    npm start
    ```
@@ -61,6 +62,12 @@
 2. Enter the drawer's password
 3. View and edit the drawer contents
 
+### Importing a Drawer
+
+1. Click the **"Import"** button in the header
+2. Select a `.clavis` file from the file dialog
+3. The drawer is imported and appears in your list
+
 ### Viewing Credits and Support
 
 1. Click the **heart icon** (❤️) in the top-right of the header
@@ -73,28 +80,46 @@
 - **Save**: Encrypts and saves changes to the drawer
 - **Delete**: Removes the drawer permanently (with confirmation)
 - **Export**: Back up drawer data as an encrypted file
+- **Import**: Load a `.clavis` file into the app
 
 ## Building for Distribution
 
-Use Electron Forge to create platform-specific distributions:
+### All Platforms (GitHub Actions, recommended)
 
-### Linux (AppImage)
+Release binaries are built **remotely on GitHub Actions** native runners (Linux, Windows, macOS) and published to a GitHub Release automatically. Just push a version tag:
 
 ```bash
+git tag v0.1.3-alpha
+git push origin v0.1.3-alpha
+```
+
+The workflow builds all 6 targets (`.deb`, `.rpm`, `.AppImage` for Linux · Portable `.zip` + installer `.exe` for Windows · `.dmg` for macOS) and publishes them to [GitHub Releases](https://github.com/ribaudequin/clavis/releases). See `.github/workflows/release.yml` and `BUILD_MANUAL.md`.
+
+### Local Build (Linux)
+
+```bash
+# TypeScript + renderer build
+npm run build
+
+# Linux .deb + .rpm + AppImage (via Electron Forge)
 npm run make
+
+# Or all in one
+npm run release
 ```
 
-### Windows (NSIS + Portable)
+Windows/macOS targets are built in CI (native runners) — no Wine cross-compile needed.
 
-```bash
-npm run make
-```
+### Prerequisites (local Linux)
 
-### Flatpak
+- `dpkg`, `fakeroot` (for .deb)
+- `rpm` (for .rpm)
+- `mksquashfs` (for AppImage)
+- See `BUILD_MANUAL.md` for full guide
 
-```bash
-npm run flatpak-make
-```
+## Downloads
+
+Pre-built binaries for each release: [GitHub Releases](https://github.com/ribaudequin/clavis/releases)
 
 # Credits & support
 

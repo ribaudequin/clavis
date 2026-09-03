@@ -20,59 +20,20 @@
     "build:renderer": "vite build",
     "build": "npm run clean && npm run build:main && npm run copy:preload && npm run build:renderer",
     "make": "electron-forge make",
-    "make:all": "npm run build && npm run make && npm run make:appimage && npm run make:windows",
-    "make:appimage": "electron-builder --linux AppImage -p never",
-    "make:windows": "electron-builder --win portable nsis -p never",
-    "release": "npm run clean && npm run build && npm run make && npm run make:appimage && npm run make:windows",
+    "release": "npm run clean && npm run build && npm run make",
     "start": "electron .",
     "test": "vitest run",
     "lint": "eslint . --ext .ts,.tsx",
     "flatpak-make": "flatpak-builder --repo=repo build-dir flatpak/com.github.marcelosalvador.Clavis.yaml"
   },
-  "build": {
-    "appId": "com.github.ribaudequin.clavis",
-    "productName": "Clavis",
-    "directories": {
-      "buildResources": "icons",
-      "output": "release_artifacts"
-    },
-    "files": [
-      "dist/**/*",
-      "package.json"
-    ],
-    "asarUnpack": [
-      "**/node_modules/argon2/**/*"
-    ],
-    "afterPack": "./scripts/afterPack.js",
-    "linux": {
-      "target": [
-        "AppImage"
-      ],
-      "icon": "icons/linux/512x512.png",
-      "category": "Utility"
-    },
-    "win": {
-      "target": [
-        "portable",
-        "nsis"
-      ],
-      "icon": "icons/windows/clavis.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "artifactName": "Clavis-Setup-${version}.${ext}"
-    },
-    "portable": {
-      "artifactName": "Clavis-Portable-${version}.${ext}"
-    }
-  },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
     "@electron-forge/maker-deb": "^7.11.2",
+    "@electron-forge/maker-dmg": "^7.11.2",
+    "@electron-forge/maker-rpm": "^7.11.2",
     "@electron-forge/maker-squirrel": "^7.11.2",
     "@electron-forge/maker-zip": "^7.11.2",
+    "@reforged/maker-appimage": "^5.3.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
@@ -84,7 +45,6 @@
     "@vitejs/plugin-react": "^6.1.1",
     "autoprefixer": "^10.5.4",
     "electron": "^44.0.0",
-    "electron-builder": "^26.15.3",
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "jsdom": "^30.0.1",

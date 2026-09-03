@@ -55,4 +55,19 @@ module.exports = [
     },
     rules: sharedRules,
   },
+  {
+    files: ['*.ts'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        node: true,
+      },
+      parser: tsParser,
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
+    rules: sharedRules,
+  },
 ];
