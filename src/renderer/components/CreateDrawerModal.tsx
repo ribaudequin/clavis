@@ -28,17 +28,17 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
   }, []);
 
   function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
-    if (pw.length < 8) return { score: 0, label: 'Too short', color: 'bg-red-200' };
-    let score = 0;
-    if (pw.length >= 8) score++;
+    if (pw.length > 0 && pw.length < 8) return { score: 1, label: 'Too short (min 8 chars)', color: '#fca5a5' };
+    if (pw.length === 0) return { score: 0, label: '', color: '#e5e7eb' };
+    let score = 1;
     if (pw.length >= 12) score++;
-    if (/[A-Z]/.test(pw)) score++;
+    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
     if (/[0-9]/.test(pw)) score++;
     if (/[^A-Za-z0-9]/.test(pw)) score++;
-    const labels = ['Weak', 'Fair', 'Good', 'Strong', 'Excellent'];
-    const colors = ['bg-red-200', 'bg-yellow-200', 'bg-yellow-200', 'bg-green-200', 'bg-green-300'];
-    const idx = Math.min(score - 1, 4);
-    return { score, label: labels[Math.max(0, idx)], color: colors[Math.max(0, idx)] };
+    const labels = ['', 'Weak', 'Fair', 'Good', 'Strong', 'Excellent'];
+    const colors = ['#e5e7eb', '#fca5a5', '#fdba74', '#fde047', '#86efac', '#4ade80'];
+    const idx = Math.min(score, 5);
+    return { score, label: labels[idx], color: colors[idx] };
   }
 
   async function handleSubmit(e?: React.FormEvent): Promise<void> {
@@ -128,13 +128,16 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
                 </button>
               </div>
               {password.length > 0 && (
-                <div className="mt-1">
-                  <div className="flex gap-1 mb-1 h-4">
+                <div className="mt-2" aria-live="polite">
+                  <div className="flex gap-1 mb-1">
                     {Array.from({ length: 5 }).map((_, i) => (
                       <div
                         key={i}
-                        className={i < strength.score ? strength.color : 'bg-gray-200'}
-                        style={{ height: '16px', width: '20%' }}
+                        className="flex-1 rounded"
+                        style={{
+                          height: '6px',
+                          backgroundColor: i < strength.score ? strength.color : '#e5e7eb',
+                        }}
                       />
                     ))}
                   </div>
