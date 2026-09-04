@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { DrawerListItem, EncryptedDrawer, ElectronAPI } from '../../shared/types';
 import PasswordModal from '../components/PasswordModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import CreateDrawerModal from '../components/CreateDrawerModal';
+import SkeletonLoader, { SkeletonLoaders } from '../components/SkeletonLoader';
 import ViewDrawer from './ViewDrawer';
 import HeartIcon from '../../../icons/svg/heart.svg?react';
 import GithubIcon from '../../../icons/svg/github.svg?react';
 import EthIcon from '../../../icons/svg/eth.svg?react';
 import SolIcon from '../../../icons/svg/sol.svg?react';
 import KoFiIcon from '../../../icons/svg/ko-fi.svg?react';
+import { toast } from 'react-hot-toast';
 
 declare global {
   interface Window {
@@ -73,7 +76,7 @@ function HomeScreen(): React.JSX.Element {
     try {
       const result = await api().exportDrawer(id);
       if (!result.ok) {
-        alert(`Error exporting: ${result.error.message}`);
+        toast.error(`Error exporting: ${result.error.message}`);
         return;
       }
       const blob = new Blob([result.data], { type: 'application/json' });
@@ -83,6 +86,7 @@ function HomeScreen(): React.JSX.Element {
       a.download = `${id}.clavis`;
       a.click();
       URL.revokeObjectURL(url);
+      toast.success('Drawer exported successfully.');
     } finally {
       setExportingId(null);
     }
@@ -103,10 +107,11 @@ function HomeScreen(): React.JSX.Element {
     try {
       const result = await api().deleteDrawer(id);
       if (!result.ok) {
-        alert(`Error deleting: ${result.error.message}`);
+        toast.error(`Error deleting: ${result.error.message}`);
         window.focus();
         return;
       }
+      toast.success('Drawer deleted successfully.');
       await loadDrawers();
     } finally {
       setDeletingId(null);
@@ -121,20 +126,20 @@ function HomeScreen(): React.JSX.Element {
     try {
       const result = await api().openFile();
       if (!result.ok) {
-        alert(`Error: ${result.error.message}`);
+        toast.error(`Error: ${result.error.message}`);
         return;
       }
       if (!result.data) return;
       try {
         const importResult = await api().importDrawer(result.data.token);
         if (!importResult.ok) {
-          alert(`Error importing: ${importResult.error.message}`);
+          toast.error(`Error importing: ${importResult.error.message}`);
           return;
         }
-        alert('Imported successfully');
+        toast.success('Imported successfully');
         await loadDrawers();
       } catch {
-        alert('Error importing');
+        toast.error('Error importing');
       }
     } finally {
       setImporting(false);
@@ -234,9 +239,17 @@ function HomeScreen(): React.JSX.Element {
 
       <main className="px-6 py-6 max-w-4xl mx-auto">
         {loadingDrawers ? (
-          <p className="text-gray-500 text-center py-12">Loading...</p>
+          <SkeletonLoaders count={3} />
         ) : drawers.length === 0 ? (
-          <p className="text-gray-500 text-center py-12">No drawers created.</p>
+          <div className="text-center py-12">
+            <p className="text-gray-500 mb-4">No drawers created.</p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+            >
+              Create your first drawer
+            </button>
+          </div>
         ) : (
           <div className="space-y-2">
             {drawers.map((drawer) => (

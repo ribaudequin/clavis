@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Result } from '../../shared/types';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import { toast } from 'react-hot-toast';
 
 interface ViewDrawerProps {
   drawerId: string;
@@ -18,43 +19,40 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function doDelete(): Promise<void> {
     setShowDeleteConfirm(false);
     setDeleting(true);
-    setDeleteError(null);
     try {
       const result = await onDelete(drawerId);
       if (!result.ok) {
-        setDeleteError(result.error.message);
-        window.focus();
+        toast.error(result.error.message);
         return;
       }
+      toast.success('Drawer deleted successfully.');
       onBack();
     } catch {
-      setDeleteError('Error deleting drawer.');
-      window.focus();
+      toast.error('Error deleting drawer.');
     } finally {
       setDeleting(false);
-      setTimeout(() => window.focus(), 0);
     }
   }
+
   async function handleSave(): Promise<void> {
     if (title.trim() === '') {
-      alert('Title cannot be empty.');
+      toast.error('Title cannot be empty.');
       return;
     }
     setSaving(true);
     try {
       const result = await onSave(drawerId, password, title, content);
       if (!result.ok) {
-        alert(`Error saving drawer: ${result.error.message}`);
+        toast.error(`Error saving drawer: ${result.error.message}`);
         return;
       }
       onBack();
     } catch {
-      alert('Error saving drawer.');
+      toast.error('Error saving drawer.');
     } finally {
       setSaving(false);
     }
@@ -67,6 +65,9 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b px-6 py-4 flex items-center cursor-default">
+        <button onClick={onBack} className="text-blue-600 hover:text-blue-800 mr-4 text-sm">
+          ← Back
+        </button>
         <h1 className="text-xl font-semibold text-gray-800">Clavis</h1>
       </header>
 
@@ -75,14 +76,14 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          disabled={saving}
+          disabled={saving || deleting}
           placeholder="Drawer title"
           className="w-full border rounded px-3 py-2 text-sm mb-4 bg-white disabled:opacity-50"
         />
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          disabled={saving}
+          disabled={saving || deleting}
           placeholder="Drawer content"
           className="flex-1 w-full border rounded px-3 py-2 text-sm bg-white resize-none min-h-[300px] disabled:opacity-50"
         />
@@ -114,19 +115,6 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
             window.focus();
           }}
         />
-      )}
-      {deleteError && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-lg p-6 w-80 text-center">
-            <p className="text-sm text-red-700 mb-4">{deleteError}</p>
-            <button
-              onClick={() => { setDeleteError(null); window.focus(); }}
-              className="px-4 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
-            >
-              OK
-            </button>
-          </div>
-        </div>
       )}
     </div>
   );
