@@ -38,13 +38,49 @@
 
 ## Phase 2 — UX/DX IMPROVEMENTS (Medium Priority)
 
-- [ ] P2.1: Convert preload to TypeScript (preload/index.ts with ElectronAPI types) — 0.5h
-- [ ] P2.2: Define structured error types (Result<T, E>, ErrorCode enum) — 2h
-- [ ] P2.3: Add centralized logging (electron-log setup) — 1h
-- [ ] P2.4: Add loading states to UI (HomeScreen async actions + PasswordModal) — 1.5h
-- [ ] P2.5: Add React error boundary (ErrorBoundary.tsx wrapper) — 0.75h
-- [ ] P2.6: Add navigation guards to Credits window — 0.5h
-- [ ] Run `npm run lint`, `npm run typecheck`, `npm run test` — all must pass
+### P0 — Critical UX (Blocks User Trust)
+- [x] P0.1: Replace all `alert()` with toast/notification system (react-hot-toast) — 2h
+- [x] P0.2: Add focus trap to all modals (focus-trap-react or custom hook) — 2h
+- [x] P0.3: Implement skeleton loaders for drawer list (shimmer animation) — 1.5h
+
+### P1 — High Impact UX
+- [x] P1.4: Add password visibility toggle + strength meter to PasswordModal — 1.5h
+- [x] P1.5: Extract CreateDrawerModal to separate component — 0.5h
+- [x] P1.6: Extract CreditsModal to separate component — 0.5h
+- [x] P1.7: Add keyboard shortcuts (Ctrl+N, Escape, Enter, Ctrl+S) — 1h
+- [x] P1.8: Add aria-live regions for loading states, errors, list updates — 1h
+- [x] P1.9: Empty state illustration + CTA button ("Create your first drawer") — 1h
+
+### P1 — Build Blockers
+- [x] P1.10: Fix ESM/CommonJS mismatch ("type": "module" or CommonJS configs) — 0.5h
+- [x] P1.11: Add @electron-forge/maker-rpm for Linux RPM target — 0.5h
+- [x] P1.12: Implement auto-update (electron-updater + GitHub Releases) — 4h
+- [x] P1.13: Add quality gates to CI (lint, typecheck, test before build/make) — 1h
+
+### P2 — CI/CD Reliability & Polish
+- [x] P2.1: Convert preload to TypeScript (preload/index.ts with ElectronAPI types) — 0.5h
+- [x] P2.2: Define structured error types (Result<T, E>, ErrorCode enum) — 2h
+- [x] P2.3: Add centralized logging (electron-log setup) — 1h
+- [x] P2.4: Add loading states to UI (HomeScreen async actions + PasswordModal) — 1.5h
+- [x] P2.5: Add React error boundary (ErrorBoundary.tsx wrapper) — 0.75h
+- [x] P2.6: Add navigation guards to Credits window — 0.5h
+- [x] P2.7: Fix CI certificate handling (remove cert secrets or make optional) — 0.5h
+- [x] P2.8: Add typecheck script to package.json — 0.25h
+- [x] P2.9: Add release/ to .gitignore — 0.1h
+- [x] P2.10: Fix Flatpak manifest version (parameterize version injection) — 0.5h
+- [x] P2.11: Add transitions/animations to modals (fade-in, scale) — 1h
+- [x] P2.12: Click backdrop to close modals — 0.5h
+- [x] P2.13: Portals for modals (ReactDOM.createPortal) — 1h
+- [x] P2.14: Responsive breakpoints (max-w-[90vw], sm:/md:) — 1h
+- [x] P2.15: Copy-to-clipboard for crypto addresses in Credits — 0.5h
+- [x] P2.16: Consistent icon system (move Credits close icon to vite-plugin-svgr) — 0.5h
+
+### P3 — Architecture & Code Quality
+- [x] P3.1: Extract useModalKeyboard / useFocusTrap hooks — 1h
+- [x] P3.2: Extract DrawerIcon component (memoize icon rendering) — 0.5h
+- [x] P3.3: Add resetErrorBoundary to ErrorBoundary — 0.5h
+- [x] P3.4: Unify error display (delete error modal pattern for all async errors) — 1h
+- [x] Run `npm run lint`, `npm run typecheck`, `npm run test` — all must pass
 
 ## Phase 3 — QUALITY ASSURANCE (Lower Priority)
 
@@ -61,6 +97,7 @@
 
 ## Progress
 - **Done**: All 23 audit-2026-08-30 findings fixed, full drawer flow (+ import UI), security hardening, store extraction, 51/51 tests, **v0.1.4-alpha** (2026-09-03): **DeleteConfirmModal** replaces native `confirm()` on delete in HomeScreen + ViewDrawer (red bg, `danger.svg` biohazard red/black icon, irreversible warning); 6 assets published (deb 94M, AppImage 123M, Setup.exe 150M, zip 154M, nupkg 149M, dmg 125M), run `33790511624` green, AppImage smoke-tested. **v0.1.3-alpha** bumped earlier same day. **v0.1.2-alpha** baseline: import drawer button, 4 targets via Wine 10, `gh release create` 4 assets. **v0.1.1-alpha**: fixed `argon2` Win32 `PE32+` via `afterPack` + `scrypt` fallback, save/delete `Result` mismatch, Windows `confirm()` focus steal.
-- **Tested**: Encryption round-trip, wrong-password rejection, drawer CRUD, path-traversal rejection, import drawer flow, HomeScreen rendering, all build targets, ASAR content, AppImage runtime (`Clavis started`), Windows `PE32+` verified, save/delete `Result` flow, Windows modal focus after delete, CI-built `v0.1.3-alpha` (AppImage Linux + ZIP Windows 11) and `v0.1.4-alpha` (AppImage delete-confirm UI)
-- **Audit 2026-09-01**: 14 recommendations validated by 4 specialized sub-agents; consolidated into 4-phase roadmap (Phase 0-3, ~35h total; MVP target 18.75h)
-- **Current focus**: Phase 1 — P1.2 (ESM/CommonJS mismatch) and P1.3 (IPC handler tests). **Phase 0 DONE** (P0.1 token whitelist, P0.2 password min-length, P0.3 Zod validation). Smoke tests validados: AppImage (Linux) + Windows Portable ZIP; dmg sem verificação local (sem Mac). Decisão: Windows fica com Setup.exe + ZIP portable (sem portable de ficheiro único — não complicar o build).
+- [x] **Tested**: Encryption round-trip, wrong-password rejection, drawer CRUD, path-traversal rejection, import drawer flow, HomeScreen rendering, all build targets, ASAR content, AppImage runtime (`Clavis started`), Windows `PE32+` verified, save/delete `Result` flow, Windows modal focus after delete, CI-built `v0.1.3-alpha` (AppImage Linux + ZIP Windows 11) and `v0.1.4-alpha` (AppImage delete-confirm UI)
+- [x] **Audit 2026-09-01**: 14 recommendations validated by 4 specialized sub-agents; consolidated into 4-phase roadmap (Phase 0-3, ~35h total; MVP target 18.75h)
+
+_P0 UX items from audit_2026-09-03-ui-ux.md: toast system (P0.1), focus traps (P0.2), skeleton loaders (P0.3) — all COMPLETED._

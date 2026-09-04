@@ -1,6 +1,6 @@
 {
   "name": "clavis",
-  "version": "0.1.4-alpha",
+  "version": "0.1.4.1-alpha",
   "description": "Cross-platform encrypted notes application for storing banking info, PINs, passwords, and safe codes.",
   "main": "dist/main/index.js",
   "author": "Marcelo Salvador",
@@ -63,4 +63,5 @@
     "uuid": "^11.1.0",
     "zod": "^4.5.4"
   }
+}
 }

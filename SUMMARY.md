@@ -12,8 +12,17 @@
 
 **CI/CD (2026-09-03):** Single Electron Forge + `release.yml` — 6 targets on native runners, publish on tag push. v0.1.3-alpha first green CI run (`33781273256`). Local Linux validated. `scripts/backup/` for old scripts.
 
-**Focus next:** Phase 1 — P1.2 (ESM/CommonJS), P1.3 (IPC handler tests). Smoke tests: AppImage (Linux) + Win ZIP done; dmg CI-built but unverifiable (no Mac).
+**2026-09-03 Audits:** 
+- `audit_2026-09-03.md` — comprehensive 5-sub-agent audit (Security, Build, UI/UX, Code Quality, Documentation) 
+- `audit_2026-09-03-ui-ux.md` — dedicated UI/UX audit
+
+**Priority findings (P0 — blocks user trust):**
+1. Replace all `alert()` with toast system (`aria-live="polite"`)
+2. Add focus traps to all 4 modals (WCAG 2.4.3)
+3. Implement skeleton loaders for drawer list
+
+**Focus next:** P0 UX items + Phase 1 — P1.2 (ESM/CommonJS), P1.3 (IPC handler tests). Smoke tests: AppImage (Linux) + Win ZIP done; dmg CI-built but unverifiable (no Mac).
 
 **Read more if:** Technical decision → PLANO.md | Task list → TODO.md | Full history → /MEMORY/HISTORY.md
 
-_Last updated: 2026-09-03_
+_Last updated: 2026-09-04_
