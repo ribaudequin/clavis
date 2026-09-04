@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useModalKeyboard } from '../hooks/useModalKeyboard';
+import { EyeOpenIcon, EyeClosedIcon } from './EyeIcons';
 
 interface PasswordModalProps {
   drawerTitle: string;
@@ -12,6 +13,7 @@ interface PasswordModalProps {
 function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalProps): React.JSX.Element {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -57,18 +59,29 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
             <label htmlFor="password-input" className="block text-sm text-gray-600 mb-1">
               Password
             </label>
-            <input
-              id="password-input"
-              ref={inputRef}
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
-              className="w-full border rounded px-2 py-1 text-sm disabled:opacity-50"
-              placeholder="Enter password"
-              autoComplete="new-password"
-              aria-invalid={error ? 'true' : 'false'}
-            />
+            <div className="relative">
+              <input
+                id="password-input"
+                ref={inputRef}
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                className="w-full border rounded px-2 py-1 text-sm pr-8 disabled:opacity-50"
+                placeholder="Enter password"
+                autoComplete="current-password"
+                aria-invalid={error ? 'true' : 'false'}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={isLoading}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeClosedIcon /> : <EyeOpenIcon />}
+              </button>
+            </div>
             {error && (
               <p id="password-error" className="text-red-500 text-xs mt-1" role="alert">
                 {error}
