@@ -100,4 +100,5 @@
 - [x] **Tested**: Encryption round-trip, wrong-password rejection, drawer CRUD, path-traversal rejection, import drawer flow, HomeScreen rendering, all build targets, ASAR content, AppImage runtime (`Clavis started`), Windows `PE32+` verified, save/delete `Result` flow, Windows modal focus after delete, CI-built `v0.1.3-alpha` (AppImage Linux + ZIP Windows 11) and `v0.1.4-alpha` (AppImage delete-confirm UI)
 - [x] **Audit 2026-09-01**: 14 recommendations validated by 4 specialized sub-agents; consolidated into 4-phase roadmap (Phase 0-3, ~35h total; MVP target 18.75h)
 
-_P0 UX items from audit_2026-09-03-ui-ux.md: toast system (P0.1), focus traps (P0.2), skeleton loaders (P0.3) — all COMPLETED._
+_P0 UX items from audit_2026-09-03-ui-ux.md: toast system (P0.1), focus traps (P0.2), skeleton loaders (P0.3) — all COMPLETED and visually verified in v0.1.6-alpha (visibility toggle in both modals, strength meter in CreateDrawerModal only, between password and confirm fields)._
+- **Current focus**: Phase 1 build blockers — P1.2 (ESM/CommonJS), P1.3 (IPC handler tests), CI quality gates.

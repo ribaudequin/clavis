@@ -4,9 +4,9 @@
 
 **Project:** Clavis — Cross-platform encrypted notes app (Electron + TypeScript + React + AES-256-GCM + Argon2id)
 
-**Current version:** 0.1.4-alpha (2026-09-03, CI-built with 6 assets, AppImage smoke-tested)
+**Current version:** 0.1.6-alpha (2026-09-04, CI-built, P0 UX visually verified)
 
-**State:** All 23 audit findings fixed. Phase 0 security complete (token import whitelist, password min-length, Zod validation). Import feature complete; full drawer flow create → list → import → unlock → view/edit → save/delete. **UI:** native `confirm()` replaced with `DeleteConfirmModal` (red bg, biohazard `danger.svg`, irreversible warning). Store `src/main/store.ts`. **51/51 tests pass**, tsc + eslint clean.
+**State:** All 23 audit findings fixed. Phase 0 security complete (token import whitelist, password min-length, Zod validation). Import feature complete; full drawer flow create → list → import → unlock → view/edit → save/delete. **UI:** `DeleteConfirmModal` (red bg, biohazard `danger.svg`); toast system replaced all `alert()`; focus traps + shortcuts on all modals; skeleton loaders; visibility toggle in both password modals; strength meter in CreateDrawerModal only (between password/confirm). Store `src/main/store.ts`. **51/51 tests pass**, tsc + eslint clean.
 
 **Release 0.1.4-alpha (2026-09-03):** DeleteConfirmModal + danger.svg; 6 assets (deb, AppImage, Setup.exe, zip, nupkg, dmg). Run `33790511624` green. AppImage smoke-tested.
 
@@ -21,7 +21,9 @@
 2. Add focus traps to all 4 modals (WCAG 2.4.3)
 3. Implement skeleton loaders for drawer list
 
-**Focus next:** P0 UX items + Phase 1 — P1.2 (ESM/CommonJS), P1.3 (IPC handler tests). Smoke tests: AppImage (Linux) + Win ZIP done; dmg CI-built but unverifiable (no Mac).
+**Release 0.1.6-alpha (2026-09-04):** P0 UX complete + visually verified; SemVer fix for Windows Squirrel; CI green.
+
+**Focus next:** Phase 1 — P1.2 (ESM/CommonJS), P1.3 (IPC handler tests), CI quality gates. Smoke tests: AppImage (Linux) + Win ZIP done; dmg CI-built but unverifiable (no Mac).
 
 **Read more if:** Technical decision → PLANO.md | Task list → TODO.md | Full history → /MEMORY/HISTORY.md
 
