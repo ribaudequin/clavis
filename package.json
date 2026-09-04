@@ -1,6 +1,6 @@
 {
   "name": "clavis",
-  "version": "0.1.5-alpha",
+  "version": "0.1.6-alpha",
   "description": "Cross-platform encrypted notes application for storing banking info, PINs, passwords, and safe codes.",
   "main": "dist/main/index.js",
   "author": "Marcelo Salvador",
