@@ -24,6 +24,7 @@
     "start": "electron .",
     "test": "vitest run",
     "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
     "flatpak-make": "flatpak-builder --repo=repo build-dir flatpak/com.github.marcelosalvador.Clavis.yaml"
   },
   "devDependencies": {
@@ -51,6 +52,7 @@
     "prettier": "^3.9.6",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-hot-toast": "^2.6.0",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.8.3",
     "vite": "^8.2.2",
@@ -63,5 +65,4 @@
     "uuid": "^11.1.0",
     "zod": "^4.5.4"
   }
-}
 }
