@@ -1,336 +1,631 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import * as path from 'path';
-import * as fs from 'fs/promises';
-import * as os from 'os';
-import {
-  setDataDir,
-  getDataDir,
-  createDrawer,
-  listDrawers,
-  unlockDrawer,
-  saveDrawer,
-  deleteDrawer,
-  readDrawerRaw,
-  importDrawerRaw,
-  isValidId,
-} from '../src/main/store';
-import { Result, ErrorCode } from '../src/shared/types';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-let tempDir: string;
+vi.mock('electron', () => ({
+  ipcMain: { handle: vi.fn() },
+  dialog: { showOpenDialog: vi.fn() },
+}));
 
-beforeEach(async () => {
-  tempDir = path.join(os.tmpdir(), `clavis-ipc-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  await fs.mkdir(tempDir, { recursive: true });
-  setDataDir(tempDir);
+vi.mock('../src/main/store.js', () => ({
+  listDrawers: vi.fn(),
+  createDrawer: vi.fn(),
+  unlockDrawer: vi.fn(),
+  saveDrawer: vi.fn(),
+  deleteDrawer: vi.fn(),
+  readDrawerRaw: vi.fn(),
+  importDrawerRaw: vi.fn(),
+  ensureDataDir: vi.fn(),
+}));
+
+vi.mock('../src/main/logger.js', () => ({
+  logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+  initializeLogger: vi.fn(),
+}));
+
+vi.mock('fs/promises', () => {
+  const actual = require('fs/promises');
+  return {
+    ...actual,
+    default: actual,
+    readFile: vi.fn(),
+    lstat: vi.fn(),
+  };
 });
 
-afterEach(async () => {
-  setDataDir(path.join(os.homedir(), '.local', 'share', 'Clavis'));
-  await fs.rm(tempDir, { recursive: true, force: true });
+import { registerIpcHandlers, __resetAllowedImportPaths } from '../src/main/ipc-handlers';
+import * as store from '../src/main/store';
+import * as fsPromises from 'fs/promises';
+import { ErrorCode, Result } from '../src/shared/types';
+
+const VALID_UUID = '123e4567-e89b-12d3-a456-426614174000';
+const VALID_UUID_2 = '123e4567-e89b-12d3-a456-426614174001';
+
+type Handler = (...args: any[]) => Promise<Result<any>>;
+
+let handlers: Map<string, Handler>;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  __resetAllowedImportPaths();
+  handlers = new Map<string, Handler>();
+  registerIpcHandlers({
+    ipcMain: {
+      handle: (channel: string, fn: Handler) => {
+        handlers.set(channel, fn);
+      },
+    },
+    dialog: {
+      showOpenDialog: vi.fn(),
+    },
+  });
 });
 
-describe('IPC handlers (mocked via store functions)', () => {
-  describe('list-drawers handler', () => {
-    it('returns empty array when no drawers exist', async () => {
-      const result = await listDrawers();
-      expect(result).toEqual([]);
+function getHandler<T = any>(channel: string): T {
+  const h = handlers.get(channel);
+  if (!h) throw new Error(`Handler not registered: ${channel}`);
+  return h as unknown as T;
+}
+
+describe('IPC handlers', () => {
+  describe('list-drawers', () => {
+    it('returns ok with data on success', async () => {
+      const items = [{ id: VALID_UUID, title: 't', iconData: 'rgb(0,0,0)' }];
+      vi.mocked(store.listDrawers).mockResolvedValue(items);
+
+      const handler = getHandler<(e: any) => Promise<Result<typeof items>>>('list-drawers');
+      const result = await handler({});
+
+      expect(result).toEqual({ ok: true, data: items });
+      expect(store.listDrawers).toHaveBeenCalledOnce();
     });
 
-    it('returns list of created drawers with metadata', async () => {
-      const drawer1 = await createDrawer('Drawer 1', 'password123456');
-      const drawer2 = await createDrawer('Drawer 2', 'password654321');
+    it('returns FILE_NOT_FOUND error when store throws', async () => {
+      vi.mocked(store.listDrawers).mockRejectedValue(new Error('boom'));
 
-      const result = await listDrawers();
-      expect(result).toHaveLength(2);
-      expect(result.map((d) => d.id)).toContain(drawer1.id);
-      expect(result.map((d) => d.id)).toContain(drawer2.id);
-      expect(result[0]).toHaveProperty('title');
-      expect(result[0]).toHaveProperty('iconData');
+      const handler = getHandler<(e: any) => Promise<Result<any>>>('list-drawers');
+      const result = await handler({});
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.FILE_NOT_FOUND);
+        expect(result.error.message).toBe('Failed to list drawers');
+      }
     });
   });
 
-  describe('create-drawer handler', () => {
-    it('creates a new drawer with valid title and password', async () => {
-      const result = await createDrawer('My Secrets', 'SecurePassword123');
-      
-      expect(result).toHaveProperty('id');
-      expect(result).toHaveProperty('title', 'My Secrets');
-      expect(result).toHaveProperty('encryptedData');
-      expect(result).toHaveProperty('salt');
-      expect(result).toHaveProperty('iv');
-      expect(result).toHaveProperty('authTag');
-      expect(isValidId(result.id)).toBe(true);
+  describe('create-drawer', () => {
+    it('returns ok with encrypted drawer on success', async () => {
+      const drawer = { id: VALID_UUID, title: 'A', iconData: 'rgb(0,0,0)' } as any;
+      vi.mocked(store.createDrawer).mockResolvedValue(drawer);
+
+      const handler = getHandler<(e: any, t: string, p: string) => Promise<Result<any>>>('create-drawer');
+      const result = await handler({}, 'My Drawer', 'password12345');
+
+      expect(result).toEqual({ ok: true, data: drawer });
+      expect(store.createDrawer).toHaveBeenCalledWith('My Drawer', 'password12345');
     });
 
-    it('rejects password shorter than 8 characters', async () => {
-      await expect(createDrawer('Test', 'short')).rejects.toThrow(
-        'Password must be at least 8 characters'
+    it('returns VALIDATION_ERROR on Zod failure (empty title)', async () => {
+      const handler = getHandler<(e: any, t: string, p: string) => Promise<Result<any>>>('create-drawer');
+      const result = await handler({}, '', 'password12345');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+        expect(result.error.message).toBe('Title is required');
+      }
+      expect(store.createDrawer).not.toHaveBeenCalled();
+    });
+
+    it('returns VALIDATION_ERROR on Zod failure (password too short)', async () => {
+      const handler = getHandler<(e: any, t: string, p: string) => Promise<Result<any>>>('create-drawer');
+      const result = await handler({}, 'Title', 'short');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+      }
+      expect(store.createDrawer).not.toHaveBeenCalled();
+    });
+
+    it('returns PASSWORD_TOO_SHORT when store throws with password message', async () => {
+      vi.mocked(store.createDrawer).mockRejectedValue(new Error('Password must be at least 8 characters'));
+
+      const handler = getHandler<(e: any, t: string, p: string) => Promise<Result<any>>>('create-drawer');
+      const result = await handler({}, 'Title', 'whatever1');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.PASSWORD_TOO_SHORT);
+        expect(result.error.message).toBe('Password must be at least 8 characters');
+      }
+    });
+
+    it('returns WRITE_FAILED on generic store error', async () => {
+      vi.mocked(store.createDrawer).mockRejectedValue(new Error('disk full'));
+
+      const handler = getHandler<(e: any, t: string, p: string) => Promise<Result<any>>>('create-drawer');
+      const result = await handler({}, 'Title', 'password12345');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.WRITE_FAILED);
+        expect(result.error.message).toBe('Failed to create drawer');
+      }
+    });
+  });
+
+  describe('unlock-drawer', () => {
+    it('returns ok with content on success', async () => {
+      const payload = { title: 'A', content: 'hello', iconData: 'rgb(0,0,0)' };
+      vi.mocked(store.unlockDrawer).mockResolvedValue(payload);
+
+      const handler = getHandler<(e: any, id: string, p: string) => Promise<Result<any>>>('unlock-drawer');
+      const result = await handler({}, VALID_UUID, 'password12345');
+
+      expect(result).toEqual({ ok: true, data: payload });
+      expect(store.unlockDrawer).toHaveBeenCalledWith(VALID_UUID, 'password12345');
+    });
+
+    it('returns DECRYPT_FAILED with data:null mapped to error envelope when password wrong', async () => {
+      vi.mocked(store.unlockDrawer).mockResolvedValue(null);
+
+      const handler = getHandler<(e: any, id: string, p: string) => Promise<Result<any>>>('unlock-drawer');
+      const result = await handler({}, VALID_UUID, 'wrong-password');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.DECRYPT_FAILED);
+        expect(result.error.message).toBe('Incorrect password or drawer not found');
+        expect(result.error.details).toBeUndefined();
+      }
+    });
+
+    it('returns VALIDATION_ERROR on invalid id', async () => {
+      const handler = getHandler<(e: any, id: string, p: string) => Promise<Result<any>>>('unlock-drawer');
+      const result = await handler({}, 'not-a-uuid', 'password12345');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+      }
+      expect(store.unlockDrawer).not.toHaveBeenCalled();
+    });
+
+    it('returns DECRYPT_FAILED when store throws', async () => {
+      vi.mocked(store.unlockDrawer).mockRejectedValue(new Error('crypto broke'));
+
+      const handler = getHandler<(e: any, id: string, p: string) => Promise<Result<any>>>('unlock-drawer');
+      const result = await handler({}, VALID_UUID, 'password12345');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.DECRYPT_FAILED);
+        expect(result.error.message).toBe('Failed to unlock drawer');
+      }
+    });
+  });
+
+  describe('save-drawer', () => {
+    it('returns ok on success', async () => {
+      vi.mocked(store.saveDrawer).mockResolvedValue(true);
+
+      const handler = getHandler<(e: any, id: string, p: string, t: string, c: string) => Promise<Result<any>>>('save-drawer');
+      const result = await handler({}, VALID_UUID, 'password12345', 'Title', 'content');
+
+      expect(result).toEqual({ ok: true, data: undefined });
+      expect(store.saveDrawer).toHaveBeenCalledWith(VALID_UUID, 'password12345', 'Title', 'content');
+    });
+
+    it('returns WRITE_FAILED with "invalid ID or password" when store returns false', async () => {
+      vi.mocked(store.saveDrawer).mockResolvedValue(false);
+
+      const handler = getHandler<(e: any, id: string, p: string, t: string, c: string) => Promise<Result<any>>>('save-drawer');
+      const result = await handler({}, VALID_UUID, 'wrong-password', 'Title', 'content');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.WRITE_FAILED);
+        expect(result.error.message).toBe('Failed to save drawer (invalid ID or password)');
+      }
+    });
+
+    it('returns VALIDATION_ERROR on invalid id', async () => {
+      const handler = getHandler<(e: any, id: string, p: string, t: string, c: string) => Promise<Result<any>>>('save-drawer');
+      const result = await handler({}, 'bad', 'password12345', 'Title', 'content');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+      }
+      expect(store.saveDrawer).not.toHaveBeenCalled();
+    });
+
+    it('returns WRITE_FAILED when store throws', async () => {
+      vi.mocked(store.saveDrawer).mockRejectedValue(new Error('io error'));
+
+      const handler = getHandler<(e: any, id: string, p: string, t: string, c: string) => Promise<Result<any>>>('save-drawer');
+      const result = await handler({}, VALID_UUID, 'password12345', 'Title', 'content');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.WRITE_FAILED);
+        expect(result.error.message).toBe('Failed to save drawer');
+      }
+    });
+  });
+
+  describe('delete-drawer', () => {
+    it('returns ok on success', async () => {
+      vi.mocked(store.deleteDrawer).mockResolvedValue(true);
+
+      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('delete-drawer');
+      const result = await handler({}, VALID_UUID);
+
+      expect(result).toEqual({ ok: true, data: undefined });
+    });
+
+    it('returns FILE_NOT_FOUND when store returns false', async () => {
+      vi.mocked(store.deleteDrawer).mockResolvedValue(false);
+
+      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('delete-drawer');
+      const result = await handler({}, VALID_UUID);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.FILE_NOT_FOUND);
+        expect(result.error.message).toBe('Failed to delete drawer (invalid ID or drawer not found)');
+      }
+    });
+
+    it('returns VALIDATION_ERROR on invalid id', async () => {
+      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('delete-drawer');
+      const result = await handler({}, 'not-a-uuid');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+      }
+      expect(store.deleteDrawer).not.toHaveBeenCalled();
+    });
+
+    it('returns WRITE_FAILED when store throws', async () => {
+      vi.mocked(store.deleteDrawer).mockRejectedValue(new Error('disk error'));
+
+      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('delete-drawer');
+      const result = await handler({}, VALID_UUID);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.WRITE_FAILED);
+      }
+    });
+  });
+
+  describe('export-drawer', () => {
+    it('returns ok with raw json string on success', async () => {
+      const raw = '{"id":"x","title":"t"}';
+      vi.mocked(store.readDrawerRaw).mockResolvedValue(raw);
+
+      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('export-drawer');
+      const result = await handler({}, VALID_UUID);
+
+      expect(result).toEqual({ ok: true, data: raw });
+    });
+
+    it('returns FILE_NOT_FOUND when store returns null', async () => {
+      vi.mocked(store.readDrawerRaw).mockResolvedValue(null);
+
+      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('export-drawer');
+      const result = await handler({}, VALID_UUID);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.FILE_NOT_FOUND);
+        expect(result.error.message).toBe('Drawer not found');
+      }
+    });
+
+    it('returns VALIDATION_ERROR on invalid id', async () => {
+      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('export-drawer');
+      const result = await handler({}, 'not-a-uuid');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+      }
+      expect(store.readDrawerRaw).not.toHaveBeenCalled();
+    });
+
+    it('returns WRITE_FAILED when store throws', async () => {
+      vi.mocked(store.readDrawerRaw).mockRejectedValue(new Error('eio'));
+
+      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('export-drawer');
+      const result = await handler({}, VALID_UUID);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.WRITE_FAILED);
+      }
+    });
+  });
+
+  describe('open-file-dialog', () => {
+    it('returns ok with data:null when user cancels (no file selected)', async () => {
+      const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: [] });
+      handlers.clear();
+      registerIpcHandlers({
+        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        dialog: { showOpenDialog },
+      });
+
+      const result = await handlers.get('open-file-dialog')!({});
+      expect(result).toEqual({ ok: true, data: null });
+      expect(showOpenDialog).toHaveBeenCalledWith({
+        properties: ['openFile'],
+        filters: [{ name: 'Clavis Drawers', extensions: ['clavis'] }],
+      });
+    });
+
+    it('returns ok with token and fileName on valid selection', async () => {
+      const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/home/user/secret.clavis'] });
+      handlers.clear();
+      registerIpcHandlers({
+        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        dialog: { showOpenDialog },
+      });
+
+      const result = await handlers.get('open-file-dialog')!({});
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data).not.toBeNull();
+        expect(result.data!.fileName).toBe('secret.clavis');
+        expect(result.data!.token).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      }
+      expect(showOpenDialog).toHaveBeenCalledOnce();
+    });
+
+    it('returns FILE_NOT_FOUND error when dialog throws', async () => {
+      const showOpenDialog = vi.fn().mockRejectedValue(new Error('dialog crash'));
+      handlers.clear();
+      registerIpcHandlers({
+        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        dialog: { showOpenDialog },
+      });
+
+      const result = await handlers.get('open-file-dialog')!({});
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.FILE_NOT_FOUND);
+        expect(result.error.message).toBe('Failed to open file dialog');
+      }
+    });
+  });
+
+  describe('import-drawer', () => {
+    beforeEach(() => {
+      const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: [] });
+      handlers.clear();
+      registerIpcHandlers({
+        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        dialog: { showOpenDialog },
+      });
+      vi.mocked(fsPromises.lstat as any).mockResolvedValue({ isSymbolicLink: () => false });
+    });
+
+    it('returns VALIDATION_ERROR for non-uuid token', async () => {
+      const handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      const result = await handler({}, 'not-a-uuid');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+      }
+    });
+
+    it('returns VALIDATION_ERROR "Invalid or expired import token" for unknown uuid token', async () => {
+      const handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      const result = await handler({}, VALID_UUID);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+        expect(result.error.message).toBe('Invalid or expired import token');
+      }
+      expect(fsPromises.readFile).not.toHaveBeenCalled();
+    });
+
+    it('returns ok after successful import and consumes token (one-shot)', async () => {
+      const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/import.clavis'] });
+      handlers.clear();
+      registerIpcHandlers({
+        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        dialog: { showOpenDialog },
+      });
+      const dialogResult = await handlers.get('open-file-dialog')!({});
+      expect(dialogResult.ok).toBe(true);
+      if (!dialogResult.ok) throw new Error('expected ok');
+      const token = dialogResult.data!.token;
+
+      vi.mocked(fsPromises.readFile as any).mockResolvedValue('{"id":"x","title":"t","iconData":"i","createdAt":0,"updatedAt":0,"encryptedData":"e","salt":"s","iv":"i","authTag":"a","keyDerivation":{"algorithm":"x","iterations":1,"memory":1,"parallelism":1}}');
+      vi.mocked(store.importDrawerRaw).mockResolvedValue(true);
+
+      const handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      const result = await handler({}, token);
+
+      expect(result).toEqual({ ok: true, data: undefined });
+      expect(fsPromises.readFile).toHaveBeenCalledWith('/tmp/import.clavis', 'utf8');
+      expect(store.importDrawerRaw).toHaveBeenCalledOnce();
+
+      const replay = await handler({}, token);
+      expect(replay.ok).toBe(false);
+      if (!replay.ok) {
+        expect(replay.error.message).toBe('Invalid or expired import token');
+      }
+    });
+
+    it('returns INVALID_JSON when importDrawerRaw returns false', async () => {
+      const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/bad.clavis'] });
+      handlers.clear();
+      registerIpcHandlers({
+        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        dialog: { showOpenDialog },
+      });
+      const dialogResult = await handlers.get('open-file-dialog')!({});
+      if (!dialogResult.ok) throw new Error('expected ok');
+      const token = dialogResult.data!.token;
+
+      vi.mocked(fsPromises.readFile as any).mockResolvedValue('garbage');
+      vi.mocked(store.importDrawerRaw).mockResolvedValue(false);
+
+      const handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      const result = await handler({}, token);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.INVALID_JSON);
+        expect(result.error.message).toBe('Failed to import drawer (invalid file format)');
+      }
+    });
+
+    it('returns FILE_NOT_FOUND when fs.readFile throws', async () => {
+      const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/missing.clavis'] });
+      handlers.clear();
+      registerIpcHandlers({
+        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        dialog: { showOpenDialog },
+      });
+      const dialogResult = await handlers.get('open-file-dialog')!({});
+      if (!dialogResult.ok) throw new Error('expected ok');
+      const token = dialogResult.data!.token;
+
+      vi.mocked(fsPromises.readFile as any).mockRejectedValue(new Error('ENOENT'));
+
+      const handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      const result = await handler({}, token);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.FILE_NOT_FOUND);
+        expect(result.error.message).toBe('Failed to read import file');
+      }
+    });
+
+    it('strips exception details from import error envelope (details === undefined)', async () => {
+      const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/leak.clavis'] });
+      handlers.clear();
+      registerIpcHandlers({
+        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        dialog: { showOpenDialog },
+      });
+      const dialogResult = await handlers.get('open-file-dialog')!({});
+      if (!dialogResult.ok) throw new Error('expected ok');
+      const token = dialogResult.data!.token;
+
+      vi.mocked(fsPromises.readFile as any).mockRejectedValue(
+        new Error('read failed: file contents leaked into message')
       );
+
+      const handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      const result = await handler({}, token);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.FILE_NOT_FOUND);
+        expect(result.error.details).toBeUndefined();
+      }
     });
 
-    it('creates drawer with empty content', async () => {
-      const result = await createDrawer('Empty', 'password123456');
-      const unlocked = await unlockDrawer(result.id, 'password123456');
-      
-      expect(unlocked?.content).toBe('');
-    });
-  });
+    it('returns VALIDATION_ERROR "Refusing to import a symbolic link" when file is a symlink', async () => {
+      const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/link.clavis'] });
+      handlers.clear();
+      registerIpcHandlers({
+        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        dialog: { showOpenDialog },
+      });
+      const dialogResult = await handlers.get('open-file-dialog')!({});
+      if (!dialogResult.ok) throw new Error('expected ok');
+      const token = dialogResult.data!.token;
 
-  describe('unlock-drawer handler', () => {
-    it('unlocks drawer with correct password', async () => {
-      const drawer = await createDrawer('Test Drawer', 'correctPassword123');
-      const result = await unlockDrawer(drawer.id, 'correctPassword123');
-      
-      expect(result).not.toBeNull();
-      expect(result?.title).toBe('Test Drawer');
-      expect(result?.iconData).toBeDefined();
-    });
+      vi.mocked(fsPromises.lstat as any).mockResolvedValue({ isSymbolicLink: () => true });
 
-    it('returns null with wrong password', async () => {
-      const drawer = await createDrawer('Test Drawer', 'correctPassword123');
-      const result = await unlockDrawer(drawer.id, 'wrongPassword123');
-      
-      expect(result).toBeNull();
-    });
+      const handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      const result = await handler({}, token);
 
-    it('returns null with invalid ID', async () => {
-      const result = await unlockDrawer('not-a-uuid', 'password123');
-      expect(result).toBeNull();
-    });
-
-    it('returns null with non-existent drawer ID', async () => {
-      const fakeId = '123e4567-e89b-12d3-a456-426614174000';
-      const result = await unlockDrawer(fakeId, 'password123456');
-      expect(result).toBeNull();
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+        expect(result.error.message).toBe('Refusing to import a symbolic link');
+      }
+      expect(fsPromises.readFile).not.toHaveBeenCalled();
+      expect(store.importDrawerRaw).not.toHaveBeenCalled();
     });
   });
 
-  describe('save-drawer handler', () => {
-    it('saves drawer with updated content', async () => {
-      const drawer = await createDrawer('My Drawer', 'password123456');
-      const saveResult = await saveDrawer(drawer.id, 'password123456', 'Updated Title', 'New Content');
-      
-      expect(saveResult).toBe(true);
-
-      const unlocked = await unlockDrawer(drawer.id, 'password123456');
-      expect(unlocked?.title).toBe('Updated Title');
-      expect(unlocked?.content).toBe('New Content');
-    });
-
-    it('rejects save with invalid drawer ID', async () => {
-      const result = await saveDrawer('not-a-uuid', 'password123456', 'Title', 'Content');
-      expect(result).toBe(false);
-    });
-
-    it('rejects save with password shorter than 8 characters', async () => {
-      const drawer = await createDrawer('Test', 'password123456');
-      const result = await saveDrawer(drawer.id, 'short', 'Title', 'Content');
-      expect(result).toBe(false);
-    });
-
-    it('rejects save with non-existent drawer ID', async () => {
-      const fakeId = '123e4567-e89b-12d3-a456-426614174000';
-      const result = await saveDrawer(fakeId, 'password123456', 'Title', 'Content');
-      expect(result).toBe(false);
-    });
-  });
-
-  describe('delete-drawer handler', () => {
-    it('deletes an existing drawer', async () => {
-      const drawer = await createDrawer('To Delete', 'password123456');
-      const listBefore = await listDrawers();
-      expect(listBefore).toHaveLength(1);
-
-      const deleteResult = await deleteDrawer(drawer.id);
-      expect(deleteResult).toBe(true);
-
-      const listAfter = await listDrawers();
-      expect(listAfter).toHaveLength(0);
-    });
-
-    it('rejects delete with invalid ID', async () => {
-      const result = await deleteDrawer('not-a-uuid');
-      expect(result).toBe(false);
-    });
-
-    it('rejects delete with non-existent drawer ID', async () => {
-      const fakeId = '123e4567-e89b-12d3-a456-426614174000';
-      const result = await deleteDrawer(fakeId);
-      expect(result).toBe(false);
-    });
-  });
-
-  describe('export-drawer handler', () => {
-    it('exports drawer as JSON string', async () => {
-      const drawer = await createDrawer('Export Test', 'password123456');
-      const exported = await readDrawerRaw(drawer.id);
-      
-      expect(typeof exported).toBe('string');
-      const parsed = JSON.parse(exported);
-      expect(parsed.id).toBe(drawer.id);
-      expect(parsed.title).toBe('Export Test');
-      expect(parsed.encryptedData).toBeDefined();
-    });
-
-    it('returns null for non-existent drawer', async () => {
-      const fakeId = '123e4567-e89b-12d3-a456-426614174000';
-      const result = await readDrawerRaw(fakeId);
-      expect(result).toBeNull();
-    });
-
-    it('returns null for invalid ID', async () => {
-      const result = await readDrawerRaw('not-a-uuid');
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('import-drawer handler', () => {
-    it('imports drawer from JSON string', async () => {
-      const original = await createDrawer('Original', 'password123456');
-      const exported = await readDrawerRaw(original.id);
-
-      await deleteDrawer(original.id);
-      let drawers = await listDrawers();
-      expect(drawers).toHaveLength(0);
-
-      const imported = await importDrawerRaw(exported);
-      expect(imported).toBe(true);
-
-      drawers = await listDrawers();
-      expect(drawers).toHaveLength(1);
-      expect(drawers[0].id).toBe(original.id);
-      expect(drawers[0].title).toBe('Original');
-    });
-
-    it('rejects import with invalid JSON', async () => {
-      const result = await importDrawerRaw('invalid json');
-      expect(result).toBe(false);
-    });
-
-    it('rejects import with malformed drawer', async () => {
-      const malformed = JSON.stringify({ id: 'not-a-uuid', title: 'Bad' });
-      const result = await importDrawerRaw(malformed);
-      expect(result).toBe(false);
-    });
-
-    it('handles import of drawer with large content', async () => {
-      const original = await createDrawer('Large', 'password123456');
-      const largeContent = 'x'.repeat(100000);
-      
-      const saved = await saveDrawer(original.id, 'password123456', 'Large Drawer', largeContent);
-      expect(saved).toBe(true);
-
-      const exported = await readDrawerRaw(original.id);
-      await deleteDrawer(original.id);
-
-      const imported = await importDrawerRaw(exported);
-      expect(imported).toBe(true);
-
-      const unlocked = await unlockDrawer(original.id, 'password123456');
-      expect(unlocked?.content).toBe(largeContent);
-    });
-  });
-
-  describe('open-file-dialog handler simulation', () => {
-    it('simulates file path validation via isValidId for drawer IDs', async () => {
-      expect(isValidId('../../../etc/passwd')).toBe(false);
-      expect(isValidId('/etc/passwd')).toBe(false);
-      expect(isValidId('123e4567-e89b-12d3-a456-426614174000')).toBe(true);
-    });
-  });
-
-  describe('IPC handler error handling', () => {
-    it('handles concurrent drawer operations', async () => {
-      const promises = [
-        createDrawer('Drawer 1', 'password123456'),
-        createDrawer('Drawer 2', 'password654321'),
-        createDrawer('Drawer 3', 'passwordABCDEF'),
+  describe('handler registration', () => {
+    it('registers all 8 expected channels', () => {
+      const expected = [
+        'list-drawers',
+        'create-drawer',
+        'unlock-drawer',
+        'save-drawer',
+        'delete-drawer',
+        'export-drawer',
+        'open-file-dialog',
+        'import-drawer',
       ];
-
-      const results = await Promise.all(promises);
-      expect(results).toHaveLength(3);
-      expect(results.map((d) => d.id)).toHaveLength(3);
-
-      const drawers = await listDrawers();
-      expect(drawers).toHaveLength(3);
-    });
-
-    it('preserves drawer data after save operations', async () => {
-      const drawer = await createDrawer('Persistent', 'password123456');
-      const originalId = drawer.id;
-
-      await saveDrawer(drawer.id, 'password123456', 'Modified Title', 'Modified Content');
-      await saveDrawer(drawer.id, 'password123456', 'Final Title', 'Final Content');
-
-      const unlocked = await unlockDrawer(originalId, 'password123456');
-      expect(unlocked?.title).toBe('Final Title');
-      expect(unlocked?.content).toBe('Final Content');
+      for (const channel of expected) {
+        expect(handlers.has(channel), `missing handler for ${channel}`).toBe(true);
+      }
+      expect(handlers.size).toBe(expected.length);
     });
   });
 
-  describe('Result<T> type validation', () => {
-    it('validates Result structure for successful operations', async () => {
-      const drawer = await createDrawer('Test', 'password123456');
-      expect(drawer).toHaveProperty('id');
-      expect(drawer).toHaveProperty('title');
-      expect(drawer).toHaveProperty('encryptedData');
+  describe('Result envelope', () => {
+    it('always returns either ok:true with data or ok:false with structured error', async () => {
+      vi.mocked(store.listDrawers).mockRejectedValue(new Error('x'));
+      const handler = getHandler<(e: any) => Promise<Result<any>>>('list-drawers');
+      const result = await handler({});
+      expect('ok' in result).toBe(true);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toHaveProperty('code');
+        expect(result.error).toHaveProperty('message');
+        expect(Object.values(ErrorCode)).toContain(result.error.code);
+      }
     });
+  });
 
-    it('validates unlock returns proper structure on success', async () => {
-      const drawer = await createDrawer('Test', 'password123456');
-      const result = await unlockDrawer(drawer.id, 'password123456');
-      
-      expect(result).not.toBeNull();
-      expect(result).toHaveProperty('title');
-      expect(result).toHaveProperty('content');
-      expect(result).toHaveProperty('iconData');
-    });
+  describe('token whitelist (allowedImportPaths)', () => {
+    it('__resetAllowedImportPaths clears the whitelist', async () => {
+      const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/a.clavis'] });
+      handlers.clear();
+      registerIpcHandlers({
+        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        dialog: { showOpenDialog },
+      });
+      const dlgResult = await handlers.get('open-file-dialog')!({});
+      if (!dlgResult.ok) throw new Error('expected ok');
+      const token = dlgResult.data!.token;
 
-    it('validates unlock returns null on failure (wrong password)', async () => {
-      const drawer = await createDrawer('Test', 'password123456');
-      const result = await unlockDrawer(drawer.id, 'wrongPassword');
-      
-      expect(result).toBeNull();
-    });
+      let handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      vi.mocked(fsPromises.readFile as any).mockResolvedValue('{}');
+      vi.mocked(store.importDrawerRaw).mockResolvedValue(true);
+      await handler({}, token);
 
-    it('validates save returns boolean on success', async () => {
-      const drawer = await createDrawer('Test', 'password123456');
-      const result = await saveDrawer(drawer.id, 'password123456', 'New Title', 'New Content');
-      
-      expect(typeof result).toBe('boolean');
-      expect(result).toBe(true);
-    });
-
-    it('validates save returns false on failure', async () => {
-      const result = await saveDrawer('invalid-id', 'password123456', 'Title', 'Content');
-      
-      expect(typeof result).toBe('boolean');
-      expect(result).toBe(false);
-    });
-
-    it('validates delete returns boolean', async () => {
-      const drawer = await createDrawer('Test', 'password123456');
-      const result = await deleteDrawer(drawer.id);
-      
-      expect(typeof result).toBe('boolean');
-      expect(result).toBe(true);
-    });
-
-    it('validates export returns string or null', async () => {
-      const drawer = await createDrawer('Test', 'password123456');
-      const result = await readDrawerRaw(drawer.id);
-      
-      expect(result === null || typeof result === 'string').toBe(true);
-    });
-
-    it('validates ErrorCode enum has all required values', () => {
-      expect(ErrorCode.INVALID_ID).toBe('INVALID_ID');
-      expect(ErrorCode.PASSWORD_TOO_SHORT).toBe('PASSWORD_TOO_SHORT');
-      expect(ErrorCode.DECRYPT_FAILED).toBe('DECRYPT_FAILED');
-      expect(ErrorCode.WRITE_FAILED).toBe('WRITE_FAILED');
-      expect(ErrorCode.FILE_NOT_FOUND).toBe('FILE_NOT_FOUND');
-      expect(ErrorCode.INVALID_JSON).toBe('INVALID_JSON');
-      expect(ErrorCode.VALIDATION_ERROR).toBe('VALIDATION_ERROR');
+      __resetAllowedImportPaths();
+      handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      const replay = await handler({}, VALID_UUID_2);
+      expect(replay.ok).toBe(false);
+      if (!replay.ok) {
+        expect(replay.error.message).toBe('Invalid or expired import token');
+      }
     });
   });
 });
