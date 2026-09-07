@@ -52,9 +52,9 @@ Compiles TypeScript + bundles renderer via Vite:
 
 | File | Purpose |
 |------|---------|
-| `forge.config.ts` | electron-forge config — all makers, per-platform icon, `asar.unpack` for argon2 |
+| `forge.config.mts` | electron-forge config — all makers, per-platform icon, `asar.unpack` for argon2 |
 | `.github/workflows/release.yml` | CI: build matrix (ubuntu/windows/macos) + release job |
-| `vite.config.ts` | Renderer bundling (React + Tailwind + SVGR) |
+| `vite.config.mts` | Renderer bundling (React + Tailwind + SVGR) |
 | `tsconfig.json` | TypeScript config (main: CommonJS, renderer: ESM) |
 
 ## CI/CD Workflow

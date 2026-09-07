@@ -23,7 +23,7 @@ The repo [ribaudequin/clavis](https://github.com/ribaudequin/clavis) is an Elect
 
 The dual build system (electron-builder for AppImage/Portable/NSIS + Forge for deb) was **consolidated to a single Electron Forge setup**. `electron-builder`, the `build` block in `package.json`, and its scripts (`make:appimage`, `make:windows`) were removed.
 
-### `forge.config.ts`
+### `forge.config.mts`
 
 Uses `process.platform` to pick the packager icon per OS and declares one maker per platform:
 

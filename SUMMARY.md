@@ -4,27 +4,16 @@
 
 **Project:** Clavis — Cross-platform encrypted notes app (Electron + TypeScript + React + AES-256-GCM + Argon2id)
 
-**Current version:** 0.1.6-alpha (2026-09-04, CI-built, P0 UX visually verified)
+**Current version:** 0.1.7-alpha (2026-09-07, IPC-layer hardening)
 
-**State:** All 23 audit findings fixed. Phase 0 security complete (token import whitelist, password min-length, Zod validation). Import feature complete; full drawer flow create → list → import → unlock → view/edit → save/delete. **UI:** `DeleteConfirmModal` (red bg, biohazard `danger.svg`); toast system replaced all `alert()`; focus traps + shortcuts on all modals; skeleton loaders; visibility toggle in both password modals; strength meter in CreateDrawerModal only (between password/confirm). Store `src/main/store.ts`. **51/51 tests pass**, tsc + eslint clean.
+**State:** All 23 audit findings fixed. Phase 0 security complete. **v0.1.7-alpha hardening:** B2 symlink rejection in `import-drawer` (`fs.lstat` + reject); B2 strip `details: e` from import-read error envelope; B3 decrypted content size cap (10 MB); B5 `CHANNELS` const (`src/shared/channels.ts`, kills drift risk between ipc-handlers + preload); doc sweep `.config.ts` → `.config.mts`. **54/54 tests pass**, tsc + eslint clean. Audits: `audit_2026-09-07-appsec.md` (P2 only — no blockers), `review_2026-09-07-code.md`.
 
-**Release 0.1.4-alpha (2026-09-03):** DeleteConfirmModal + danger.svg; 6 assets (deb, AppImage, Setup.exe, zip, nupkg, dmg). Run `33790511624` green. AppImage smoke-tested.
+**Phase 1 P1.2 (2026-09-07):** configs renamed `.ts` → `.mts`. Phase 1 P1.3 (2026-09-07): IPC handlers extracted from `index.ts` → `src/main/ipc-handlers.ts` with `registerIpcHandlers({ ipcMain, dialog })` (DI for testability). 8 handlers, 34 tests.
 
-**CI/CD (2026-09-03):** Single Electron Forge + `release.yml` — 6 targets on native runners, publish on tag push. v0.1.3-alpha first green CI run (`33781273256`). Local Linux validated. `scripts/backup/` for old scripts.
+**CI/CD (2026-09-03):** Single Electron Forge + `release.yml` — 6 targets on native runners, publish on tag push. AppSec + code review audits 2026-09-07.
 
-**2026-09-03 Audits:** 
-- `audit_2026-09-03.md` — comprehensive 5-sub-agent audit (Security, Build, UI/UX, Code Quality, Documentation) 
-- `audit_2026-09-03-ui-ux.md` — dedicated UI/UX audit
-
-**Priority findings (P0 — blocks user trust):**
-1. Replace all `alert()` with toast system (`aria-live="polite"`)
-2. Add focus traps to all 4 modals (WCAG 2.4.3)
-3. Implement skeleton loaders for drawer list
-
-**Release 0.1.6-alpha (2026-09-04):** P0 UX complete + visually verified; SemVer fix for Windows Squirrel; CI green.
-
-**Focus next:** Phase 1 — P1.2 (ESM/CommonJS), P1.3 (IPC handler tests), CI quality gates. Smoke tests: AppImage (Linux) + Win ZIP done; dmg CI-built but unverifiable (no Mac).
+**Focus next:** Phase 1 — P1.13 CI quality gates (lint+typecheck+test before make), `npm run make` validation all 4 platforms.
 
 **Read more if:** Technical decision → PLANO.md | Task list → TODO.md | Full history → /MEMORY/HISTORY.md
 
-_Last updated: 2026-09-04_
+_Last updated: 2026-09-07 (v0.1.7-alpha)_

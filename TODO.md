@@ -28,13 +28,25 @@
 - [x] P0.3: Add Zod runtime validation to IPC handlers (schema validation for 4 handlers) — DONE (6 schemas in validation.ts, all handlers use `.parse()`)
 - [x] Run `npm run test` — all must pass (51/51)
 
+## v0.1.7-alpha — IPC-layer hardening (2026-09-07)
+
+- [x] B2: Symlink rejection in `import-drawer` (`fs.lstat` + `isSymbolicLink()` reject) — DONE
+- [x] B2: Strip `details: e` from import-read error envelope — DONE (prevents raw exception text crossing IPC)
+- [x] B3: Decrypted content size cap 10 MB in `encryption.ts:decrypt` — DONE (mirrors Zod `SaveDrawerSchema.content.max(10_000_000)`)
+- [x] B5: `CHANNELS` const in `src/shared/channels.ts` (1 source of truth for IPC channel names) — DONE
+- [x] Doc sweep `.config.ts` → `.config.mts` in `BUILD_MANUAL.md`, `BUILD_TARGETS.md`, `docs/clavis-ci-cd-setup.md` — DONE
+- [x] Version bump 0.1.6-alpha → 0.1.7-alpha — DONE
+- [x] AppSec audit `audits/audit_2026-09-07-appsec.md` — DONE (no P0/P1; P2 only, all fixed)
+- [x] Code review `audits/review_2026-09-07-code.md` — DONE
+
 ## Phase 1 — BUILD SYSTEM & RELIABILITY (High Priority)
 
 - [x] P1.1: Resolve dual build system (remove electron-builder, keep Forge) — DONE 2026-09-03 (consolidated to single Forge; electron-builder removed)
-- [ ] P1.2: Fix ESM/CommonJS mismatch (`"type": "module"`) — 0.5h
-- [ ] P1.3: Add IPC handler tests (8 handlers, vitest mocking) — 6h
+- [x] P1.2: Fix ESM/CommonJS mismatch — DONE 2026-09-07 (renamed `forge.config.ts`/`vite.config.ts`/`vitest.config.ts` → `.mts`; electron-forge 7.11.2 + Vitest + Vite all support `.mts` natively; `tsconfig.json` excludes `*.config.mts`; CommonJS preserved for `src/main` runtime via Electron; `npm run make` validated Linux → deb (215M) + AppImage (244M))
+- [x] P1.3: Add IPC handler tests (8 handlers, vitest mocking) — DONE 2026-09-07 (extracted `handleIPC()` from `index.ts` → `registerIpcHandlers({ ipcMain, dialog })` in `src/main/ipc-handlers.ts`; 34 tests in `tests/ipc-handlers.test.ts`; `dialog` DI for testability; covers Zod validation, error codes, token whitelist + atomic consume)
 - [ ] P1.4: Code signing (deferred; document unsigned status in README) — SKIP
-- [ ] Verify `npm run make` builds all 4 platforms successfully
+- [x] Verify `npm run make` builds Linux targets (deb + AppImage) — DONE 2026-09-07
+- [ ] P1.13: CI quality gates (lint + typecheck + test before build/make)
 
 ## Phase 2 — UX/DX IMPROVEMENTS (Medium Priority)
 
@@ -96,9 +108,11 @@
 - [ ] Code signing (EV certs, Apple notarization) — post-v1.0 if needed
 
 ## Progress
-- **Done**: All 23 audit-2026-08-30 findings fixed, full drawer flow (+ import UI), security hardening, store extraction, 51/51 tests, **v0.1.4-alpha** (2026-09-03): **DeleteConfirmModal** replaces native `confirm()` on delete in HomeScreen + ViewDrawer (red bg, `danger.svg` biohazard red/black icon, irreversible warning); 6 assets published (deb 94M, AppImage 123M, Setup.exe 150M, zip 154M, nupkg 149M, dmg 125M), run `33790511624` green, AppImage smoke-tested. **v0.1.3-alpha** bumped earlier same day. **v0.1.2-alpha** baseline: import drawer button, 4 targets via Wine 10, `gh release create` 4 assets. **v0.1.1-alpha**: fixed `argon2` Win32 `PE32+` via `afterPack` + `scrypt` fallback, save/delete `Result` mismatch, Windows `confirm()` focus steal.
-- [x] **Tested**: Encryption round-trip, wrong-password rejection, drawer CRUD, path-traversal rejection, import drawer flow, HomeScreen rendering, all build targets, ASAR content, AppImage runtime (`Clavis started`), Windows `PE32+` verified, save/delete `Result` flow, Windows modal focus after delete, CI-built `v0.1.3-alpha` (AppImage Linux + ZIP Windows 11) and `v0.1.4-alpha` (AppImage delete-confirm UI)
+- **Done**: All 23 audit-2026-08-30 findings fixed, full drawer flow (+ import UI), security hardening, store extraction. **v0.1.7-alpha** (2026-09-07): IPC-layer hardening — B2 symlink rejection + strip `details: e`, B3 decrypt size cap 10 MB, B5 `CHANNELS` const (kills drift risk), doc sweep. **v0.1.6-alpha** (2026-09-04): P0 UX (toast system, focus traps, skeleton loaders, password visibility toggle, strength meter in CreateDrawerModal only). **v0.1.4-alpha** (2026-09-03): DeleteConfirmModal + `danger.svg`. **v0.1.3-alpha** (2026-09-03): first CI-built green run `33781273256`. **v0.1.2-alpha** baseline: import drawer button. **v0.1.1-alpha**: fixed `argon2` Win32 `PE32+` via `afterPack` + `scrypt` fallback, save/delete `Result` mismatch, Windows `confirm()` focus steal.
+- [x] **Tested**: Encryption round-trip, wrong-password rejection, drawer CRUD, path-traversal rejection, import drawer flow, HomeScreen rendering, all build targets, ASAR content, AppImage runtime, Windows `PE32+` verified, save/delete `Result` flow, Windows modal focus after delete, CI-built `v0.1.3-alpha` (AppImage Linux + ZIP Windows 11), CI-built `v0.1.4-alpha` (AppImage delete-confirm UI), **v0.1.7-alpha (54/54 tests)** — symlink rejection, decrypt size cap, CHANNELS const, all 8 IPC handlers
 - [x] **Audit 2026-09-01**: 14 recommendations validated by 4 specialized sub-agents; consolidated into 4-phase roadmap (Phase 0-3, ~35h total; MVP target 18.75h)
+- [x] **Audit 2026-09-07 (appsec)**: IPC layer review after P1.3 extraction — refactor regressions all PASS (A1-A7); 2 P2 soft-blocking (B2 symlink, B3 decrypt size) fixed in v0.1.7-alpha; 1 P3 hygiene (B5 CHANNELS const) bundled. `audits/audit_2026-09-07-appsec.md`.
+- [x] **Code review 2026-09-07**: P1.2 + P1.3 confirmed correct, byte-identical extraction, no behavioral drift. Verdict WITH-MINOR-FIXES — all fixes bundled in v0.1.7-alpha. `audits/review_2026-09-07-code.md`.
 
-_P0 UX items from audit_2026-09-03-ui-ux.md: toast system (P0.1), focus traps (P0.2), skeleton loaders (P0.3) — all COMPLETED and visually verified in v0.1.6-alpha (visibility toggle in both modals, strength meter in CreateDrawerModal only, between password and confirm fields)._
-- **Current focus**: Phase 1 build blockers — P1.2 (ESM/CommonJS), P1.3 (IPC handler tests), CI quality gates.
+_AppSec findings: B1 prototype pollution (PASS — not exploitable), B4 brute force (P3 — bounded by Argon2id cost), B5 channel collision (P3 hygiene — fixed in same release), B6 preload surface (PASS — minimal type-aligned surface)._
+- **Current focus**: Phase 1 — P1.13 CI quality gates (lint+typecheck+test before make), then `npm run make` validation all 4 platforms.
