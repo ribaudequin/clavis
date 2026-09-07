@@ -72,7 +72,9 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
       </header>
 
       <main className="flex-1 px-6 py-6 max-w-4xl mx-auto w-full flex flex-col">
+        <label htmlFor="drawer-title-input" className="sr-only">Title</label>
         <input
+          id="drawer-title-input"
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -80,7 +82,9 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
           placeholder="Drawer title"
           className="w-full border rounded px-3 py-2 text-sm mb-4 bg-white disabled:opacity-50"
         />
+        <label htmlFor="drawer-content-textarea" className="sr-only">Content</label>
         <textarea
+          id="drawer-content-textarea"
           value={content}
           onChange={(e) => setContent(e.target.value)}
           disabled={saving || deleting}

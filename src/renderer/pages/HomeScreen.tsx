@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DrawerListItem, EncryptedDrawer, ElectronAPI } from '../../shared/types';
 import PasswordModal from '../components/PasswordModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
@@ -10,6 +10,8 @@ import GithubIcon from '../../../icons/svg/github.svg?react';
 import EthIcon from '../../../icons/svg/eth.svg?react';
 import SolIcon from '../../../icons/svg/sol.svg?react';
 import KoFiIcon from '../../../icons/svg/ko-fi.svg?react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
+import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import { toast } from 'react-hot-toast';
 
 declare global {
@@ -39,6 +41,12 @@ function HomeScreen(): React.JSX.Element {
   const [importing, setImporting] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmDeleteTitle, setConfirmDeleteTitle] = useState('');
+  const creditsModalRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(creditsModalRef, { isActive: showCreditsModal, onEscape: () => setShowCreditsModal(false) });
+  useModalKeyboard(creditsModalRef, {
+    onEscape: () => setShowCreditsModal(false),
+  });
 
   const api = (): ElectronAPI => window.electronAPI;
 
@@ -228,7 +236,7 @@ function HomeScreen(): React.JSX.Element {
             </button>
               <button
                 onClick={() => setShowCreditsModal(true)}
-                className="p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
+                className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
                 aria-label="Credits"
                 title="Credits"
               >
@@ -251,32 +259,40 @@ function HomeScreen(): React.JSX.Element {
             </button>
           </div>
         ) : (
-          <div className="space-y-2">
+          <ul className="space-y-2" role="list">
             {drawers.map((drawer) => (
-              <div
+              <li
                 key={drawer.id}
-                onClick={() => !exportingId && !deletingId && handleDrawerClick(drawer.id, drawer.title)}
-                className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm hover:bg-gray-50 cursor-pointer"
+                className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm hover:bg-gray-50"
               >
-                <div>{renderIcon(drawer.iconData)}</div>
-                <span className="flex-1 text-gray-800">{drawer.title}</span>
                 <button
+                  type="button"
+                  onClick={() => !exportingId && !deletingId && handleDrawerClick(drawer.id, drawer.title)}
+                  disabled={!!exportingId || !!deletingId}
+                  className="flex-1 flex items-center gap-3 text-left disabled:opacity-50"
+                >
+                  <div aria-hidden="true">{renderIcon(drawer.iconData)}</div>
+                  <span className="flex-1 text-gray-800">{drawer.title}</span>
+                </button>
+                <button
+                  type="button"
                   onClick={(e) => { e.stopPropagation(); handleExport(drawer.id); }}
                   disabled={exportingId === drawer.id}
-                  className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                  className="text-xs text-gray-600 hover:text-gray-700 disabled:opacity-50"
                 >
                   {exportingId === drawer.id ? 'Exporting...' : 'Export'}
                 </button>
                 <button
+                  type="button"
                   onClick={(e) => { e.stopPropagation(); handleDelete(drawer.id); setConfirmDeleteTitle(drawer.title); }}
                   disabled={deletingId === drawer.id}
-                  className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
+                  className="text-xs text-red-700 hover:text-red-800 disabled:opacity-50"
                 >
                   {deletingId === drawer.id ? 'Deleting...' : 'Delete'}
                 </button>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </main>
 
@@ -316,10 +332,16 @@ function HomeScreen(): React.JSX.Element {
       )}
 
       {showCreditsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" role="dialog" aria-modal="true">
+        <div
+          ref={creditsModalRef}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="credits-title"
+        >
           <div className="bg-white rounded-lg p-6 w-[480px] max-h-[85vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Credits &amp; support</h2>
+              <h2 id="credits-title" className="text-lg font-semibold">Credits &amp; support</h2>
               <button
                 onClick={() => setShowCreditsModal(false)}
                 className="text-gray-500 hover:text-gray-700"

@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn() },
   dialog: { showOpenDialog: vi.fn() },
+  app: { quit: vi.fn() },
 }));
 
 vi.mock('../src/main/store.js', () => ({
@@ -569,7 +570,7 @@ describe('IPC handlers', () => {
   });
 
   describe('handler registration', () => {
-    it('registers all 8 expected channels', () => {
+    it('registers all 9 expected channels', () => {
       const expected = [
         'list-drawers',
         'create-drawer',
@@ -579,6 +580,7 @@ describe('IPC handlers', () => {
         'export-drawer',
         'open-file-dialog',
         'import-drawer',
+        'restart-app',
       ];
       for (const channel of expected) {
         expect(handlers.has(channel), `missing handler for ${channel}`).toBe(true);

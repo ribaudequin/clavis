@@ -1,4 +1,4 @@
-import React, { useEffect, RefObject } from 'react';
+import React, { useEffect, useRef, RefObject } from 'react';
 
 interface UseFocusTrapOptions {
   isActive?: boolean;
@@ -10,11 +10,22 @@ export function useFocusTrap(
   options: UseFocusTrapOptions = {}
 ): void {
   const { isActive = true, onEscape } = options;
+  const previouslyFocused = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (!isActive || !containerRef.current) return;
+    if (!isActive) {
+      if (previouslyFocused.current && document.body.contains(previouslyFocused.current)) {
+        previouslyFocused.current.focus();
+      }
+      previouslyFocused.current = null;
+      return;
+    }
 
     const container = containerRef.current;
+    if (!container) return;
+
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+
     const focusable = container.querySelectorAll<HTMLElement>(
       'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
     );
@@ -53,6 +64,10 @@ export function useFocusTrap(
     return () => {
       container.removeEventListener('keydown', handleTab);
       container.removeEventListener('keydown', handleEscape);
+      if (previouslyFocused.current && document.body.contains(previouslyFocused.current)) {
+        previouslyFocused.current.focus();
+      }
+      previouslyFocused.current = null;
     };
   }, [containerRef, isActive, onEscape]);
 }

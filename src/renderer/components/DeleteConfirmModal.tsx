@@ -39,6 +39,7 @@ function DeleteConfirmModal({ drawerTitle, onConfirm, onCancel }: DeleteConfirmM
       role="dialog"
       aria-modal="true"
       aria-labelledby="delete-confirm-title"
+      aria-describedby="delete-confirm-desc"
     >
       <div className="bg-red-50 border-2 border-red-600 rounded-lg p-6 w-96 shadow-xl">
         <div className="w-12 h-12 mx-auto mb-4 flex items-center justify-center">
@@ -50,7 +51,7 @@ function DeleteConfirmModal({ drawerTitle, onConfirm, onCancel }: DeleteConfirmM
         {drawerTitle && (
           <p className="text-sm text-red-700 text-center mb-2 font-medium">&quot;{drawerTitle}&quot;</p>
         )}
-        <p className="text-sm text-red-800 text-center mb-6">
+        <p id="delete-confirm-desc" className="text-sm text-red-800 text-center mb-6">
           This action is <span className="font-bold">irreversible</span>. Once deleted, the drawer and all its contents cannot be recovered.
         </p>
         <div className="flex justify-center gap-3">

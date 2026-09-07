@@ -17,6 +17,7 @@ function buildStub(): Window['electronAPI'] {
     exportDrawer: async (): Promise<Result<string>> => ({ ok: true, data: '' }),
     importDrawer: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
     openFile: async (): Promise<Result<{ token: string; fileName: string } | null>> => ({ ok: true, data: null }),
+    restartApp: async (): Promise<void> => undefined,
   };
 }
 

@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { randomUUID } from 'crypto';
+import { app } from 'electron';
 import { z } from 'zod';
 import {
   ensureDataDir,
@@ -372,6 +373,23 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           code: ErrorCode.WRITE_FAILED,
           message: 'Failed to import drawer',
           details: e,
+        },
+      };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.RESTART_APP, async (): Promise<Result<void>> => {
+    try {
+      logger.info('Restart requested via IPC', {});
+      setImmediate(() => app.quit());
+      return { ok: true, data: undefined };
+    } catch (e) {
+      logger.error('restart-app failed', { error: e instanceof Error ? e.message : String(e) });
+      return {
+        ok: false,
+        error: {
+          code: ErrorCode.WRITE_FAILED,
+          message: 'Failed to restart app',
         },
       };
     }

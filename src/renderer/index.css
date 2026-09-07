@@ -2,8 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  @apply border-none outline-none;
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 body {
