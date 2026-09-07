@@ -4,16 +4,14 @@
 
 **Project:** Clavis — Cross-platform encrypted notes app (Electron + TypeScript + React + AES-256-GCM + Argon2id)
 
-**Current version:** 0.1.7-alpha (2026-09-07, IPC-layer hardening)
+**Current version:** 0.1.8-alpha (2026-09-07, Phase 2 a11y + ErrorBoundary)
 
-**State:** All 23 audit findings fixed. Phase 0 security complete. **v0.1.7-alpha hardening:** B2 symlink rejection in `import-drawer` (`fs.lstat` + reject); B2 strip `details: e` from import-read error envelope; B3 decrypted content size cap (10 MB); B5 `CHANNELS` const (`src/shared/channels.ts`, kills drift risk between ipc-handlers + preload); doc sweep `.config.ts` → `.config.mts`. **54/54 tests pass**, tsc + eslint clean. Audits: `audit_2026-09-07-appsec.md` (P2 only — no blockers), `review_2026-09-07-code.md`.
+**State:** All 23 audit findings fixed. Phase 0 + Phase 1 + Phase 2 P0 a11y complete. **v0.1.8-alpha (2026-09-07):** 3 P0 a11y blockers fixed (focus indicator restored, drawer rows → semantic `<button>`+`<ul>`, credits modal now has `useFocusTrap`+`useModalKeyboard`); 10 P1 quick wins (focus restoration on modal close, `aria-pressed` on toggles, `aria-describedby` on inputs, color contrast fix red-500→red-700 / gray-500→gray-600, sr-only labels in ViewDrawer, `aria-describedby` in DeleteConfirmModal, 44×44 touch target on heart icon, `aria-hidden` on icon grid); `restartApp` IPC implemented end-to-end (channels + preload + main + types) — fixes the ErrorBoundary that silently fell back to `window.location.reload()`. **58/58 tests pass**, tsc + eslint clean. A11y audit `audits/audit_2026-09-07-a11y.md`.
 
-**Phase 1 P1.2 (2026-09-07):** configs renamed `.ts` → `.mts`. Phase 1 P1.3 (2026-09-07): IPC handlers extracted from `index.ts` → `src/main/ipc-handlers.ts` with `registerIpcHandlers({ ipcMain, dialog })` (DI for testability). 8 handlers, 34 tests.
+**Phase 1 complete (2026-09-07):** P1.1 dual build system, P1.2 ESM/CommonJS (.mts), P1.3 IPC handler tests (8 → 9 channels), P1.13 CI quality gates. Phase 0 (2026-09-03): token import whitelist, password min-length, Zod validation. v0.1.7-alpha (2026-09-07): B2+B3+B5 IPC hardening, productName pin.
 
-**CI/CD (2026-09-03):** Single Electron Forge + `release.yml` — 6 targets on native runners, publish on tag push. AppSec + code review audits 2026-09-07.
-
-**Focus next:** Phase 1 — P1.13 CI quality gates (lint+typecheck+test before make), `npm run make` validation all 4 platforms.
+**Focus next:** Phase 2 remaining P1 a11y polish (live region for list updates, error inline vs toast), Phase 3 P3.1 (renderer component tests), or Post-MVP (auto-updater / i18n).
 
 **Read more if:** Technical decision → PLANO.md | Task list → TODO.md | Full history → /MEMORY/HISTORY.md
 
-_Last updated: 2026-09-07 (v0.1.7-alpha)_
+_Last updated: 2026-09-07 (v0.1.8-alpha)_

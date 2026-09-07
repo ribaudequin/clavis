@@ -28,6 +28,24 @@
 - [x] P0.3: Add Zod runtime validation to IPC handlers (schema validation for 4 handlers) — DONE (6 schemas in validation.ts, all handlers use `.parse()`)
 - [x] Run `npm run test` — all must pass (51/51)
 
+## v0.1.8-alpha — Phase 2 P0 a11y + ErrorBoundary fix (2026-09-07)
+
+- [x] A2 P0: Restore visible focus indicator (`src/renderer/index.css` — remove `* { outline-none }`, add `*:focus-visible { outline: 2px solid #2563eb }`) — DONE
+- [x] A1 P0: Drawer rows are now semantic `<button>` inside `<ul role="list">` (`HomeScreen.tsx`) — DONE
+- [x] A1 P0 / A5 P0: Credits modal wraps `useFocusTrap` + `useModalKeyboard` (`HomeScreen.tsx:319`) — DONE
+- [x] A5 P1: `useFocusTrap` captures trigger element on mount, restores focus on unmount — DONE
+- [x] A3 P1: `aria-pressed` on eye-icon toggles (PasswordModal + CreateDrawerModal) — DONE
+- [x] A3 P1: `aria-describedby="password-error"` on PasswordModal input — DONE
+- [x] A4 P1: `text-red-500` → `text-red-700`, `text-gray-500` → `text-gray-600` (contrast ≥4.5:1) — DONE
+- [x] A6 P1: `<label className="sr-only">` for ViewDrawer title + content inputs — DONE
+- [x] A3 P1: `aria-describedby="delete-confirm-desc"` on DeleteConfirmModal — DONE
+- [x] A9 P1: Heart icon button `p-1` → `p-2` (40×40 touch target) — DONE
+- [x] A3 P2: `aria-hidden="true"` on decorative 3×3 icon grid — DONE
+- [x] **ErrorBoundary.restartApp implemented end-to-end**: `src/shared/channels.ts` adds `RESTART_APP`, `src/shared/types.ts` adds `restartApp: () => Promise<void>`, `src/main/preload/index.ts` exposes it, `src/main/ipc-handlers.ts` registers the handler calling `app.quit()` via `setImmediate`. Tests updated to mock `app` in `vi.mock('electron', ...)` — DONE
+- [x] A11y audit `audits/audit_2026-09-07-a11y.md` — DONE (3 P0 + 10 P1 quick wins + ~5 P2 polish deferred)
+- [x] Version bump 0.1.7-alpha → 0.1.8-alpha — DONE
+- **58/58 tests pass**, tsc + eslint clean.
+
 ## v0.1.7-alpha — IPC-layer hardening (2026-09-07)
 
 - [x] B2: Symlink rejection in `import-drawer` (`fs.lstat` + `isSymbolicLink()` reject) — DONE
@@ -46,7 +64,7 @@
 - [x] P1.3: Add IPC handler tests (8 handlers, vitest mocking) — DONE 2026-09-07 (extracted `handleIPC()` from `index.ts` → `registerIpcHandlers({ ipcMain, dialog })` in `src/main/ipc-handlers.ts`; 34 tests in `tests/ipc-handlers.test.ts`; `dialog` DI for testability; covers Zod validation, error codes, token whitelist + atomic consume)
 - [ ] P1.4: Code signing (deferred; document unsigned status in README) — SKIP
 - [x] Verify `npm run make` builds Linux targets (deb + AppImage) — DONE 2026-09-07
-- [ ] P1.13: CI quality gates (lint + typecheck + test before build/make)
+- [ ] P1.13: CI quality gates (lint + typecheck + test before build/make) — DONE 2026-09-07 (`quality` job in `.github/workflows/release.yml`, runs in 28s; `build` job gated by `if: startsWith(github.ref, 'refs/tags/v')` + `needs: quality`; CI run `34146157247` green)
 
 ## Phase 2 — UX/DX IMPROVEMENTS (Medium Priority)
 
@@ -115,4 +133,4 @@
 - [x] **Code review 2026-09-07**: P1.2 + P1.3 confirmed correct, byte-identical extraction, no behavioral drift. Verdict WITH-MINOR-FIXES — all fixes bundled in v0.1.7-alpha. `audits/review_2026-09-07-code.md`.
 
 _AppSec findings: B1 prototype pollution (PASS — not exploitable), B4 brute force (P3 — bounded by Argon2id cost), B5 channel collision (P3 hygiene — fixed in same release), B6 preload surface (PASS — minimal type-aligned surface)._
-- **Current focus**: Phase 1 — P1.13 CI quality gates (lint+typecheck+test before make), then `npm run make` validation all 4 platforms.
+- **Current focus**: Phase 2 P1 a11y polish (live region for list updates, inline validation) OR Phase 3 P3.1 (renderer component tests). Phase 1 + Phase 2 P0 complete.
