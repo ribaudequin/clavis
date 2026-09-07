@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { encrypt, decrypt, deriveKey, generateSalt } from '../src/main/encryption';
+import { encrypt, decrypt, deriveKey, generateSalt, MAX_DECRYPTED_SIZE } from '../src/main/encryption';
 
 describe('encryption module', () => {
   it('should generate a 16-byte salt', () => {
@@ -56,5 +56,16 @@ describe('encryption module', () => {
     await expect(
       decrypt(encryptedData, salt, iv, authTag, 'wrong-password')
     ).rejects.toThrow();
+  });
+
+  it('should throw "Decrypted content exceeds maximum size" when content larger than MAX_DECRYPTED_SIZE', async () => {
+    const password = 'oversized-password-123';
+    const plainText = 'x'.repeat(MAX_DECRYPTED_SIZE + 1);
+
+    const { encryptedData, salt, iv, authTag } = await encrypt(plainText, password);
+
+    await expect(
+      decrypt(encryptedData, salt, iv, authTag, password)
+    ).rejects.toThrow('Decrypted content exceeds maximum size');
   });
 });

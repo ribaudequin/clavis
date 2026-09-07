@@ -5,6 +5,7 @@ import { logger } from './logger.js';
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH = 32;
 const IV_LENGTH = 16;
+export const MAX_DECRYPTED_SIZE = 10_000_000;
 
 // Lazy-load argon2 native module with fallback to Node's scrypt.
 // This prevents the hard crash "is not a valid Win32 application" when the
@@ -131,6 +132,10 @@ export async function decrypt(
 
   try {
     const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
+    if (decrypted.length > MAX_DECRYPTED_SIZE) {
+      logger.error('Decrypted content exceeds maximum size', { size: decrypted.length });
+      throw new Error('Decrypted content exceeds maximum size');
+    }
     logger.debug('Content decrypted', { size: decrypted.length });
     return decrypted.toString('utf8');
   } catch (e) {
