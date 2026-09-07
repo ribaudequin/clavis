@@ -25,5 +25,13 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "out", "**/*.test.ts", "**/*.test.tsx", "src/renderer"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "out",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "src/renderer",
+    "*.config.mts"
+  ]
 }
