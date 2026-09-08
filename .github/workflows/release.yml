@@ -96,7 +96,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: clavis-${{ matrix.os }}
+          name: clavis-${{ matrix.os }}-${{ github.ref_name }}
           path: |
             out/make/**/*.deb
             out/make/**/*.AppImage
@@ -117,6 +117,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist
+          pattern: clavis-*-${{ github.ref_name }}
           merge-multiple: true
 
       - name: List downloaded artifacts
