@@ -95,8 +95,8 @@ app.whenReady().then(async () => {
   }
   await ensureDataDir();
   Menu.setApplicationMenu(null);
-  createWindow();
   registerIpcHandlers({ ipcMain, dialog });
+  createWindow();
 });
 
 app.on('window-all-closed', () => {
