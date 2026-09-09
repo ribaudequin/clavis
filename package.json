@@ -1,7 +1,7 @@
 {
   "name": "clavis",
   "productName": "clavis",
-  "version": "0.1.9-alpha",
+  "version": "0.2.0-alpha",
   "description": "Cross-platform encrypted notes application for storing banking info, PINs, passwords, and safe codes.",
   "main": "dist/main/index.js",
   "author": "Marcelo Salvador",
@@ -24,6 +24,7 @@
     "release": "npm run clean && npm run build && npm run make",
     "start": "electron .",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
     "flatpak-make": "flatpak-builder --repo=repo build-dir flatpak/com.github.marcelosalvador.Clavis.yaml"
@@ -34,11 +35,12 @@
     "@electron-forge/maker-dmg": "^7.11.2",
     "@electron-forge/maker-squirrel": "^7.11.2",
     "@electron-forge/maker-zip": "^7.11.2",
+    "@playwright/test": "^1.63.0",
     "@reforged/maker-appimage": "^5.3.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.5.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "@typescript-eslint/eslint-plugin": "^8.68.0",
@@ -63,6 +65,7 @@
   "dependencies": {
     "argon2": "^0.45.1",
     "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9",
     "uuid": "^11.1.0",
     "zod": "^4.5.4"
   }

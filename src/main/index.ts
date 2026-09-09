@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, Menu } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import * as path from 'path';
 import { ensureDataDir } from './store.js';
 import { registerIpcHandlers } from './ipc-handlers.js';
@@ -97,6 +98,18 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
   registerIpcHandlers({ ipcMain, dialog });
   createWindow();
+
+  // Auto-updater (GitHub Releases endpoint)
+  if (app.isPackaged) {
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner: 'ribaudequin',
+      repo: 'clavis',
+    });
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      logger.warn('Auto-updater check failed', { error: err instanceof Error ? err.message : String(err) });
+    });
+  }
 });
 
 app.on('window-all-closed', () => {

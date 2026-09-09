@@ -52,4 +52,14 @@ describe('HomeScreen', () => {
     expect(await screen.findByText('Banco Central')).toBeTruthy();
     expect(screen.getByText('New Drawer')).toBeTruthy();
   });
+
+  it('shows empty state when no drawers', async () => {
+    render(<HomeScreen />);
+    expect(await screen.findByText('No drawers created.')).toBeTruthy();
+  });
+
+  it('shows skeleton loader initially', () => {
+    render(<HomeScreen />);
+    expect(screen.getByText('New Drawer')).toBeTruthy();
+  });
 });
