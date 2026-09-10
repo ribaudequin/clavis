@@ -54,7 +54,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         error: {
           code: ErrorCode.FILE_NOT_FOUND,
           message: 'Failed to list drawers',
-          details: undefined,
+          details: e,
         },
       };
     }
@@ -75,7 +75,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           error: {
             code: ErrorCode.VALIDATION_ERROR,
             message: e.issues[0]?.message || 'Validation failed',
-            details: undefined,
+            details: e.issues,
           },
         };
       }
@@ -86,7 +86,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           error: {
             code: ErrorCode.PASSWORD_TOO_SHORT,
             message: 'Password must be at least 8 characters',
-            details: undefined,
+            details: e,
           },
         };
       }
@@ -96,7 +96,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         error: {
           code: ErrorCode.WRITE_FAILED,
           message: 'Failed to create drawer',
-          details: undefined,
+          details: e,
         },
       };
     }
@@ -127,7 +127,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           error: {
             code: ErrorCode.VALIDATION_ERROR,
             message: e.issues[0]?.message || 'Validation failed',
-            details: undefined,
+            details: e.issues,
           },
         };
       }
@@ -137,7 +137,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         error: {
           code: ErrorCode.DECRYPT_FAILED,
           message: 'Failed to unlock drawer',
-          details: undefined,
+          details: e,
         },
       };
     }
@@ -168,7 +168,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           error: {
             code: ErrorCode.VALIDATION_ERROR,
             message: e.issues[0]?.message || 'Validation failed',
-            details: undefined,
+            details: e.issues,
           },
         };
       }
@@ -178,7 +178,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         error: {
           code: ErrorCode.WRITE_FAILED,
           message: 'Failed to save drawer',
-          details: undefined,
+          details: e,
         },
       };
     }
@@ -209,7 +209,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           error: {
             code: ErrorCode.VALIDATION_ERROR,
             message: e.issues[0]?.message || 'Validation failed',
-            details: undefined,
+            details: e.issues,
           },
         };
       }
@@ -219,7 +219,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         error: {
           code: ErrorCode.WRITE_FAILED,
           message: 'Failed to delete drawer',
-          details: undefined,
+          details: e,
         },
       };
     }
@@ -250,7 +250,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           error: {
             code: ErrorCode.VALIDATION_ERROR,
             message: e.issues[0]?.message || 'Validation failed',
-            details: undefined,
+            details: e.issues,
           },
         };
       }
@@ -260,7 +260,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         error: {
           code: ErrorCode.WRITE_FAILED,
           message: 'Failed to export drawer',
-          details: undefined,
+          details: e,
         },
       };
     }
@@ -293,7 +293,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         error: {
           code: ErrorCode.FILE_NOT_FOUND,
           message: 'Failed to open file dialog',
-          details: undefined,
+          details: e,
         },
       };
     }
@@ -362,7 +362,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           error: {
             code: ErrorCode.VALIDATION_ERROR,
             message: e.issues[0]?.message || 'Validation failed',
-            details: undefined,
+            details: e.issues,
           },
         };
       }
@@ -372,7 +372,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         error: {
           code: ErrorCode.WRITE_FAILED,
           message: 'Failed to import drawer',
-          details: undefined,
+          details: e,
         },
       };
     }
