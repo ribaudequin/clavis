@@ -14,4 +14,4 @@
 
 **Read more if:** Technical decision → PLANO.md | Task list → TODO.md | Full history → /MEMORY/HISTORY.md
 
-_Last updated: 2026-09-08 (v0.1.9.1-alpha)_
+_Last updated: 2026-09-09 (v0.2.0-alpha)_
