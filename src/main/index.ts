@@ -77,6 +77,21 @@ function createWindow(): void {
     return { action: 'deny' };
   });
   mainWindow.webContents.on('will-attach-webview', (e) => e.preventDefault());
+
+  // Context menu (cut/copy/paste) — global for all text inputs
+  mainWindow.webContents.on('context-menu', (event, params) => {
+    const menu = Menu.buildFromTemplate([
+      { role: 'cut', label: 'Cut', enabled: params.editFlags.canCut },
+      { role: 'copy', label: 'Copy', enabled: params.editFlags.canCopy },
+      { role: 'paste', label: 'Paste', enabled: params.editFlags.canPaste },
+      { type: 'separator' },
+      { role: 'selectAll', label: 'Select All', enabled: params.editFlags.canSelectAll },
+    ]);
+    const win = mainWindow;
+    if (win) {
+      menu.popup({ window: win });
+    }
+  });
 }
 
 app.whenReady().then(async () => {
