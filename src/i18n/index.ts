@@ -141,6 +141,7 @@ const translations: Record<string, TranslationDict> = {
 };
 
 function detectLocale(): string {
+  if (process.env.CI) return 'en';
   const lang = navigator.language || 'en';
   if (lang.startsWith('pt-BR')) return 'pt-BR';
   if (lang.startsWith('pt')) return 'pt-PT';
