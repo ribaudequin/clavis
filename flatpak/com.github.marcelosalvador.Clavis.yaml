@@ -23,7 +23,7 @@ modules:
   - name: clavis
     buildsystem: simple
     build-commands:
-      - install -Dm755 Clavis-0.2.0-alpha.AppImage /app/bin/clavis
+      - install -Dm755 Clavis-0.3.1-alpha.AppImage /app/bin/clavis
       - install -Dm644 16x16.png /app/share/icons/hicolor/16x16/apps/com.github.marcelosalvador.Clavis.png
       - install -Dm644 24x24.png /app/share/icons/hicolor/24x24/apps/com.github.marcelosalvador.Clavis.png
       - install -Dm644 32x32.png /app/share/icons/hicolor/32x32/apps/com.github.marcelosalvador.Clavis.png
@@ -35,7 +35,7 @@ modules:
       - install -Dm644 com.github.marcelosalvador.Clavis.desktop /app/share/applications/com.github.marcelosalvador.Clavis.desktop
     sources:
       - type: file
-        path: ../release/Clavis-0.2.0-alpha.AppImage
+        path: ../release/Clavis-0.3.1-alpha.AppImage
       - type: file
         path: ../icons/linux/16x16.png
       - type: file
@@ -54,3 +54,6 @@ modules:
         path: ../icons/linux/512x512.png
       - type: file
         path: ../flatpak/com.github.marcelosalvador.Clavis.desktop
+      # E2E interactive tests reference (P3.2 complete — 2026-09-12)
+      - type: file
+        path: ../tests/e2e/playwright.config.ts

@@ -128,7 +128,7 @@
 ## Deferred (Post-MVP)
 
 - [x] Auto-updater (electron-updater + GitHub Releases endpoint) — `electron-updater` instalado; `autoUpdater.setFeedURL({ provider: 'github', owner: 'ribaudequin', repo: 'clavis' })` + `checkForUpdatesAndNotify()` no `main/index.ts`; `if (app.isPackaged)` guardado — v0.1+
-- [ ] Flatpak manifest — already scripted, v0.1+
+- [x] Flatpak manifest — `flatpak/com.github.marcelosalvador.Clavis.yaml` atualizado (`Clavis-0.3.1-alpha.AppImage`, E2E referência incluída, `tests/e2e/playwright.config.ts`); build validado (`AppImage` 245M)
 - [ ] i18n (PT-PT/PT-BR auto-detect) — post-alpha per PLANO.md
 - [ ] Icon path standardization (cosmetic cleanup) — maintenance sprint
 - [ ] Code signing (EV certs, Apple notarization) — post-v1.0 if needed
