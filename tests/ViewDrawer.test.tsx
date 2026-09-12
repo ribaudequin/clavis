@@ -59,7 +59,7 @@ describe('ViewDrawer', () => {
     );
     fireEvent.change(screen.getByDisplayValue('T'), { target: { value: 'Updated' } });
     fireEvent.change(screen.getByDisplayValue('C'), { target: { value: 'Updated content' } });
-    await fireEvent.click(screen.getAllByText('Save drawer and back to menu')[0]);
+    await fireEvent.click(screen.getByRole('button', { name: /save drawer/i }));
     expect(onSave).toHaveBeenCalledWith('1', 'pw', 'Updated', 'Updated content');
   });
 
@@ -75,6 +75,6 @@ describe('ViewDrawer', () => {
         onBack={() => {}}
       />
     );
-    expect(screen.getAllByText('delete drawer').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /delete drawer/i })).toBeTruthy();
   });
 });
