@@ -24,5 +24,11 @@ export default defineConfig({
         },
       },
     },
+    {
+      name: 'macOS Safari (Desktop)',
+      use: {
+        ...devices['Desktop Safari'],
+      },
+    },
   ],
 });

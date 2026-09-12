@@ -123,7 +123,7 @@
 ## Phase 3 — QUALITY ASSURANCE (Lower Priority)
 
 - [x] P3.1: Renderer component tests (HomeScreen, PasswordModal, ViewDrawer + jsdom setup) — 69/69 pass (interação resolvida via mock dos hooks `useFocusTrap`/`useModalKeyboard` + `cleanup`)
-- [x] P3.2: E2E Playwright base (electron context, critical flows + 3 error paths: senha errada, arquivo corrompido, caminho inválido) — `tests/e2e/playwright.config.ts` + `tests/e2e/clavis.spec.ts` (macOS incluído via `Desktop Safari`)
+- [x] P3.2: E2E Playwright interativo completo (electron context, critical flows + 3 error paths + teclado `Ctrl+N`/`Escape`/`Enter`/`Ctrl+S` + eventos de modal: focus trap, delete confirm, import dialog) — `tests/e2e/playwright.config.ts` (+macOS `Desktop Safari`) + `tests/e2e/clavis.spec.ts`
 
 ## Deferred (Post-MVP)
 
@@ -142,3 +142,4 @@
 - [x] **A11y audit 2026-09-07**: 3 P0 blockers fixed, 10 P1 quick wins, preload fix. `audits/audit_2026-09-07-a11y.md`.
 - **Current focus**: Phase 3 P3.1 (renderer component tests, 8h) or Post-MVP (auto-updater / i18n / Flatpak). Phase 1 + Phase 2 P0 complete.
 - [x] **Sub-agent 3 (implementation & validation)** — completed 2026-09-09: PLANO.md edited (Note 2026-09-09 + Audit-Driven Action Plan 2026-09-09), consistency verified with SUMMARY.md (v0.2.0-alpha, 69/69) and TODO.md. No critical conflicts.
+- **Current focus (2026-09-12)**: P3.2 E2E Playwright expanded (`tests/e2e/playwright.config.ts` macOS + `clavis.spec.ts` 3 error paths complete); `CHAN-01` remains deferred; build validated (`AppImage` OK).
