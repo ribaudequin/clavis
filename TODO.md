@@ -15,6 +15,9 @@
 - [x] Packaging: Windows Portable — `release_artifacts/Clavis-Portable-0.1.1-alpha.exe` (96M, built via Wine 10, ASAR 1043 files, `afterPack` PE32+, published 2026-09-02 `v0.1.1-alpha`)
 - [x] Packaging: Flatpak manifest — `flatpak/com.github.marcelosalvador.Clavis.yaml` atualizado (`Clavis-0.2.0-alpha.AppImage`)
 - [x] Tests: encryption round-trip, drawer CRUD (store), component tests (51/51 passing)
+- [x] **i18n** — auto-detect PT-PT/PT-BR (navigator.language), English fallback (`src/i18n/index.ts`); strings traduzidas em `HomeScreen`, `CreateDrawerModal`, `PasswordModal`, `DeleteConfirmModal`, `ViewDrawer`. Build validado (`npm run build` + `make` OK).
+- [x] **Icon path cleanup** — `PROMPT.md` removido (`rm`); `i18n` implementado (manifests/icon paths não alterados, apenas standardização existente confirmada).
+- [x] **Build local validado** (`npm run build` → `npm run make --platform=linux`) antes de qualquer `git tag`/release.
 - [x] Audit remediation: all 23 findings from `audits/audit_2026-08-30.md` addressed
 - [x] README + user docs — updated `Credits & support` section with requested copy (intro + GitHub + Credits + Support Ko-fi/ETH/SOL + footer *From Portugal, with love.*)
 - [x] UI polish: Remove native Electron menu (`Menu.setApplicationMenu(null)`), add Credits button with `icons/svg` via `vite-plugin-svgr` (`?react`), sanitized SVGs, modal `Credits & support`

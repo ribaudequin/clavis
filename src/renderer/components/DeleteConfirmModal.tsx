@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import DangerIcon from '../../../icons/svg/danger.svg?react';
+import { t } from '../../i18n';
 
 interface DeleteConfirmModalProps {
   drawerTitle?: string;
@@ -46,13 +47,13 @@ function DeleteConfirmModal({ drawerTitle, onConfirm, onCancel }: DeleteConfirmM
           <DangerIcon className="w-12 h-12" />
         </div>
         <h2 id="delete-confirm-title" className="text-lg font-bold text-red-800 text-center mb-2">
-          Delete Drawer
+          {t('btn.delete')}
         </h2>
         {drawerTitle && (
           <p className="text-sm text-red-700 text-center mb-2 font-medium">&quot;{drawerTitle}&quot;</p>
         )}
         <p id="delete-confirm-desc" className="text-sm text-red-800 text-center mb-6">
-          This action is <span className="font-bold">irreversible</span>. Once deleted, the drawer and all its contents cannot be recovered.
+          {t('msg.irreversible') || 'This action is irreversible.'}
         </p>
         <div className="flex justify-center gap-3">
           <button
@@ -61,14 +62,14 @@ function DeleteConfirmModal({ drawerTitle, onConfirm, onCancel }: DeleteConfirmM
             disabled={isConfirming}
             className="px-4 py-1.5 text-sm font-medium text-red-700 bg-white border border-red-300 rounded hover:bg-red-100 disabled:opacity-50"
           >
-            Cancel
+            {t('btn.cancel')}
           </button>
           <button
             onClick={handleConfirm}
             disabled={isConfirming}
             className="px-4 py-1.5 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50"
           >
-            {isConfirming ? 'Deleting...' : 'Delete Drawer'}
+            {isConfirming ? t('btn.deleting') : t('btn.delete')}
           </button>
         </div>
       </div>

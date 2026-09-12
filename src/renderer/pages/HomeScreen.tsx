@@ -12,6 +12,7 @@ import SolIcon from '../../../icons/svg/sol.svg?react';
 import KoFiIcon from '../../../icons/svg/ko-fi.svg?react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useModalKeyboard } from '../hooks/useModalKeyboard';
+import { t } from '../../i18n';
 import { toast } from 'react-hot-toast';
 
 declare global {
@@ -84,7 +85,7 @@ function HomeScreen(): React.JSX.Element {
     try {
       const result = await api().exportDrawer(id);
       if (!result.ok) {
-        toast.error(`Error exporting: ${result.error.message}`);
+        toast.error(`${t('msg.error_export')} ${result.error.message}`);
         return;
       }
       const blob = new Blob([result.data], { type: 'application/json' });
@@ -94,7 +95,7 @@ function HomeScreen(): React.JSX.Element {
       a.download = `${id}.clavis`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success('Drawer exported successfully.');
+      toast.success(t('msg.drawer_exported'));
     } finally {
       setExportingId(null);
     }
@@ -115,11 +116,11 @@ function HomeScreen(): React.JSX.Element {
     try {
       const result = await api().deleteDrawer(id);
       if (!result.ok) {
-        toast.error(`Error deleting: ${result.error.message}`);
+        toast.error(`${t('msg.error_delete')} ${result.error.message}`);
         window.focus();
         return;
       }
-      toast.success('Drawer deleted successfully.');
+      toast.success(t('msg.drawer_deleted'));
       await loadDrawers();
     } finally {
       setDeletingId(null);
@@ -134,20 +135,20 @@ function HomeScreen(): React.JSX.Element {
     try {
       const result = await api().openFile();
       if (!result.ok) {
-        toast.error(`Error: ${result.error.message}`);
+        toast.error(`${t('msg.error_import')} ${result.error.message}`);
         return;
       }
       if (!result.data) return;
       try {
         const importResult = await api().importDrawer(result.data.token);
         if (!importResult.ok) {
-          toast.error(`Error importing: ${importResult.error.message}`);
+          toast.error(`${t('msg.error_import')} ${importResult.error.message}`);
           return;
         }
-        toast.success('Imported successfully');
+        toast.success(t('msg.imported'));
         await loadDrawers();
       } catch {
-        toast.error('Error importing');
+        toast.error(t('msg.error_import'));
       }
     } finally {
       setImporting(false);
@@ -169,7 +170,7 @@ function HomeScreen(): React.JSX.Element {
         return;
       }
       if (result.data === null) {
-        setUnlockError('Drawer not found.');
+        setUnlockError(t('label.drawer_not_found'));
         return;
       }
       setUnlockDrawerId(null);
@@ -180,7 +181,7 @@ function HomeScreen(): React.JSX.Element {
         content: result.data.content,
       });
     } catch {
-      setUnlockError('Incorrect password.');
+      setUnlockError(t('label.incorrect_password'));
     }
   }
 
@@ -225,20 +226,20 @@ function HomeScreen(): React.JSX.Element {
               onClick={() => setShowCreateModal(true)}
               className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
             >
-              New Drawer
+              {t('btn.new')}
             </button>
             <button
               onClick={handleImport}
               disabled={importing}
               className="px-3 py-1 text-sm text-gray-700 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
             >
-              {importing ? 'Importing...' : 'Import'}
+              {importing ? t('btn.importing') : t('btn.import')}
             </button>
               <button
                 onClick={() => setShowCreditsModal(true)}
                 className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
-                aria-label="Credits"
-                title="Credits"
+                aria-label={t('label.credits_title')}
+                title={t('label.credits_title')}
               >
                 <HeartIcon className="w-5 h-5 text-gray-600" />
               </button>
@@ -250,12 +251,12 @@ function HomeScreen(): React.JSX.Element {
           <SkeletonLoaders count={3} />
         ) : drawers.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500 mb-4">No drawers created.</p>
+            <p className="text-gray-500 mb-4">{t('msg.no_drawers')}</p>
             <button
               onClick={() => setShowCreateModal(true)}
               className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
             >
-              Create your first drawer
+              {t('btn.create_first')}
             </button>
           </div>
         ) : (
@@ -280,7 +281,7 @@ function HomeScreen(): React.JSX.Element {
                   disabled={exportingId === drawer.id}
                   className="text-xs text-gray-600 hover:text-gray-700 disabled:opacity-50"
                 >
-                  {exportingId === drawer.id ? 'Exporting...' : 'Export'}
+                  {exportingId === drawer.id ? t('btn.exporting') : t('btn.export')}
                 </button>
                 <button
                   type="button"
@@ -288,7 +289,7 @@ function HomeScreen(): React.JSX.Element {
                   disabled={deletingId === drawer.id}
                   className="text-xs text-red-700 hover:text-red-800 disabled:opacity-50"
                 >
-                  {deletingId === drawer.id ? 'Deleting...' : 'Delete'}
+                  {deletingId === drawer.id ? t('btn.deleting') : t('btn.delete')}
                 </button>
               </li>
             ))}
@@ -341,11 +342,11 @@ function HomeScreen(): React.JSX.Element {
         >
           <div className="bg-white rounded-lg p-6 w-[480px] max-h-[85vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h2 id="credits-title" className="text-lg font-semibold">Credits &amp; support</h2>
+              <h2 id="credits-title" className="text-lg font-semibold">{t('label.credits_title')}</h2>
               <button
                 onClick={() => setShowCreditsModal(false)}
                 className="text-gray-500 hover:text-gray-700"
-                aria-label="Close credits"
+                aria-label={t('btn.close')}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -415,7 +416,7 @@ function HomeScreen(): React.JSX.Element {
                 onClick={() => setShowCreditsModal(false)}
                 className="px-4 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
               >
-                Close
+                {t('btn.close')}
               </button>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useModalKeyboard } from '../hooks/useModalKeyboard';
+import { t } from '../../i18n';
 import { EyeOpenIcon, EyeClosedIcon } from './EyeIcons';
 
 interface PasswordModalProps {
@@ -57,7 +58,7 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label htmlFor="password-input" className="block text-sm text-gray-600 mb-1">
-              Password
+              {t('label.password')}
             </label>
             <div className="relative">
               <input
@@ -68,7 +69,7 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
                 className="w-full border rounded px-2 py-1 text-sm pr-8 disabled:opacity-50"
-                placeholder="Enter password"
+                placeholder={t('label.password')}
                 autoComplete="current-password"
                 aria-invalid={error ? 'true' : 'false'}
                 aria-describedby={error ? 'password-error' : undefined}
@@ -78,7 +79,7 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={isLoading}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 disabled:opacity-50"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? t('label.hide_password') : t('label.show_password')}
                 aria-pressed={showPassword}
               >
                 {showPassword ? <EyeClosedIcon /> : <EyeOpenIcon />}
@@ -97,14 +98,14 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
               disabled={isLoading}
               className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50"
             >
-              Cancel
+              {t('btn.cancel')}
             </button>
             <button
               type="submit"
               disabled={isLoading}
               className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
             >
-              {isLoading ? 'Unlocking...' : 'Open'}
+              {isLoading ? t('btn.importing') : t('btn.open')}
             </button>
           </div>
         </form>

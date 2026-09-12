@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import { EyeOpenIcon, EyeClosedIcon } from '../components/EyeIcons';
+import { t } from '../../i18n';
 import { toast } from 'react-hot-toast';
 
 interface CreateDrawerModalProps {
@@ -44,15 +45,15 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
   async function handleSubmit(e?: React.FormEvent): Promise<void> {
     if (e) e.preventDefault();
     if (title.trim() === '') {
-      toast.error('Title cannot be empty.');
+      toast.error(t('msg.title_empty'));
       return;
     }
     if (password !== confirmPassword) {
-      toast.error('Passwords do not match.');
+      toast.error(t('msg.password_mismatch'));
       return;
     }
     if (password.length < 8) {
-      toast.error('Password must be at least 8 characters long.');
+      toast.error(t('msg.password_too_short'));
       return;
     }
     setIsLoading(true);
@@ -62,10 +63,10 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
         toast.error(`Error: ${result.error.message}`);
         return;
       }
-      toast.success('Drawer created successfully.');
+      toast.success(t('msg.drawer_created'));
       onCreated();
     } catch {
-      toast.error('Error creating drawer.');
+      toast.error(t('msg.error_create'));
     } finally {
       setIsLoading(false);
     }
@@ -83,13 +84,13 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
     >
       <div className="bg-white rounded-lg p-6 w-80">
         <h2 id="create-drawer-title" className="text-lg font-semibold mb-4">
-          New Drawer
+          {t('label.new_drawer')}
         </h2>
         <form onSubmit={handleSubmit}>
           <div className="space-y-3">
             <div>
               <label htmlFor="drawer-title" className="block text-sm text-gray-600 mb-1">
-                Title
+                {t('label.title')}
               </label>
               <input
                 id="drawer-title"
@@ -99,12 +100,12 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
                 onChange={(e) => setTitle(e.target.value)}
                 disabled={isLoading}
                 className="w-full border rounded px-2 py-1 text-sm disabled:opacity-50"
-                placeholder="Drawer title"
+                placeholder={t('label.title')}
               />
             </div>
             <div>
               <label htmlFor="drawer-password" className="block text-sm text-gray-600 mb-1">
-                Password
+                {t('label.password')}
               </label>
               <div className="relative">
                 <input
@@ -114,7 +115,7 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
                   className="w-full border rounded px-2 py-1 text-sm pr-8 disabled:opacity-50"
-                  placeholder="Password to encrypt"
+                  placeholder={t('label.password')}
                   autoComplete="new-password"
                 />
                 <button
@@ -122,7 +123,7 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
                   onClick={() => setShowPassword(!showPassword)}
                   disabled={isLoading}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 disabled:opacity-50"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? t('label.hide_password') : t('label.show_password')}
                   aria-pressed={showPassword}
                 >
                   {showPassword ? <EyeClosedIcon /> : <EyeOpenIcon />}
@@ -148,7 +149,7 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
             </div>
             <div>
               <label htmlFor="drawer-confirm-password" className="block text-sm text-gray-600 mb-1">
-                Confirm Password
+                {t('label.confirm_password')}
               </label>
               <div className="relative">
                 <input
@@ -158,7 +159,7 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={isLoading}
                   className="w-full border rounded px-2 py-1 text-sm pr-8 disabled:opacity-50"
-                  placeholder="Confirm password to encrypt"
+                  placeholder={t('label.confirm_password')}
                   autoComplete="new-password"
                 />
                 <button
@@ -166,7 +167,7 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   disabled={isLoading}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 disabled:opacity-50"
-                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showConfirmPassword ? t('label.hide_password') : t('label.show_password')}
                   aria-pressed={showConfirmPassword}
                 >
                   {showConfirmPassword ? <EyeClosedIcon /> : <EyeOpenIcon />}
@@ -181,14 +182,14 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
               disabled={isLoading}
               className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50"
             >
-              Cancel
+              {t('btn.cancel')}
             </button>
             <button
               type="submit"
               disabled={isLoading}
               className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
             >
-              {isLoading ? 'Creating...' : 'OK'}
+              {isLoading ? t('btn.creating') : t('btn.ok')}
             </button>
           </div>
         </form>

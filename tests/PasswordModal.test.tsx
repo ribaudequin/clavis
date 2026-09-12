@@ -14,29 +14,30 @@ describe('PasswordModal', () => {
   it('renders title and password input', () => {
     render(<PasswordModal drawerTitle="Test Drawer" onClose={() => {}} onSubmit={async () => {}} error={null} />);
     expect(screen.getByText('Test Drawer')).toBeTruthy();
-    expect(screen.getByPlaceholderText('Enter password')).toBeTruthy();
+    expect(screen.getByPlaceholderText(/password/i)).toBeTruthy();
   });
 
   it('calls onSubmit with password', async () => {
     const onSubmit = vi.fn(async () => {});
     render(<PasswordModal drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />);
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret' } });
-    await fireEvent.click(screen.getByRole('button', { name: /open/i }));
+    const input = screen.getByPlaceholderText(/password/i) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'secret' } });
+    await fireEvent.click(screen.getByRole('button', { name: /open|abrir/i }));
     expect(onSubmit).toHaveBeenCalledWith('secret');
   });
 
   it('calls onClose when cancel clicked', () => {
     const onClose = vi.fn();
     render(<PasswordModal drawerTitle="Test" onClose={onClose} onSubmit={async () => {}} error={null} />);
-    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    fireEvent.click(screen.getByRole('button', { name: /cancel|cancelar/i }));
     expect(onClose).toHaveBeenCalled();
   });
 
   it('toggles password visibility', () => {
     render(<PasswordModal drawerTitle="Test" onClose={() => {}} onSubmit={async () => {}} error={null} />);
-    const input = screen.getByLabelText('Password') as HTMLInputElement;
+    const input = screen.getByPlaceholderText(/password/i) as HTMLInputElement;
     expect(input.type).toBe('password');
-    fireEvent.click(screen.getByRole('button', { name: /show password/i }));
+    fireEvent.click(screen.getByRole('button', { name: /show/i }));
     expect(input.type).toBe('text');
   });
 
