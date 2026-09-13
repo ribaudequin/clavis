@@ -18,7 +18,7 @@ export function initializeLogger(): void {
   log.transports.file.level = 'debug';
   log.transports.file.maxSize = 5242880;
 
-  const isDev = !process.env.ELECTRON_IS_DEV === false;
+  const isDev = process.env.ELECTRON_IS_DEV === '1';
   log.transports.console.level = isDev ? 'debug' : 'info';
 
   log.transports.file.format = '{h}:{i}:{s}.{ms} [{level}] {text}';

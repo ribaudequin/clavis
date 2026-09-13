@@ -21,8 +21,14 @@ export function useModalKeyboard(
         onEscape();
       }
       if (e.key === 'Enter' && onEnter) {
-        e.preventDefault();
-        onEnter();
+        const target = e.target as HTMLElement;
+        const tag = target.tagName.toLowerCase();
+        const isTextArea = tag === 'textarea';
+        const isContentEditable = target.getAttribute('contenteditable') === 'true';
+        if (!isTextArea && !isContentEditable) {
+          e.preventDefault();
+          onEnter();
+        }
       }
     }
 

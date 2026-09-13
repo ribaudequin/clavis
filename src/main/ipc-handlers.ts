@@ -62,10 +62,10 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 
   ipcMain.handle(CHANNELS.CREATE_DRAWER, async (_e, title: string, password: string): Promise<Result<EncryptedDrawer>> => {
     try {
-      logger.debug('IPC handler called', { handler: 'create-drawer', title });
+      logger.debug('IPC handler called', { handler: 'create-drawer', titleLength: title?.length || 0 });
       const validated = CreateDrawerSchema.parse({ title, password });
       const data = await createDrawer(validated.title, validated.password);
-      logger.info('Drawer created', { id: data.id, title: data.title });
+      logger.info('Drawer created', { id: data.id, titleLength: data.title?.length || 0 });
       return { ok: true, data };
     } catch (e) {
       if (e instanceof z.ZodError) {

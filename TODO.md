@@ -128,6 +128,17 @@
 - [x] P3.1: Renderer component tests (HomeScreen, PasswordModal, ViewDrawer + jsdom setup) — 69/69 pass (interação resolvida via mock dos hooks `useFocusTrap`/`useModalKeyboard` + `cleanup`)
 - [x] P3.2: E2E Playwright interativo completo (electron context, critical flows + 3 error paths + teclado `Ctrl+N`/`Escape`/`Enter`/`Ctrl+S` + eventos de modal: focus trap, delete confirm, import dialog) — `tests/e2e/playwright.config.ts` (+macOS `Desktop Safari`) + `tests/e2e/clavis.spec.ts`
 
+## Audit 2026-09-13 — Validações (Estado atual)
+- [x] **VALID-01** (P3): `importDrawerRaw` valida `encryptedData`, `salt`, `iv`, `authTag`, `keyDerivation` (`store.ts`)
+- [x] **DOS-01** (P3): `importDrawerRaw` limite `MAX_IMPORT_FILE_SIZE` (11_000_000) (`store.ts`)
+- [x] **OVERWRITE-01** (P3): Import bloqueia sobrescrita (`fs.access` verifica existência) (`store.ts`)
+- [x] **KDF-01** (P3): `keyDerivation` validado (`iterations >= 1`, `memory >= 2**14`, `parallelism >= 1`) (`store.ts`)
+- [x] **TEST-01** (P3): `tests/validation.test.ts` criado (5 testes: SaveDrawer max content, CreateDrawer min password, ImportDrawer UUID, DeleteDrawer UUID)
+- [x] **TYPE-01** (P3): `restartApp` corrigido para `Promise<Result<void>>` (`types.ts`)
+- [x] **DEAD-01** (P3): `createCreditsWindow()` removido (`main/index.ts`)
+- [x] **LOG-01** (P3): `isDev` simplificado (`logger.ts`)
+- [x] **LOG-02** (P3): `title` removido/substituído por `titleLength` nos logs (`ipc-handlers.ts`, `store.ts`)
+
 ## Deferred (Post-MVP)
 
 - [x] Auto-updater (electron-updater + GitHub Releases endpoint) — `electron-updater` instalado; `autoUpdater.setFeedURL({ provider: 'github', owner: 'ribaudequin', repo: 'clavis' })` + `checkForUpdatesAndNotify()` no `main/index.ts`; `if (app.isPackaged)` guardado — v0.1+

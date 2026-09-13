@@ -14,4 +14,4 @@
 
 **Read more if:** Technical decision → PLANO.md | Task list → TODO.md | Full history → /MEMORY/HISTORY.md
 
-_Last updated: 2026-09-12 (v0.3.2-alpha, P3.2 interactive complete, i18n + PROMPT.md removal)_
+_Last updated: 2026-09-13 (v0.3.2-alpha; audit 2026-09-13 validado; build local visualmente validado — AppImage 245M inicia + lista drawers + .deb 215M; BS-06 ainda pendente)_

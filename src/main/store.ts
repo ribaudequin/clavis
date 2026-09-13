@@ -119,7 +119,7 @@ export async function createDrawer(
   };
 
   await fs.writeFile(getDrawerFilePath(id), JSON.stringify(drawer, null, 2), { encoding: 'utf8', mode: 0o600 });
-  logger.info('Drawer created', { id, title });
+  logger.info('Drawer created', { id, titleLength: title?.length || 0 });
   return drawer;
 }
 
@@ -189,7 +189,7 @@ export async function saveDrawer(
     };
 
     await fs.writeFile(filePath, JSON.stringify(updatedDrawer, null, 2), { encoding: 'utf8', mode: 0o600 });
-    logger.info('Drawer saved', { id, title });
+    logger.info('Drawer saved', { id, titleLength: title?.length || 0 });
     return true;
   } catch (e) {
     logger.error('Save failed', { id, error: e instanceof Error ? e.message : String(e) });
@@ -220,15 +220,62 @@ export async function readDrawerRaw(id: string): Promise<string | null> {
   }
 }
 
+const MAX_IMPORT_FILE_SIZE = 11_000_000; // ~11MB; slightly above MAX_DECRYPTED_SIZE (10MB) to allow JSON overhead
+
 export async function importDrawerRaw(fileContent: string): Promise<boolean> {
   try {
+    // DOS-01: file size cap
+    if (fileContent.length > MAX_IMPORT_FILE_SIZE) {
+      logger.warn('importDrawerRaw: file content exceeds max size', { size: fileContent.length });
+      return false;
+    }
+
     const drawer: EncryptedDrawer = JSON.parse(fileContent);
     if (!drawer.id || !isValidId(drawer.id)) {
       logger.warn('importDrawerRaw: invalid drawer ID', {});
       return false;
     }
+
+    // VALID-01: validate required encrypted fields
+    if (!drawer.encryptedData || typeof drawer.encryptedData !== 'string' ||
+        !drawer.salt || typeof drawer.salt !== 'string' ||
+        !drawer.iv || typeof drawer.iv !== 'string' ||
+        !drawer.authTag || typeof drawer.authTag !== 'string') {
+      logger.warn('importDrawerRaw: missing or invalid encrypted fields', { id: drawer.id });
+      return false;
+    }
+
+    // KDF-01: validate KDF parameters with minimum floors
+    const kdf = drawer.keyDerivation;
+    if (!kdf || typeof kdf !== 'object') {
+      logger.warn('importDrawerRaw: missing keyDerivation', { id: drawer.id });
+      return false;
+    }
+    if (typeof kdf.iterations !== 'number' || kdf.iterations < 1) {
+      logger.warn('importDrawerRaw: invalid KDF iterations', { id: drawer.id, iterations: kdf.iterations });
+      return false;
+    }
+    if (typeof kdf.memory !== 'number' || kdf.memory < 2 ** 14) {
+      logger.warn('importDrawerRaw: invalid KDF memory', { id: drawer.id, memory: kdf.memory });
+      return false;
+    }
+    if (typeof kdf.parallelism !== 'number' || kdf.parallelism < 1) {
+      logger.warn('importDrawerRaw: invalid KDF parallelism', { id: drawer.id, parallelism: kdf.parallelism });
+      return false;
+    }
+
+    // OVERWRITE-01: check existing drawer
+    const filePath = getDrawerFilePath(drawer.id);
+    try {
+      await fs.access(filePath);
+      logger.warn('importDrawerRaw: drawer already exists — overwrite blocked', { id: drawer.id });
+      return false;
+    } catch {
+      // file does not exist — safe to import
+    }
+
     await ensureDataDir();
-    await fs.writeFile(getDrawerFilePath(drawer.id), fileContent, { encoding: 'utf8', mode: 0o600 });
+    await fs.writeFile(filePath, fileContent, { encoding: 'utf8', mode: 0o600 });
     logger.info('Drawer imported', { id: drawer.id });
     return true;
   } catch (e) {

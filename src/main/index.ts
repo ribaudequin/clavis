@@ -7,43 +7,6 @@ import { logger, initializeLogger } from './logger.js';
 
 let mainWindow: BrowserWindow | null = null;
 
-function createCreditsWindow(): void {
-  if (mainWindow) {
-    mainWindow.setAlwaysOnTop(true);
-  }
-  const creditsWindow = new BrowserWindow({
-    width: 380,
-    height: 300,
-    parent: mainWindow || undefined,
-    modal: true,
-    titleBarStyle: 'default',
-    resizable: false,
-    fullscreenable: false,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: true,
-      devTools: !app.isPackaged,
-    },
-  });
-
-  creditsWindow.loadFile(path.join(__dirname, '..', 'renderer', 'credits.html'));
-
-  creditsWindow.webContents.on('will-navigate', (e) => e.preventDefault());
-  creditsWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://')) {
-      shell.openExternal(url);
-    }
-    return { action: 'deny' };
-  });
-  creditsWindow.webContents.on('will-attach-webview', (e) => e.preventDefault());
-
-  creditsWindow.on('closed', () => {
-    if (mainWindow) {
-      mainWindow.setAlwaysOnTop(false);
-    }
-  });
-}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
