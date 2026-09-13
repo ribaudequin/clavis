@@ -11,7 +11,7 @@ Encrypted notes desktop application (passwords, PINs, bank data, safe codes) org
 - **Desktop Stack**: Electron + TypeScript — proven multi-platform tooling, good packaging story for AppImage / Windows (NSIS + Portable) / Flatpak.
 - **Frontend**: React + Tailwind CSS (consistent with Electron ecosystem, fast UI iteration).
 - **UI Language**: The application UI (user-facing text, labels, messages) is in **English**. (Documentation/comms with the user may be in PT-PT; the app itself is English.)
-  - **Planned (later, post-alpha):** Internationalization (i18n) with automatic locale detection — PT-PT and PT-BR when the system is Portuguese; English as the default/fallback for all other locales. Not implemented yet to keep maintenance low during alpha. Revisit with Flatpak/auto-updater/UI-polish.
+  - **Internationalization (i18n):** IMPLEMENTED in v0.3.2-alpha. Auto-detect `navigator.language` (PT-PT / PT-BR / EN fallback); `src/i18n/index.ts` + translated components (`HomeScreen`, `CreateDrawerModal`, `PasswordModal`, `DeleteConfirmModal`, `ViewDrawer`). See `TODO.md` lines 17-19. Completed: no longer post-alpha.
 - **Encryption**: AES-256-GCM per drawer; key derivation via **Argon2id** (memory-hard, OWASP-recommended).
 - **Global vs Per-Drawer Password**: Support both — a global master password (optional) unlocks all drawers; otherwise each drawer has its own password. Stored metadata (titles, icons) is unencrypted; only drawer content is encrypted.
 - **Persistence**: Drawers stored as encrypted JSON files (`*.clavis`) in a user-data directory (`~/.local/share/Clavis` on Linux). Icons generated deterministically from a hash of the drawer title.
@@ -119,9 +119,9 @@ clavis/
 - `CHAN-01` deferred due to runtime regression (`preload/index.ts` fails to resolve `shared/channels` import in Electron ASAR). Inline `CHANNELS` accepted as stable solution.
 
 ### Strategic Post-Audit
-- **Differentiation:** `Differentiation.md` exists. Missing: `COMPETITORS.md`, `CONTRIBUTING.md`, `SECURITY.md`, `.github/` templates, `docs/adr/`.
-- **Distribution:** Auto-updater implemented; `latest.yml` pending (BS-06); Flatpak Flathub publish pending.
-- **Roadmap:** i18n deferred; sync protocol design doc needed; mobile strategy (Capacitor / PWA / React Native) undecided.
+- **Differentiation:** `Differentiation.md` exists. **P4 Governance missing:** `CONTRIBUTING.md`, `SECURITY.md`, `.github/` templates, `docs/adr/`, `CHANGELOG.md`, user guide. `COMPETITORS.md` optional.
+- **Distribution:** Auto-updater implemented (`electron-updater` + `main/index.ts`); `latest.yml` pending (BS-06); Flatpak Flathub publish pending.
+- **Roadmap:** i18n completed (v0.3.2-alpha); sync protocol design doc pending; mobile strategy (Capacitor / PWA / React Native) undecided.
 
 ## References
 - Wireframe docs: see `wireframes/` directory for full specs.

@@ -16,7 +16,7 @@
 - [x] Packaging: Flatpak manifest — `flatpak/com.github.marcelosalvador.Clavis.yaml` atualizado (`Clavis-0.2.0-alpha.AppImage`)
 - [x] Tests: encryption round-trip, drawer CRUD (store), component tests (51/51 passing)
 - [x] **i18n** — auto-detect PT-PT/PT-BR (navigator.language), English fallback (`src/i18n/index.ts`); strings traduzidas em `HomeScreen`, `CreateDrawerModal`, `PasswordModal`, `DeleteConfirmModal`, `ViewDrawer`. Build validado (`npm run build` + `make` OK). CI fix (`detectLocale` `process.env.CI`) aplicado (`tests/ViewDrawer.test.tsx` ajustado). `v0.3.2-alpha` (`05305b3`) publicado.
-- [x] **Icon path cleanup** — `PROMPT.md` removido (`rm`); `i18n` implementado (manifests/icon paths não alterados, apenas standardização existente confirmada).
+- [x] **Icon path cleanup** — `PROMPT.md` removed (`rm`); `i18n` implemented (manifest/icon paths unchanged, only existing standardization confirmed).
 - [x] **Build local validado** (`npm run build` → `npm run make --platform=linux`) antes de qualquer `git tag`/release.
 - [x] Audit remediation: all 23 findings from `audits/audit_2026-08-30.md` addressed
 - [x] README + user docs — updated `Credits & support` section with requested copy (intro + GitHub + Credits + Support Ko-fi/ETH/SOL + footer *From Portugal, with love.*)
@@ -132,7 +132,7 @@
 
 - [x] Auto-updater (electron-updater + GitHub Releases endpoint) — `electron-updater` instalado; `autoUpdater.setFeedURL({ provider: 'github', owner: 'ribaudequin', repo: 'clavis' })` + `checkForUpdatesAndNotify()` no `main/index.ts`; `if (app.isPackaged)` guardado — v0.1+
 - [x] Flatpak manifest — `flatpak/com.github.marcelosalvador.Clavis.yaml` atualizado (`Clavis-0.3.1-alpha.AppImage`, E2E referência incluída, `tests/e2e/playwright.config.ts`); build validado (`AppImage` 245M)
-- [ ] i18n (PT-PT/PT-BR auto-detect) — post-alpha per PLANO.md
+- [x] i18n — IMPLEMENTED in v0.3.2-alpha (`05305b3`). See lines 17-19 and `SUMMARY.md`.
 - [ ] Icon path standardization (cosmetic cleanup) — maintenance sprint
 - [ ] Code signing (EV certs, Apple notarization) — post-v1.0 if needed
 
