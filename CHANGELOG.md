@@ -1,5 +1,12 @@
 # Changelog — Clavis
 
+## v0.3.4-alpha (2026-09-14)
+- `CHAN-01` resolved: preload imports `CHANNELS` from `src/shared/channels.ts` (single source of truth)
+- Preload bundled via Vite (`scripts/build-preload.mjs`) — self-contained `dist/main/preload.js`, `electron` external, `CHANNELS` inlined
+- `BS-17` resolved: `copy:preload` (Unix-only `cp`) removed; bundling is cross-platform
+- Verified in packaged AppImage: `electronAPI` exposed (`Drawers listed count:5`)
+- 74/74 tests pass; typecheck clean; lint 0 errors
+
 ## v0.3.2-alpha (2026-09-12)
 - i18n implemented (PT-PT / PT-BR / EN fallback) (`src/i18n/index.ts`)
 - PROMPT.md removed

@@ -74,6 +74,7 @@
 - [x] P1.2: Fix ESM/CommonJS mismatch — DONE 2026-09-07 (renamed `forge.config.ts`/`vite.config.ts`/`vitest.config.ts` → `.mts`; electron-forge 7.11.2 + Vitest + Vite all support `.mts` natively; `tsconfig.json` excludes `*.config.mts`; CommonJS preserved for `src/main` runtime via Electron; `npm run make` validated Linux → deb (215M) + AppImage (244M))
 - [x] P1.3: Add IPC handler tests (8 handlers, vitest mocking) — DONE 2026-09-07 (extracted `handleIPC()` from `index.ts` → `registerIpcHandlers({ ipcMain, dialog })` in `src/main/ipc-handlers.ts`; 34 tests in `tests/ipc-handlers.test.ts`; `dialog` DI for testability; covers Zod validation, error codes, token whitelist + atomic consume)
 - [ ] P1.4: Code signing (deferred; document unsigned status in README) — SKIP
+- [ ] **BS-06**: `@electron-forge/publisher-github` requer configuração alternativa (falhou com `plugin.init`) — tentar `publish` no `package.json` ou script `postMake`
 - [x] Verify `npm run make` builds Linux targets (deb + AppImage) — DONE 2026-09-07
 - [ ] P1.13: CI quality gates (lint + typecheck + test before build/make) — DONE 2026-09-07 (`quality` job in `.github/workflows/release.yml`, runs in 28s; `build` job gated by `if: startsWith(github.ref, 'refs/tags/v')` + `needs: quality`; CI run `34146157247` green)
 
@@ -139,6 +140,17 @@
 - [x] **LOG-01** (P3): `isDev` simplificado (`logger.ts`)
 - [x] **LOG-02** (P3): `title` removido/substituído por `titleLength` nos logs (`ipc-handlers.ts`, `store.ts`)
 
+## CHAN-01 + BS-17 — preload bundling (2026-09-14)
+
+- [x] **CHAN-01** (P2): Preload now imports `CHANNELS` from `src/shared/channels.ts` (single source of truth) — inline duplicate removed
+- [x] **BS-17** (Medium): `copy:preload` (Unix-only `cp`) removed; replaced by cross-platform Vite bundling (`scripts/build-preload.mjs`)
+- [x] `package.json`: `build:preload` script added; `build` = clean → tsc → build:preload → vite renderer
+- [x] `scripts/build-preload.mjs` bundles preload to `dist/main/preload.js` (electron external, CHANNELS inlined) + removes redundant `dist/main/preload/`
+- [x] Verified: `typecheck` ✅, `lint` 0 errors (79 warnings), `test` 74/74 ✅
+- [x] Verified ASAR: `dist/main/preload.js` has only `require("electron")`; no `shared/channels` require
+- [x] Verified runtime (AppImage `v0.3.3-alpha`): `Clavis started` → `IPC handler called list-drawers` → `Drawers listed count:5`
+- [x] ADR-007 updated (Superseded → Resolved)
+
 ## Deferred (Post-MVP)
 
 - [x] Auto-updater (electron-updater + GitHub Releases endpoint) — `electron-updater` instalado; `autoUpdater.setFeedURL({ provider: 'github', owner: 'ribaudequin', repo: 'clavis' })` + `checkForUpdatesAndNotify()` no `main/index.ts`; `if (app.isPackaged)` guardado — v0.1+
@@ -156,4 +168,4 @@
 - [x] **A11y audit 2026-09-07**: 3 P0 blockers fixed, 10 P1 quick wins, preload fix. `audits/audit_2026-09-07-a11y.md`.
 - **Current focus**: Phase 3 P3.1 (renderer component tests, 8h) or Post-MVP (auto-updater / i18n / Flatpak). Phase 1 + Phase 2 P0 complete.
 - [x] **Sub-agent 3 (implementation & validation)** — completed 2026-09-09: PLANO.md edited (Note 2026-09-09 + Audit-Driven Action Plan 2026-09-09), consistency verified with SUMMARY.md (v0.2.0-alpha, 69/69) and TODO.md. No critical conflicts.
-- **Current focus (2026-09-12)**: P3.2 E2E Playwright expanded (`tests/e2e/playwright.config.ts` macOS + `clavis.spec.ts` 3 error paths complete); `CHAN-01` remains deferred; build validated (`AppImage` OK).
+- **Current focus (2026-09-14)**: `CHAN-01` + `BS-17` resolved (preload bundled via Vite, single source of truth `CHANNELS`; AppImage runtime validated). Next: `BS-06` (auto-updater `latest-linux.yml` 404) or `a11y` P2 (N4–N7 overlay, N12 dirty, N16 `Ctrl+S`, N10 focus).

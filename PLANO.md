@@ -139,7 +139,7 @@ clavis/
 ### Action Plan — 70 Findings (grouped by domain, from audit_2026-09-13.md)
 
 **P0 — Security & Drift Prevention (same release / deferred):**
-- CHAN-01 (P2): Import CHANNELS from `../../shared/channels.js` in `preload/index.ts` (or document inline as stable).
+- ~~CHAN-01 (P2): Import CHANNELS from `../../shared/channels.js` in `preload/index.ts` (or document inline as stable).~~ **RESOLVED 2026-09-14** — preload bundled via Vite, imports `CHANNELS` from `src/shared/channels.ts` (see ADR-007).
 - TYPE-01 / N2 (High): Align `restartApp` type in `types.ts:60` to `Promise<Result<void>>`.
 - DEAD-01 / N3 (High): Remove `createCreditsWindow()` or wire to a menu item.
 - VALID-01 (P3): Add import field validation (`encryptedData`, `salt`, `iv`, `authTag`, `keyDerivation`) to `store.ts`.
@@ -162,7 +162,7 @@ clavis/
 - BS-14 (Medium): Add `prerelease: true` to `.github/workflows/release.yml`.
 - BS-15 (Medium): Add `ci` script (`lint` + `typecheck` + `test`) to `package.json`.
 - BS-16 (Medium): Update outdated dependencies (`electron`, `react`, `typescript`, `vite`, `vitest`, `zod`, `uuid`).
-- BS-17 (Medium): Make `copy:preload` cross-platform (not Unix-only `cp`).
+- ~~BS-17 (Medium): Make `copy:preload` cross-platform (not Unix-only `cp`).~~ **RESOLVED 2026-09-14** — `copy:preload` removed; preload bundled by `scripts/build-preload.mjs` (Node, cross-platform).
 - BS-18 (Medium): Fix Playwright Safari project for CI (`ubuntu-latest` lacks Safari).
 
 **P3 — UX & Accessibility (P1 / P2):**
@@ -187,8 +187,8 @@ clavis/
 - LOG-01 / LOG-02 (P3): Fix `isDev` logic and sanitize log context fields.
 - DEAD-01 / N20 (Medium): Clean icon imports if `createCreditsWindow()` removed.
 
-### Note on CHAN-01 (Reverted / Deferred — Confirmed 2026-09-13)
-- `CHAN-01` remains deferred. `preload/index.ts` continues to use inline `CHANNELS` as stable solution. Drift risk documented; no runtime regression observed in current build. Revisit if preload import resolves under Electron ASAR packaging.
+### Note on CHAN-01 (Resolved — 2026-09-14)
+- `CHAN-01` resolved. Root cause was two-fold: `sandbox: true` prevents a sandboxed preload from `require()`-ing app-local modules, and the old `copy:preload` step shifted the relative path depth. Fix: bundle the preload with Vite (`scripts/build-preload.mjs`), keeping `electron` external and inlining `CHANNELS` from `src/shared/channels.ts` at build time. Verified in the packaged `AppImage` (`v0.3.3-alpha`): `Clavis started` → `IPC handler called list-drawers` → `Drawers listed count:5`. See ADR-007.
 
 ### Note on Validation Gaps (New from 2026-09-13)
 - Import validation (`VALID-01`, `DOS-01`, `OVERWRITE-01`, `KDF-01`) is the highest security gap after CHAN-01. Recommend P0 inclusion before any Flathub publish or auto-updater activation.
