@@ -4,7 +4,7 @@
 
 **Project:** Clavis — Cross-platform encrypted notes app (Electron + TypeScript + React + AES-256-GCM + Argon2id)
 
-**Current version:** 0.3.5
+**Current version:** 0.3.5-alpha
 
 **State (2026-09-22):** `CHAN-01` + `BS-17` resolved (preload bundled via Vite). **Credits modal redesign complete** ✅ — `CreditsModal` component extracted (`src/renderer/components/CreditsModal.tsx`), shadow/depth, section cards, copy-to-clipboard, animation, backdrop click-to-close, focus polish. Pushado para GitHub (`v0.3.5-alpha` tag).
 
