@@ -167,6 +167,6 @@
 - [x] **Audit 2026-09-07 (appsec)**: IPC layer review after P1.3 extraction — refactor regressions all PASS (A1-A7); 2 P2 soft-blocking (B2 symlink, B3 decrypt size) fixed in v0.1.7-alpha; 1 P3 hygiene (B5 CHANNELS const) bundled. `audits/audit_2026-09-07-appsec.md`.
 - [x] **Code review 2026-09-07**: P1.2 + P1.3 confirmed correct, byte-identical extraction, no behavioral drift. Verdict WITH-MINOR-FIXES — all fixes bundled in v0.1.7-alpha. `audits/review_2026-09-07-code.md`.
 - [x] **A11y audit 2026-09-07**: 3 P0 blockers fixed, 10 P1 quick wins, preload fix. `audits/audit_2026-09-07-a11y.md`.
-- **Current focus**: Phase 3 P3.1 (renderer component tests, 8h) or Post-MVP (auto-updater / i18n / Flatpak). Phase 1 + Phase 2 P0 complete. **In progress: Credits modal redesign (PLANO-CREDITS-MODAL.md).**
+- **Current focus**: Phase 3 P3.1 (renderer component tests, 8h) or Post-MVP (auto-updater / i18n / Flatpak). Phase 1 + Phase 2 P0 complete. Credits modal redesign complete (v0.3.5-alpha released).
 - [x] **Sub-agent 3 (implementation & validation)** — completed 2026-09-09: PLANO.md edited (Note 2026-09-09 + Audit-Driven Action Plan 2026-09-09), consistency verified with SUMMARY.md (v0.2.0-alpha, 69/69) and TODO.md. No critical conflicts.
 - **Current focus (2026-09-14)**: `CHAN-01` + `BS-17` resolved (preload bundled via Vite, single source of truth `CHANNELS`; AppImage runtime validated). Next: `BS-06` (auto-updater `latest-linux.yml` 404) or `a11y` P2 (N4–N7 overlay, N12 dirty, N16 `Ctrl+S`, N10 focus).
