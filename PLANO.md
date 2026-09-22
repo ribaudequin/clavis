@@ -63,7 +63,7 @@ All validations derived from `audit_2026-09-13.md`. Status mapped to PLANO decis
 
 ### P1 — High Impact UX & Build Blockers
 4. **Add password visibility toggle + strength meter** to `PasswordModal`
-5. **Extract `CreateDrawerModal` and `CreditsModal`** to separate components
+5. **Extract `CreateDrawerModal` and `CreditsModal`** to separate components — DONE (`CreditsModal` at `src/renderer/components/CreditsModal.tsx`, extracted from inline `HomeScreen.tsx`)
 6. **Add keyboard shortcuts**: `Ctrl+N` (new), `Escape` (close modal), `Enter` (confirm focused), `Ctrl+S` (save in ViewDrawer)
 7. **Add `aria-live` regions** for loading states, errors, list updates
 8. **Empty state illustration + CTA** — "Create your first drawer" button
@@ -134,7 +134,7 @@ clavis/
 
 ## Audit-Driven Action Plan — 2026-09-13
 
-**State:** v0.3.2-alpha | 69 tests pass | 0 P0 blockers | 0 🔴 Critical | 10 🟡 High | 15 🔵 Medium | 25 💭 Low | 1 P1 (UI) + 19 P2 (UI) | Security baseline 8.5/10; Code quality 7/10; Build 6.5/10; UX 6.5/10.
+**State:** v0.3.4-alpha | 74 tests pass | 0 P0 blockers | 0 🔴 Critical | 10 🟡 High | 15 🔵 Medium | 25 💭 Low | 1 P1 (UI) + 19 P2 (UI) | Security baseline 8.5/10; Code quality 7/10; Build 6.5/10; UX 6.5/10.
 
 ### Action Plan — 70 Findings (grouped by domain, from audit_2026-09-13.md)
 
@@ -188,7 +188,7 @@ clavis/
 - DEAD-01 / N20 (Medium): Clean icon imports if `createCreditsWindow()` removed.
 
 ### Note on CHAN-01 (Resolved — 2026-09-14)
-- `CHAN-01` resolved. Root cause was two-fold: `sandbox: true` prevents a sandboxed preload from `require()`-ing app-local modules, and the old `copy:preload` step shifted the relative path depth. Fix: bundle the preload with Vite (`scripts/build-preload.mjs`), keeping `electron` external and inlining `CHANNELS` from `src/shared/channels.ts` at build time. Verified in the packaged `AppImage` (`v0.3.3-alpha`): `Clavis started` → `IPC handler called list-drawers` → `Drawers listed count:5`. See ADR-007.
+- `CHAN-01` resolved. Root cause was two-fold: `sandbox: true` prevents a sandboxed preload from `require()`-ing app-local modules, and the old `copy:preload` step shifted the relative path depth. Fix: bundle the preload with Vite (`scripts/build-preload.mjs`), keeping `electron` external and inlining `CHANNELS` from `src/shared/channels.ts` at build time. Verified in the packaged `AppImage` (`v0.3.4-alpha`): `Clavis started` → `IPC handler called list-drawers` → `Drawers listed count:5`. See ADR-007.
 
 ### Note on Validation Gaps (New from 2026-09-13)
 - Import validation (`VALID-01`, `DOS-01`, `OVERWRITE-01`, `KDF-01`) is the highest security gap after CHAN-01. Recommend P0 inclusion before any Flathub publish or auto-updater activation.

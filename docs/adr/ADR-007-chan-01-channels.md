@@ -18,6 +18,6 @@ The initial workaround inlined a duplicate `CHANNELS` object in the preload, cre
 - `copy:preload` removed (also resolves `BS-17` — `cp` was Unix-only).
 
 ## Consequences
-- No runtime require of app-local modules in the sandboxed preload; `electronAPI` exposes correctly in packaged builds (verified in `AppImage`, `v0.3.3-alpha`).
+- No runtime require of app-local modules in the sandboxed preload; `electronAPI` exposes correctly in packaged builds (verified in `AppImage`, `v0.3.4-alpha`).
 - Single source of truth restored: rename a channel in `src/shared/channels.ts` and both main and preload pick it up; TypeScript catches drift at compile time.
 - Build pipeline gains a bundling step (`npm run build:preload`); `scripts/build-preload.mjs` also removes the now-redundant `dist/main/preload/` directory emitted by `tsc`.
