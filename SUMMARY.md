@@ -4,13 +4,13 @@
 
 **Project:** Clavis — Cross-platform encrypted notes app (Electron + TypeScript + React + AES-256-GCM + Argon2id)
 
-**Current version:** 0.3.4-alpha
+**Current version:** 0.3.5
 
-**State (2026-09-22):** `CHAN-01` + `BS-17` resolved (preload bundled via Vite). **Credits modal redesign in progress** — see `PLANO-CREDITS-MODAL.md` (extract component, shadow/depth, section cards, copy-to-clipboard, animation, backdrop click-to-close, focus polish).
+**State (2026-09-22):** `CHAN-01` + `BS-17` resolved (preload bundled via Vite). **Credits modal redesign complete** ✅ — `CreditsModal` component extracted (`src/renderer/components/CreditsModal.tsx`), shadow/depth, section cards, copy-to-clipboard, animation, backdrop click-to-close, focus polish. Pushado para GitHub (`v0.3.5-alpha` tag).
 
-**Build:** AppImage 245M + `.deb` 215M (`v0.3.4-alpha`) — inicia, lista drawers, fecha. Auto-updater still 404 (`BS-06` pending).
+**Build:** AppImage 245M + `.deb` 215M (`v0.3.5-alpha`) — inicia, lista drawers, fecha. Auto-updater still 404 (`BS-06` pending).
 
-**Pending:** `BS-06` (publish/`latest-linux.yml`), `a11y` P2 (`N4-N7` overlay, `N12` dirty, `N16` `Ctrl+S`, `N10` focus), `P1.4` code signing `SKIP`, Flatpak Flathub, Credits modal redesign.
+**Pending:** `BS-06` (publish/`latest-linux.yml`), `a11y` P2 (`N4-N7` overlay, `N12` dirty, `N16` `Ctrl+S`, `N10` focus), `P1.4` code signing `SKIP`, Flatpak Flathub.
 
 **Read more if:** Technical decision → PLANO.md | Task list → TODO.md | Full history → /MEMORY/HISTORY.md
 
