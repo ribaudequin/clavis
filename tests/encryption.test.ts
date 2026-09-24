@@ -68,4 +68,15 @@ describe('encryption module', () => {
       decrypt(encryptedData, salt, iv, authTag, password)
     ).rejects.toThrow('Decrypted content exceeds maximum size');
   });
+
+  it('deriveKey uses the same cost factors whether params are omitted or passed explicitly', async () => {
+    const salt = generateSalt();
+    const implicit = await deriveKey('password123', salt);
+    const explicit = await deriveKey('password123', salt, {
+      timeCost: 3,
+      memoryCost: 2 ** 18,
+      parallelism: 4,
+    });
+    expect(implicit.equals(explicit)).toBe(true);
+  });
 });

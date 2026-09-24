@@ -1,7 +1,7 @@
 {
   "name": "clavis",
   "productName": "clavis",
-  "version": "0.3.5-alpha",
+  "version": "0.3.6-alpha",
   "description": "Cross-platform encrypted notes application for storing banking info, PINs, passwords, and safe codes.",
   "main": "dist/main/index.js",
   "author": "Marcelo Salvador",
@@ -30,11 +30,11 @@
     "flatpak-make": "flatpak-builder --repo=repo build-dir flatpak/com.github.marcelosalvador.Clavis.yaml"
   },
   "devDependencies": {
-    "@electron-forge/cli": "^7.11.2",
-    "@electron-forge/maker-deb": "^7.11.2",
-    "@electron-forge/maker-dmg": "^7.11.2",
-    "@electron-forge/maker-squirrel": "^7.11.2",
-    "@electron-forge/maker-zip": "^7.11.2",
+    "@electron-forge/cli": "6.4.2",
+    "@electron-forge/maker-deb": "6.4.2",
+    "@electron-forge/maker-dmg": "6.4.2",
+    "@electron-forge/maker-squirrel": "6.4.2",
+    "@electron-forge/maker-zip": "6.4.2",
     "@playwright/test": "^1.63.0",
     "@reforged/maker-appimage": "^5.3.1",
     "@testing-library/dom": "^10.4.1",

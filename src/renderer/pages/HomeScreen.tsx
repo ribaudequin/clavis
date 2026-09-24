@@ -201,7 +201,11 @@ function HomeScreen(): React.JSX.Element {
         initialContent={viewState.content}
         onSave={handleSaveDrawer}
         onDelete={handleDeleteDrawer}
-        onBack={() => { setViewState(null); loadDrawers(); }}
+        onBack={() => {
+          // P0.9 — Clear password from React state after ViewDrawer unmounts
+          setViewState(null);
+          loadDrawers();
+        }}
       />
     );
   }

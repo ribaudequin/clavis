@@ -26,6 +26,33 @@ import { CHANNELS } from '../shared/channels.js';
 import { logger } from './logger.js';
 
 const allowedImportPaths = new Map<string, string>();
+const importTimers: NodeJS.Timeout[] = [];
+
+export function clearImportTimers(): void {
+  importTimers.forEach((t) => clearTimeout(t));
+  importTimers.length = 0;
+}
+
+// P0.6 — Rate limiting for unlock attempts
+interface RateLimitState {
+  count: number;
+  lastAttempt: number;
+}
+const unlockRateLimits = new Map<string, RateLimitState>();
+
+function getUnlockDelay(id: string): number {
+  const state = unlockRateLimits.get(id);
+  if (!state) return 0;
+  const now = Date.now();
+  if (now - state.lastAttempt > 120_000) {
+    unlockRateLimits.delete(id); // reset after 2 min of inactivity
+    return 0;
+  }
+  if (state.count >= 10) return 30_000; // progressive lockout
+  if (state.count >= 5) return 5_000;
+  if (state.count >= 3) return 1_000;
+  return 0;
+}
 
 export function __resetAllowedImportPaths(): void {
   allowedImportPaths.clear();
@@ -106,9 +133,21 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     try {
       logger.debug('IPC handler called', { handler: 'unlock-drawer', id });
       const validated = UnlockDrawerSchema.parse({ id, password });
+
+      // P0.6 — Rate limiting
+      const delay = getUnlockDelay(validated.id);
+      if (delay > 0) {
+        logger.warn('Unlock rate-limited', { id, delayMs: delay });
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+
       const data = await unlockDrawer(validated.id, validated.password);
       if (data === null) {
-        logger.warn('Unlock failed: incorrect password or drawer not found', { id });
+        const state = unlockRateLimits.get(validated.id) || { count: 0, lastAttempt: 0 };
+        state.count += 1;
+        state.lastAttempt = Date.now();
+        unlockRateLimits.set(validated.id, state);
+        logger.warn('Unlock failed: incorrect password or drawer not found', { id, attemptCount: state.count });
         return {
           ok: false,
           error: {
@@ -117,6 +156,8 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           },
         };
       }
+      // Success: reset rate limit
+      unlockRateLimits.delete(validated.id);
       logger.info('Drawer unlocked', { id });
       return { ok: true, data };
     } catch (e) {
@@ -282,7 +323,8 @@ export function registerIpcHandlers(deps: IpcDeps): void {
       const token = randomUUID();
       allowedImportPaths.set(token, filePath);
 
-      setTimeout(() => allowedImportPaths.delete(token), 5 * 60 * 1000);
+      const timer = setTimeout(() => allowedImportPaths.delete(token), 5 * 60 * 1000);
+      importTimers.push(timer);
 
       logger.debug('File dialog completed', { fileName: path.basename(filePath) });
       return { ok: true, data: { token, fileName: path.basename(filePath) } };

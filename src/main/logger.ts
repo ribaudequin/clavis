@@ -1,8 +1,10 @@
 import log from 'electron-log';
 import * as path from 'path';
-import * as os from 'os';
 
-const LOG_DIR = path.join(os.homedir(), '.config', 'Clavis', 'logs');
+function getLogDir(): string {
+  const { app } = require('electron');
+  return path.join(app.getPath('logs'), 'Clavis');
+}
 
 interface LogContext {
   [key: string]: unknown;
@@ -14,7 +16,8 @@ function formatContext(context?: LogContext): string {
 }
 
 export function initializeLogger(): void {
-  log.transports.file.resolvePathFn = () => path.join(LOG_DIR, 'main.log');
+  const logDir = getLogDir();
+  log.transports.file.resolvePathFn = () => path.join(logDir, 'main.log');
   log.transports.file.level = 'debug';
   log.transports.file.maxSize = 5242880;
 

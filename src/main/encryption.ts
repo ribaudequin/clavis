@@ -7,6 +7,21 @@ const KEY_LENGTH = 32;
 const IV_LENGTH = 16;
 export const MAX_DECRYPTED_SIZE = 10_000_000;
 
+// Argon2 memoryCost is expressed in KiB.
+// 2^18 KiB = 256 MiB — comfortably above OWASP's ~19 MiB minimum while staying
+// well below the ~2 GiB native allocation that crashes the Electron main process
+// with SIGTRAP (observed at 2^21 KiB). Legacy drawers were created with 2^16 KiB
+// (64 MiB), so the floor remains at 2^16 to keep them unlockable after migration.
+export const DEFAULT_TIME_COST = 3;
+export const DEFAULT_MEMORY_COST = 2 ** 18;
+export const DEFAULT_PARALLELISM = 4;
+export const MIN_MEMORY_COST = 2 ** 16;
+export const MAX_MEMORY_COST = 2 ** 20;
+export const MIN_TIME_COST = 3;
+export const MAX_TIME_COST = 10;
+export const MIN_PARALLELISM = 1;
+export const MAX_PARALLELISM = 8;
+
 // Lazy-load argon2 native module with fallback to Node's scrypt.
 // This prevents the hard crash "is not a valid Win32 application" when the
 // wrong-architecture argon2.node is bundled (cross-build on Linux → Windows).
@@ -23,21 +38,11 @@ try {
 }
 
 const scryptAsync = promisify(crypto.scrypt) as (
-  password: string,
+  password: string | Buffer,
   salt: Buffer,
   keylen: number,
   options?: crypto.ScryptOptions
 ) => Promise<Buffer>;
-
-// Only used when argon2 is available
-const DEFAULT_ARGON2_OPTIONS: any = argon2
-  ? {
-      type: argon2.argon2id,
-      timeCost: 3,
-      memoryCost: 2 ** 16,
-      parallelism: 1,
-    }
-  : null;
 
 export function isArgon2Available(): boolean {
   return argon2 !== null;
@@ -53,17 +58,24 @@ export interface KDFParams {
   parallelism?: number;
 }
 
-export async function deriveKey(password: string, salt: Buffer, params?: KDFParams): Promise<Buffer> {
+export async function deriveKey(password: string | Buffer, salt: Buffer, params?: KDFParams): Promise<Buffer> {
   const start = Date.now();
+  // P0.7 — Convert to Buffer for zeroing; make a copy so original can be zeroed separately
+  const passwordBuffer = Buffer.isBuffer(password) ? Buffer.from(password) : Buffer.from(password, 'utf8');
+  // Resolve the effective parameters once so argon2 and the scrypt fallback use
+  // the exact same cost factors. Otherwise a drawer created with defaults would
+  // be encrypted with one cost (scrypt default) but its stored metadata would
+  // describe another (argon2 default), making it impossible to unlock later.
+  const timeCost = params?.timeCost ?? DEFAULT_TIME_COST;
+  const memoryCost = params?.memoryCost ?? DEFAULT_MEMORY_COST;
+  const parallelism = params?.parallelism ?? DEFAULT_PARALLELISM;
   let hash: Buffer;
   if (argon2) {
-    hash = (await argon2.hash(password, {
-      ...DEFAULT_ARGON2_OPTIONS,
-      ...(params && {
-        timeCost: params.timeCost,
-        memoryCost: params.memoryCost,
-        parallelism: params.parallelism,
-      }),
+    hash = (await argon2.hash(passwordBuffer, {
+      type: argon2.argon2id,
+      timeCost,
+      memoryCost,
+      parallelism,
       salt,
       raw: true,
     })) as Buffer;
@@ -73,15 +85,15 @@ export async function deriveKey(password: string, salt: Buffer, params?: KDFPara
   } else {
     // Fallback: Node's scrypt (pure JS/OpenSSL, no native .node required).
     // Maps argon2 memoryCost to scrypt cost for comparable hardness.
-    // N=16384, r=8, p=1 by default; scale N with memoryCost if provided.
-    const memoryCost = params?.memoryCost ?? 2 ** 16;
     // scrypt N must be power of two; clamp between 2^14 and 2^17
     const logN = Math.min(17, Math.max(14, Math.round(Math.log2(memoryCost / 4))));
     const N = 2 ** logN;
-    hash = (await scryptAsync(password, salt, KEY_LENGTH, { N, r: 8, p: params?.parallelism ?? 1 })) as Buffer;
+    hash = (await scryptAsync(passwordBuffer, salt, KEY_LENGTH, { N, r: 8, p: parallelism })) as Buffer;
   }
   const duration = Date.now() - start;
   logger.debug('Key derived', { duration, backend: argon2 ? 'argon2' : 'scrypt' });
+  // P0.7 — Zero password buffer from memory
+  passwordBuffer.fill(0);
   return hash;
 }
 
@@ -89,14 +101,14 @@ export function generateSalt(): Buffer {
   return crypto.randomBytes(16);
 }
 
-export async function encrypt(plainText: string, password: string): Promise<{
+export async function encrypt(plainText: string, password: string | Buffer, params?: KDFParams): Promise<{
   encryptedData: string;
   salt: string;
   iv: string;
   authTag: string;
 }> {
   const salt = generateSalt();
-  const key = await deriveKey(password, salt);
+  const key = await deriveKey(password, salt, params);
   const iv = crypto.randomBytes(IV_LENGTH);
 
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
@@ -104,6 +116,8 @@ export async function encrypt(plainText: string, password: string): Promise<{
   const authTag = cipher.getAuthTag();
 
   logger.debug('Content encrypted', { size: encrypted.length });
+  // P0.7 — Zero derived key from memory after use
+  key.fill(0);
   return {
     encryptedData: encrypted.toString('hex'),
     salt: salt.toString('hex'),
@@ -117,7 +131,7 @@ export async function decrypt(
   saltHex: string,
   ivHex: string,
   authTagHex: string,
-  password: string,
+  password: string | Buffer,
   kdfParams?: KDFParams
 ): Promise<string> {
   const salt = Buffer.from(saltHex, 'hex');
@@ -137,8 +151,11 @@ export async function decrypt(
       throw new Error('Decrypted content exceeds maximum size');
     }
     logger.debug('Content decrypted', { size: decrypted.length });
+    // P0.7 — Zero derived key from memory after use
+    key.fill(0);
     return decrypted.toString('utf8');
   } catch (e) {
+    key.fill(0);
     logger.error('Decryption failed', { error: e instanceof Error ? e.message : String(e) });
     throw e;
   }

@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog, shell, Menu } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import * as path from 'path';
 import { ensureDataDir } from './store.js';
-import { registerIpcHandlers } from './ipc-handlers.js';
+import { registerIpcHandlers, clearImportTimers } from './ipc-handlers.js';
 import { logger, initializeLogger } from './logger.js';
 
 let mainWindow: BrowserWindow | null = null;
@@ -22,7 +22,16 @@ function createWindow(): void {
       preload: path.join(__dirname, 'preload.js'),
     },
     titleBarStyle: 'default',
-    icon: path.join(__dirname, '..', 'icons', 'linux', '512x512.png'),
+    icon: (() => {
+      const platform = process.platform;
+      if (platform === 'win32') {
+        return path.join(__dirname, '..', 'icons', 'windows', 'clavis.ico');
+      }
+      if (platform === 'darwin') {
+        return path.join(__dirname, '..', 'icons', 'mac', 'icon.icns');
+      }
+      return path.join(__dirname, '..', 'icons', 'linux', '512x512.png');
+    })(),
     resizable: true,
   });
 
@@ -93,6 +102,10 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   logger.info('Clavis shutdown', {});
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('will-quit', () => {
+  clearImportTimers();
 });
 
 app.on('activate', () => {

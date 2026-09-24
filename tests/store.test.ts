@@ -12,7 +12,9 @@ import {
   deleteDrawer,
   isValidId,
   getDrawerFilePath,
+  importDrawerRaw,
 } from '../src/main/store';
+import { encrypt } from '../src/main/encryption';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 let tempDir: string;
@@ -117,5 +119,102 @@ describe('store module', () => {
     const drawer = await createDrawer('Test', 'valid-password-123');
     const result = await saveDrawer(drawer.id, 'short', 'Title', 'content');
     expect(result).toBe(false);
+  });
+
+  describe('KDF compatibility and bounds', () => {
+    const LEGACY_ID = '123e4567-e89b-12d3-a456-426614174000';
+    const HUGE_ID = '123e4567-e89b-12d3-a456-426614174001';
+    const lowId = '123e4567-e89b-12d3-a456-426614174002';
+
+    async function writeDrawer(
+      id: string,
+      password: string,
+      content: string,
+      memory: number,
+      parallelism: number
+    ): Promise<void> {
+      const params = { timeCost: 3, memoryCost: memory, parallelism };
+      const { encryptedData, salt, iv, authTag } = await encrypt(content, password, params);
+      const drawer = {
+        id,
+        title: 'Drawer',
+        iconData: '[]',
+        createdAt: 1,
+        updatedAt: 1,
+        encryptedData,
+        salt,
+        iv,
+        authTag,
+        keyDerivation: { algorithm: 'argon2id', iterations: 3, memory, parallelism },
+      };
+      await fs.mkdir(path.dirname(getDrawerFilePath(id)), { recursive: true });
+      await fs.writeFile(getDrawerFilePath(id), JSON.stringify(drawer), { mode: 0o600 });
+    }
+
+    it('unlocks drawers created with legacy 2^16 KDF params', async () => {
+      await writeDrawer(LEGACY_ID, 'legacy-password', 'legacy content', 2 ** 16, 1);
+
+      const unlocked = await unlockDrawer(LEGACY_ID, 'legacy-password');
+      expect(unlocked).not.toBeNull();
+      expect(unlocked?.content).toBe('legacy content');
+    });
+
+    it('saveDrawer preserves legacy KDF metadata and stays unlockable', async () => {
+      await writeDrawer(LEGACY_ID, 'legacy-password', 'old', 2 ** 16, 1);
+
+      const saved = await saveDrawer(LEGACY_ID, 'legacy-password', 'Updated', 'new content');
+      expect(saved).toBe(true);
+
+      const raw = JSON.parse(await fs.readFile(getDrawerFilePath(LEGACY_ID), 'utf8'));
+      expect(raw.keyDerivation.memory).toBe(2 ** 16);
+
+      const unlocked = await unlockDrawer(LEGACY_ID, 'legacy-password');
+      expect(unlocked?.content).toBe('new content');
+    });
+
+    it('refuses (without crashing) drawers whose KDF memory exceeds the safety cap', async () => {
+      // 2^21 KiB (~2 GiB) is known to crash the native Argon2 binding in Electron,
+      // so the bounds check must short-circuit before any derivation is attempted.
+      const drawer = {
+        id: HUGE_ID,
+        title: 'Huge',
+        iconData: '[]',
+        createdAt: 1,
+        updatedAt: 1,
+        encryptedData: '00',
+        salt: '00'.repeat(16),
+        iv: '00'.repeat(16),
+        authTag: '00'.repeat(16),
+        keyDerivation: { algorithm: 'argon2id', iterations: 3, memory: 2 ** 21, parallelism: 4 },
+      };
+      await fs.mkdir(path.dirname(getDrawerFilePath(HUGE_ID)), { recursive: true });
+      await fs.writeFile(getDrawerFilePath(HUGE_ID), JSON.stringify(drawer), { mode: 0o600 });
+
+      expect(await unlockDrawer(HUGE_ID, 'password-123')).toBeNull();
+      expect(await saveDrawer(HUGE_ID, 'password-123', 't', 'c')).toBe(false);
+    });
+
+    it('importDrawerRaw accepts legacy 2^16 params but rejects below-floor and above-cap values', async () => {
+      const base = {
+        id: lowId,
+        title: 'Import',
+        iconData: '[]',
+        createdAt: 1,
+        updatedAt: 1,
+        encryptedData: 'e',
+        salt: 's',
+        iv: 'i',
+        authTag: 'a',
+      };
+
+      const legacy = { ...base, id: '123e4567-e89b-12d3-a456-426614174010', keyDerivation: { algorithm: 'argon2id', iterations: 3, memory: 2 ** 16, parallelism: 1 } };
+      expect(await importDrawerRaw(JSON.stringify(legacy))).toBe(true);
+
+      const tooWeak = { ...base, id: '123e4567-e89b-12d3-a456-426614174011', keyDerivation: { algorithm: 'argon2id', iterations: 3, memory: 2 ** 14, parallelism: 1 } };
+      expect(await importDrawerRaw(JSON.stringify(tooWeak))).toBe(false);
+
+      const tooHuge = { ...base, id: '123e4567-e89b-12d3-a456-426614174012', keyDerivation: { algorithm: 'argon2id', iterations: 3, memory: 2 ** 21, parallelism: 4 } };
+      expect(await importDrawerRaw(JSON.stringify(tooHuge))).toBe(false);
+    });
   });
 });
