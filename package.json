@@ -1,7 +1,7 @@
 {
   "name": "clavis",
   "productName": "clavis",
-  "version": "0.3.6-alpha",
+  "version": "0.3.7-alpha",
   "description": "Cross-platform encrypted notes application for storing banking info, PINs, passwords, and safe codes.",
   "main": "dist/main/index.js",
   "author": "Marcelo Salvador",
@@ -80,12 +80,16 @@
       },
       "rebuildConfig": {
         "disablePreGypCopy": true,
-        "ignoreModules": ["argon2"]
+        "ignoreModules": [
+          "argon2"
+        ]
       },
       "makers": [
         {
           "name": "@electron-forge/maker-squirrel",
-          "platforms": ["win32"],
+          "platforms": [
+            "win32"
+          ],
           "config": {
             "name": "clavis",
             "iconUrl": "https://raw.githubusercontent.com/ribaudequin/clavis/main/icons/windows/clavis.ico",
@@ -94,14 +98,18 @@
         },
         {
           "name": "@electron-forge/maker-zip",
-          "platforms": ["win32"],
+          "platforms": [
+            "win32"
+          ],
           "config": {
             "artifactName": "Clavis-${version}-portable.zip"
           }
         },
         {
           "name": "@electron-forge/maker-deb",
-          "platforms": ["linux"],
+          "platforms": [
+            "linux"
+          ],
           "config": {
             "options": {
               "icon": "icons/linux/512x512.png",
@@ -112,17 +120,23 @@
         },
         {
           "name": "@reforged/maker-appimage",
-          "platforms": ["linux"],
+          "platforms": [
+            "linux"
+          ],
           "config": {
             "options": {
               "icon": "icons/linux/512x512.png",
-              "categories": ["Utility"]
+              "categories": [
+                "Utility"
+              ]
             }
           }
         },
         {
           "name": "@electron-forge/maker-dmg",
-          "platforms": ["darwin"],
+          "platforms": [
+            "darwin"
+          ],
           "config": {
             "name": "clavis",
             "icon": "icons/mac/icon.icns",
