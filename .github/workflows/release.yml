@@ -4,11 +4,13 @@ on:
   push:
     branches:
       - main
+      - test/downgrade-forge-6.4.2
     tags:
       - 'v*'
   pull_request:
     branches:
       - main
+      - test/downgrade-forge-6.4.2
 
 permissions:
   contents: write
