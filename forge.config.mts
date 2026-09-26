@@ -2,17 +2,14 @@ import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
-import { MakerAppImage } from '@reforged/maker-appimage';
+import MakerAppImage from '@reforged/maker-appimage';
 import { MakerDMG } from '@electron-forge/maker-dmg';
 
 const iconForPlatform: string = (() => {
   switch (process.platform) {
-    case 'win32':
-      return 'icons/windows/clavis.ico';
-    case 'darwin':
-      return 'icons/mac/icon.icns';
-    default:
-      return 'icons/linux/512x512.png';
+    case 'win32': return 'icons/windows/clavis.ico';
+    case 'darwin': return 'icons/mac/icon.icns';
+    default: return 'icons/linux/512x512.png';
   }
 })();
 
@@ -25,9 +22,10 @@ const config: ForgeConfig = {
     disablePreGypCopy: true,
     ignoreModules: ['argon2'],
   },
-  makers: [
-    {
-      name: '@electron-forge/maker-squirrel',
+  makers: [],
+  plugins: [
+    [MakerSquirrel, {
+      name: 'clavis',
       platforms: ['win32'],
       config: {
         name: 'clavis',
@@ -36,16 +34,16 @@ const config: ForgeConfig = {
         certificateFile: process.env.WINDOWS_CERT_FILE,
         certificatePassword: process.env.WINDOWS_CERT_PASSWORD,
       },
-    },
-    {
-      name: '@electron-forge/maker-zip',
+    }],
+    [MakerZIP, {
+      name: 'clavis',
       platforms: ['win32'],
       config: {
         artifactName: 'Clavis-${version}-portable.zip',
       },
-    },
-    {
-      name: '@electron-forge/maker-deb',
+    }],
+    [MakerDeb, {
+      name: 'clavis',
       platforms: ['linux'],
       config: {
         options: {
@@ -54,9 +52,9 @@ const config: ForgeConfig = {
           homepage: 'https://github.com/ribaudequin/clavis',
         },
       },
-    },
-    {
-      name: '@reforged/maker-appimage',
+    }],
+    [MakerAppImage, {
+      name: 'clavis',
       platforms: ['linux'],
       config: {
         options: {
@@ -64,19 +62,17 @@ const config: ForgeConfig = {
           categories: ['Utility'],
         },
       },
-    },
-    {
-      name: '@electron-forge/maker-dmg',
+    }],
+    [MakerDMG, {
+      name: 'clavis',
       platforms: ['darwin'],
       config: {
         name: 'clavis',
         icon: 'icons/mac/icon.icns',
         format: 'ULFO',
       },
-    },
+    }],
   ],
-  plugins: [],
 };
 
 export default config;
-
