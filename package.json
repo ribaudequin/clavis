@@ -129,7 +129,8 @@
             "format": "ULFO"
           }
         }
-      ]
+      ],
+      "plugins": []
     }
   }
 }
