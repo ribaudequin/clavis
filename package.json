@@ -69,5 +69,67 @@
     "electron-updater": "^6.8.9",
     "uuid": "^11.1.0",
     "zod": "^4.5.4"
+  },
+  "config": {
+    "forge": {
+      "packagerConfig": {
+        "asar": {
+          "unpack": "**/node_modules/argon2/**/*"
+        },
+        "icon": "icons/linux/512x512.png"
+      },
+      "rebuildConfig": {
+        "disablePreGypCopy": true,
+        "ignoreModules": ["argon2"]
+      },
+      "makers": [
+        {
+          "name": "@electron-forge/maker-squirrel",
+          "platforms": ["win32"],
+          "config": {
+            "name": "clavis",
+            "iconUrl": "https://raw.githubusercontent.com/ribaudequin/clavis/main/icons/windows/clavis.ico",
+            "setupIcon": "icons/windows/clavis.ico"
+          }
+        },
+        {
+          "name": "@electron-forge/maker-zip",
+          "platforms": ["win32"],
+          "config": {
+            "artifactName": "Clavis-${version}-portable.zip"
+          }
+        },
+        {
+          "name": "@electron-forge/maker-deb",
+          "platforms": ["linux"],
+          "config": {
+            "options": {
+              "icon": "icons/linux/512x512.png",
+              "maintainer": "Marcelo Salvador",
+              "homepage": "https://github.com/ribaudequin/clavis"
+            }
+          }
+        },
+        {
+          "name": "@reforged/maker-appimage",
+          "platforms": ["linux"],
+          "config": {
+            "options": {
+              "icon": "icons/linux/512x512.png",
+              "categories": ["Utility"]
+            }
+          }
+        },
+        {
+          "name": "@electron-forge/maker-dmg",
+          "platforms": ["darwin"],
+          "config": {
+            "name": "clavis",
+            "icon": "icons/mac/icon.icns",
+            "format": "ULFO"
+          }
+        }
+      ]
+    }
   }
 }
