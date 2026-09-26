@@ -42,7 +42,7 @@ jobs:
 
   build:
     needs: quality
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/test/downgrade-forge-6.4.2'
     strategy:
       fail-fast: false
       matrix:
