@@ -98,7 +98,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: clavis-${{ matrix.os }}-${{ github.ref_name }}
+          name: clavis-${{ matrix.os }}-${{ github.ref_name | replace('/', '-') }}
           path: |
             out/make/**/*.deb
             out/make/**/*.AppImage
