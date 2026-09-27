@@ -4,10 +4,10 @@ import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import { t } from '../../i18n';
 import { toast } from 'react-hot-toast';
 import HeartIcon from '../../../icons/svg/heart.svg?react';
+import KoFiIcon from '../../../icons/svg/ko-fi.svg?react';
 import GithubIcon from '../../../icons/svg/github.svg?react';
 import EthIcon from '../../../icons/svg/eth.svg?react';
 import SolIcon from '../../../icons/svg/sol.svg?react';
-import KoFiIcon from '../../../icons/svg/ko-fi.svg?react';
 
 interface CreditsModalProps {
   isOpen: boolean;
@@ -122,7 +122,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
             </div>
             <ul className="space-y-2">
               <li className="text-sm text-gray-700">
-                <span className="font-medium">Concept, design &amp; development:</span> Marcelo Salvador
+                <span className="font-medium">Concept, design & development:</span> Marcelo Salvador
               </li>
               <li className="text-sm text-gray-500 italic">
                 Thanks to all contributors and early testers
@@ -153,13 +153,13 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
               <ul className="space-y-2">
                 <li className="flex items-center gap-1">
                   <span className="text-sm font-medium text-gray-700 w-8 flex-shrink-0">ETH:</span>
-                  <code className="bg-gray-100 px-2 py-1 rounded text-xs break-all flex-1" translate="no">0x8a9D7dABf92B3F82f2c3aE5C4bF6A9d2E1aB3cCd</code>
-                  <CopyButton text="0x8a9D7dABf92B3F82f2c3aE5C4bF6A9d2E1aB3cCd" />
+                  <code className="bg-gray-100 px-2 py-1 rounded text-xs break-all flex-1" translate="no">0x466f0c3ee495a3dc851fafa5c4720ab2fdcd4af4</code>
+                  <CopyButton text="0x466f0c3ee495a3dc851fafa5c4720ab2fdcd4af4" />
                 </li>
                 <li className="flex items-center gap-1">
                   <span className="text-sm font-medium text-gray-700 w-8 flex-shrink-0">SOL:</span>
-                  <code className="bg-gray-100 px-2 py-1 rounded text-xs break-all flex-1" translate="no">7nQ1M4kF2eP9jB8vR3cT6yU5xW0zA2bC9dE8fG7hJ6k</code>
-                  <CopyButton text="7nQ1M4kF2eP9jB8vR3cT6yU5xW0zA2bC9dE8fG7hJ6k" />
+                  <code className="bg-gray-100 px-2 py-1 rounded text-xs break-all flex-1" translate="no">Hnw5z47sk1hS6FsnCLfgX8pZhDryQVnZpzWJjSSRV5Nf</code>
+                  <CopyButton text="Hnw5z47sk1hS6FsnCLfgX8pZhDryQVnZpzWJjSSRV5Nf" />
                 </li>
               </ul>
               <div className="flex gap-2 mt-3">
@@ -171,11 +171,11 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
                   <GithubIcon className="w-4 h-4 text-gray-600" />
                   GitHub
                 </a>
-                <a href="https://etherscan.io/address/0x8a9D7dABf92B3F82f2c3aE5C4bF6A9d2E1aB3cCd" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+                <a href="https://etherscan.io/address/0x466f0c3ee495a3dc851fafa5c4720ab2fdcd4af4" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
                   <EthIcon className="w-4 h-4 text-gray-600" />
                   ETH
                 </a>
-                <a href="https://solscan.io/account/7nQ1M4kF2eP9jB8vR3cT6yU5xW0zA2bC9dE8fG7hJ6k" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+                <a href="https://solscan.io/account/Hnw5z47sk1hS6FsnCLfgX8pZhDryQVnZpzWJjSSRV5Nf" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
                   <SolIcon className="w-4 h-4 text-gray-600" />
                   SOL
                 </a>

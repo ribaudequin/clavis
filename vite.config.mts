@@ -12,6 +12,22 @@ export default defineConfig({
   build: {
     outDir: '../../dist/renderer',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'react-vendor';
+            }
+            if (id.includes('react-hot-toast')) {
+              return 'toast-vendor';
+            }
+            return 'vendor';
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 500,
   },
   clearScreen: false,
 });

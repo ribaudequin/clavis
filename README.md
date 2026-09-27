@@ -139,8 +139,8 @@ Clavis is free and open source. If it's useful to you, consider supporting its d
 **Ko-fi:** https://ko-fi.com/A0383T5
 
 **Cryptocurrency** (any EVM-compatible chain for ETH):
-- **ETH:** `0x8a9D7dABf92B3F82f2c3aE5C4bF6A9d2E1aB3cCd`
-- **SOL:** `7nQ1M4kF2eP9jB8vR3cT6yU5xW0zA2bC9dE8fG7hJ6k`
+- **ETH:** `0x466f0c3ee495a3dc851fafa5c4720ab2fdcd4af4`
+- **SOL:** `Hnw5z47sk1hS6FsnCLfgX8pZhDryQVnZpzWJjSSRV5Nf`
 
 ---
 

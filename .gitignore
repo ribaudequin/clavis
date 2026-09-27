@@ -26,6 +26,9 @@ Thumbs.db
 *.swo
 *~
 
+# Unused/original icon sources (archived)
+icons/archive/
+
 # Logs
 *.log
 logs/

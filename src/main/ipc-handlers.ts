@@ -423,6 +423,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
   ipcMain.handle(CHANNELS.RESTART_APP, async (): Promise<Result<void>> => {
     try {
       logger.info('Restart requested via IPC', {});
+      app.relaunch();
       setImmediate(() => app.quit());
       return { ok: true, data: undefined };
     } catch (e) {
