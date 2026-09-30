@@ -12,6 +12,7 @@ import {
   deleteDrawer,
   readDrawerRaw,
   importDrawerRaw,
+  DrawerAlreadyExistsError,
 } from './store.js';
 import {
   CreateDrawerSchema,
@@ -386,6 +387,16 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         logger.info('Drawer imported', { fileName: path.basename(filePath) });
         return { ok: true, data: undefined };
       } catch (e) {
+        if (e instanceof DrawerAlreadyExistsError) {
+          logger.warn('import-drawer: drawer already exists', { error: e.message });
+          return {
+            ok: false,
+            error: {
+              code: ErrorCode.WRITE_FAILED,
+              message: 'Drawer already exists — overwrite blocked',
+            },
+          };
+        }
         logger.error('import-drawer read failed', { error: e instanceof Error ? e.message : String(e) });
         return {
           ok: false,

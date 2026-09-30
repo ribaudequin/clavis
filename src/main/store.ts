@@ -8,6 +8,13 @@ import { logger } from './logger.js';
 import { EncryptedDrawer, DrawerListItem } from '../shared/types.js';
 
 const DRAWER_EXT = '.clavis';
+
+export class DrawerAlreadyExistsError extends Error {
+  constructor(id: string) {
+    super(`Drawer with ID ${id} already exists — overwrite blocked`);
+    this.name = 'DrawerAlreadyExistsError';
+  }
+}
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 let DATA_DIR: string | null = null;
@@ -400,12 +407,10 @@ export async function importDrawerRaw(fileContent: string): Promise<boolean> {
 
     // OVERWRITE-01: check existing drawer
     const filePath = getDrawerFilePath(drawer.id);
-    try {
-      await fs.access(filePath);
+    const fileExists = await fs.access(filePath).then(() => true).catch(() => false);
+    if (fileExists) {
       logger.warn('importDrawerRaw: drawer already exists — overwrite blocked', { id: drawer.id });
-      return false;
-    } catch {
-      // file does not exist — safe to import
+      throw new DrawerAlreadyExistsError(drawer.id);
     }
 
     await ensureDataDir();
