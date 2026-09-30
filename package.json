@@ -27,7 +27,9 @@
     "test:e2e": "playwright test",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
-    "flatpak-make": "flatpak-builder --repo=repo build-dir flatpak/com.github.marcelosalvador.Clavis.yaml"
+    "flatpak-make": "flatpak-builder --repo=repo build-dir flatpak/com.github.marcelosalvador.Clavis.yaml",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "devDependencies": {
     "@electron-forge/cli": "6.4.2",
@@ -61,7 +63,18 @@
     "typescript": "^5.8.3",
     "vite": "^8.2.2",
     "vite-plugin-svgr": "^5.2.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "storybook": "^10.6.1",
+    "@storybook/react-vite": "^10.6.1",
+    "@chromatic-com/storybook": "latest",
+    "@storybook/addon-vitest": "^10.6.1",
+    "@storybook/addon-a11y": "^10.6.1",
+    "@storybook/addon-docs": "^10.6.1",
+    "@storybook/addon-mcp": "^10.6.1",
+    "eslint-plugin-storybook": "^10.6.1",
+    "@vitest/browser-playwright": "4.1.11",
+    "@vitest/coverage-v8": "4.1.11",
+    "playwright": "latest"
   },
   "dependencies": {
     "argon2": "^0.45.1",

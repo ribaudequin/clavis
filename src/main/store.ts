@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
-import { encrypt, decrypt, DEFAULT_MEMORY_COST, MIN_MEMORY_COST, MAX_MEMORY_COST, MIN_TIME_COST, MAX_TIME_COST, MIN_PARALLELISM, MAX_PARALLELISM } from './encryption.js';
+import { encrypt, decrypt, DEFAULT_MEMORY_COST, MIN_MEMORY_COST, MAX_MEMORY_COST, MIN_TIME_COST, MAX_TIME_COST, MIN_PARALLELISM, MAX_PARALLELISM, DEFAULT_TIME_COST, DEFAULT_PARALLELISM, deriveKey } from './encryption.js';
 import { logger } from './logger.js';
 import { EncryptedDrawer, DrawerListItem } from '../shared/types.js';
 
@@ -193,12 +193,29 @@ export async function createDrawer(
   return drawer;
 }
 
+// P0.11 — Constant-time comparison: dummy derivation to prevent timing leaks
+// when drawer doesn't exist, ID is invalid, or KDF params are out of bounds.
+async function dummyDerive(passwordBuffer: Buffer): Promise<void> {
+  try {
+    const salt = crypto.randomBytes(16);
+    const dummyPass = Buffer.from(passwordBuffer.toString('utf8'), 'utf8');
+    await deriveKey(dummyPass, salt, {
+      timeCost: DEFAULT_TIME_COST,
+      memoryCost: DEFAULT_MEMORY_COST,
+      parallelism: DEFAULT_PARALLELISM,
+    });
+  } catch {
+    // Intentionally ignore errors from dummy derivation
+  }
+}
+
 export async function unlockDrawer(
   id: string,
   password: string | Buffer
 ): Promise<{ title: string; content: string; iconData: string } | null> {
   const passwordBuffer = Buffer.isBuffer(password) ? Buffer.from(password) : Buffer.from(password, 'utf8');
   if (!isValidId(id)) {
+    await dummyDerive(passwordBuffer);
     passwordBuffer.fill(0);
     return null;
   }
@@ -213,6 +230,8 @@ export async function unlockDrawer(
     // the native Argon2 binding. Legacy drawers (2^16) remain unlockable because
     // decryption always uses the parameters stored in the file.
     if (drawer.keyDerivation && !isKdfWithinBounds(drawer.keyDerivation)) {
+      await dummyDerive(passwordBuffer);
+      passwordBuffer.fill(0);
       logger.warn('Unlock failed: KDF parameters out of bounds', {
         id,
         iterations: drawer.keyDerivation.iterations,
@@ -245,6 +264,7 @@ export async function unlockDrawer(
       iconData: drawer.iconData,
     };
   } catch (e) {
+    await dummyDerive(passwordBuffer);
     passwordBuffer.fill(0);
     logger.warn('Unlock failed', { id, error: e instanceof Error ? e.message : String(e) });
     return null;
