@@ -387,13 +387,13 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         logger.info('Drawer imported', { fileName: path.basename(filePath) });
         return { ok: true, data: undefined };
       } catch (e) {
-        if (e instanceof DrawerAlreadyExistsError) {
+        if (e instanceof Error && e.message.includes('already exists')) {
           logger.warn('import-drawer: drawer already exists', { error: e.message });
           return {
             ok: false,
             error: {
               code: ErrorCode.WRITE_FAILED,
-              message: 'Drawer already exists — overwrite blocked',
+              message: 'Gaveta já existe — a sobrescrita está bloqueada.',
             },
           };
         }
