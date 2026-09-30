@@ -163,8 +163,8 @@
 - [x] P0.8 — Memory hygiene: passwords (`renderer` → `main`) → accept `Buffer`/`Uint8Array`, zero after derivation
 - [x] P0.9 — Password in React state (`HomeScreen.tsx`) → clear after unmount; prefer `useRef`
 - [x] P0.10 — Bundle size (`vite.config.mts`) → lazy-load `ViewDrawer`, chunk heavy deps (target <500 kB) — **DONE 2026-09-27** (main chunk 17 kB, all chunks <500 kB)
-- [ ] P0.11 — Timing side-channel (`ipc-handlers.ts`) → uniform error responses / constant-time comparison
-- [ ] P0.12 — Size check before decrypt (`ipc-handlers.ts`) → validate encrypted file size before `decrypt`
+- [x] P0.11 — Timing side-channel (`ipc-handlers.ts`) — uniform error responses / constant-time comparison (`v0.4.0-beta`)
+- [x] P0.12 — Size check before decrypt (`ipc-handlers.ts`) — validate encrypted file size before `decrypt` (`v0.4.0-beta`)
 - [x] P1.13 — Argon2 parallelism (`encryption.ts`) → ≥4 threads
 - [x] P1.14 — Trusted KDF re-validation (`unlockDrawer`) → re-check params at unlock time (bounded range `2^16`–`2^20`)
 - [x] P1.15 — Import token timer cleanup (`ipc-handlers.ts`) → clear on `will-quit` / interval-based cleanup
@@ -174,7 +174,7 @@
 - [ ] P2.19 — Dirty-check back nav (`ViewDrawer`) → confirmation or auto-save draft
 - [ ] P2.20 — Modal backdrop standardization → consistent click-to-close behavior
 - [ ] P2.21 — Loading spinner (`ViewDrawer`) → spinner inside save button
-- [ ] P2.22 — Dynamic i18n messages in `ipc-handlers.ts` (all `message:` fields via `getLocale()` / `t()`)
+- [x] P2.22 — Dynamic i18n messages in `ipc-handlers.ts` (`v0.4.0-beta`)
 - [ ] P3.22 — ErrorBoundary accessibility (`ErrorBoundary.tsx`) → `role="alert"`, `aria-live="assertive"`, `aria-label` restart
 - [ ] P3.23 — SkeletonLoader accessibility (`SkeletonLoader.tsx`) → `aria-hidden="true"`, `aria-busy="true"`
 - [ ] P3.24 — CreditsModal i18n (`CreditsModal.tsx`) → extract 12 English strings
