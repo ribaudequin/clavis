@@ -254,6 +254,18 @@ export async function unlockDrawer(
       parallelism: drawer.keyDerivation.parallelism,
     } : undefined;
 
+    // P0.12 — Size check before decrypt
+    const encryptedBuffer = Buffer.from(drawer.encryptedData, 'hex');
+    if (encryptedBuffer.length > MAX_IMPORT_FILE_SIZE) {
+      await dummyDerive(passwordBuffer);
+      passwordBuffer.fill(0);
+      logger.warn('Unlock failed: encrypted file exceeds max size', {
+        id,
+        size: encryptedBuffer.length,
+      });
+      return null;
+    }
+
     const decryptedContent = await decrypt(
       drawer.encryptedData,
       drawer.salt,
@@ -418,6 +430,9 @@ export async function importDrawerRaw(fileContent: string): Promise<boolean> {
     logger.info('Drawer imported', { id: drawer.id });
     return true;
   } catch (e) {
+    if (e instanceof DrawerAlreadyExistsError) {
+      throw e; // Propagate to ipc-handlers for explicit message
+    }
     logger.error('importDrawerRaw failed', { error: e instanceof Error ? e.message : String(e) });
     return false;
   }
