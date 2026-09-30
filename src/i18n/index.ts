@@ -48,6 +48,7 @@ const translations: Record<string, TranslationDict> = {
     'msg.deleting': 'A eliminar...',
     'msg.irreversible': 'Esta ação é irreversível. Uma vez eliminada, a gaveta e todo o seu conteúdo não podem ser recuperados.',
     'msg.import_overwrite': 'Gaveta já existe — a sobrescrita está bloqueada.',
+    'msg.import_too_large': 'Ficheiro demasiado grande.',
   },
   'pt-BR': {
     'app.title': 'Clavis',
@@ -94,6 +95,7 @@ const translations: Record<string, TranslationDict> = {
     'msg.deleting': 'Excluindo...',
     'msg.irreversible': 'Esta ação é irreversível. Uma vez excluída, a gaveta e todo o seu conteúdo não podem ser recuperados.',
     'msg.import_overwrite': 'Gaveta já existe — a sobrescrita está bloqueada.',
+    'msg.import_too_large': 'Arquivo muito grande.',
   },
   'en': {
     'app.title': 'Clavis',
@@ -140,6 +142,7 @@ const translations: Record<string, TranslationDict> = {
     'msg.deleting': 'Deleting...',
     'msg.irreversible': 'This action is irreversible. Once deleted, the drawer and all its contents cannot be recovered.',
     'msg.import_overwrite': 'Drawer already exists — overwrite blocked.',
+    'msg.import_too_large': 'File too large.',
   },
 };
 

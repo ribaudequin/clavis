@@ -15,6 +15,13 @@ export class DrawerAlreadyExistsError extends Error {
     this.name = 'DrawerAlreadyExistsError';
   }
 }
+
+export class FileTooLargeError extends Error {
+  constructor() {
+    super('File content exceeds max size');
+    this.name = 'FileTooLargeError';
+  }
+}
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 let DATA_DIR: string | null = null;
@@ -382,7 +389,7 @@ export async function importDrawerRaw(fileContent: string): Promise<boolean> {
     // DOS-01: file size cap
     if (fileContent.length > MAX_IMPORT_FILE_SIZE) {
       logger.warn('importDrawerRaw: file content exceeds max size', { size: fileContent.length });
-      return false;
+      throw new FileTooLargeError();
     }
 
     const drawer: EncryptedDrawer = JSON.parse(fileContent);
@@ -430,7 +437,7 @@ export async function importDrawerRaw(fileContent: string): Promise<boolean> {
     logger.info('Drawer imported', { id: drawer.id });
     return true;
   } catch (e) {
-    if (e instanceof DrawerAlreadyExistsError) {
+    if (e instanceof DrawerAlreadyExistsError || e instanceof FileTooLargeError) {
       throw e; // Propagate to ipc-handlers for explicit message
     }
     logger.error('importDrawerRaw failed', { error: e instanceof Error ? e.message : String(e) });

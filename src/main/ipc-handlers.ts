@@ -13,6 +13,7 @@ import {
   readDrawerRaw,
   importDrawerRaw,
   DrawerAlreadyExistsError,
+  FileTooLargeError,
 } from './store.js';
 import {
   CreateDrawerSchema,
@@ -392,6 +393,16 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         logger.info('Drawer imported', { fileName: path.basename(filePath) });
         return { ok: true, data: undefined };
       } catch (e) {
+        if (e instanceof Error && e.message.includes('File content exceeds max size')) {
+          logger.warn('import-drawer: file too large', { error: e.message });
+          return {
+            ok: false,
+            error: {
+              code: ErrorCode.WRITE_FAILED,
+              message: getLocale() === 'pt' ? 'Ficheiro demasiado grande.' : 'File too large.',
+            },
+          };
+        }
         if (e instanceof Error && e.message.includes('already exists')) {
           logger.warn('import-drawer: drawer already exists', { error: e.message });
           return {
