@@ -29,6 +29,11 @@ import { logger } from './logger.js';
 const allowedImportPaths = new Map<string, string>();
 const importTimers: NodeJS.Timeout[] = [];
 
+function getLocale(): string {
+  const lang = process.env.LANG || process.env.LC_ALL || process.env.LC_MESSAGES || 'en';
+  return lang.toLowerCase().startsWith('pt') ? 'pt' : 'en';
+}
+
 export function clearImportTimers(): void {
   importTimers.forEach((t) => clearTimeout(t));
   importTimers.length = 0;
@@ -393,7 +398,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
             ok: false,
             error: {
               code: ErrorCode.WRITE_FAILED,
-              message: 'Gaveta já existe — a sobrescrita está bloqueada.',
+              message: getLocale() === 'pt' ? 'Gaveta já existe — a sobrescrita está bloqueada.' : 'Drawer already exists — overwrite blocked.',
             },
           };
         }
