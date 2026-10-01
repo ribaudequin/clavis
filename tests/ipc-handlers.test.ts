@@ -581,6 +581,7 @@ describe('IPC handlers', () => {
         'open-file-dialog',
         'import-drawer',
         'restart-app',
+        'get-app-version',
       ];
       for (const channel of expected) {
         expect(handlers.has(channel), `missing handler for ${channel}`).toBe(true);
