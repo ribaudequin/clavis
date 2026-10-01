@@ -21,6 +21,7 @@
     "build:renderer": "vite build",
     "build": "npm run clean && npm run build:main && npm run build:preload && npm run build:renderer",
     "make": "electron-forge make",
+    "postMake": "node scripts/generate-latest-yml.mjs",
     "release": "npm run clean && npm run build && npm run make",
     "start": "electron .",
     "test": "vitest run",
@@ -76,6 +77,14 @@
     "@vitest/coverage-v8": "4.1.11",
     "playwright": "latest"
   },
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "ribaudequin",
+      "repo": "clavis",
+      "releaseType": "release"
+    }
+  ],
   "dependencies": {
     "argon2": "^0.45.1",
     "electron-log": "^5.4.4",

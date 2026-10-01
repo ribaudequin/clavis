@@ -12,6 +12,7 @@ const api: ElectronAPI = {
   importDrawer: (token: string) => ipcRenderer.invoke(CHANNELS.IMPORT_DRAWER, token),
   openFile: () => ipcRenderer.invoke(CHANNELS.OPEN_FILE_DIALOG),
   restartApp: () => ipcRenderer.invoke(CHANNELS.RESTART_APP),
+  getAppVersion: () => ipcRenderer.invoke(CHANNELS.GET_APP_VERSION),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);

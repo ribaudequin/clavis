@@ -8,4 +8,5 @@ export const CHANNELS = {
   OPEN_FILE_DIALOG: 'open-file-dialog',
   IMPORT_DRAWER: 'import-drawer',
   RESTART_APP: 'restart-app',
+  GET_APP_VERSION: 'get-app-version',
 } as const;

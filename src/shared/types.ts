@@ -58,4 +58,5 @@ export interface ElectronAPI {
   importDrawer: (token: string) => Promise<Result<void>>;
   openFile: () => Promise<Result<{ token: string; fileName: string } | null>>;
   restartApp: () => Promise<Result<void>>;
+  getAppVersion: () => Promise<string>;
 }

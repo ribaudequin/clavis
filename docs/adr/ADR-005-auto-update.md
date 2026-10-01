@@ -10,7 +10,7 @@ Cross-platform release pipeline uses GitHub Actions (`release.yml`) to publish a
 - Use `electron-updater` with GitHub provider (`provider: 'github'`, `owner: 'ribaudequin'`, `repo: 'clavis'`).
 - Feed URL configured in `main/index.ts` (`autoUpdater.setFeedURL`); guarded by `if (app.isPackaged)`.
 - `checkForUpdatesAndNotify()` called at startup (packaged builds only).
-- `latest.yml` file (BS-06) pending; Flatpak manifest references `AppImage` version (`v0.3.1-alpha`).
+- `latest.yml` file (BS-06): `postMake` script (`scripts/generate-latest-yml.mjs`) + `publish` no `package.json` adicionados (`v0.4.0-beta`). Arquivo gerado pós-`make`; `sha512`/`size` ainda são placeholders (requer script de cálculo por artefato).
 
 ## Consequences
 - Users receive update notifications when a new tag (`vX.Y.Z-alpha`) is pushed.

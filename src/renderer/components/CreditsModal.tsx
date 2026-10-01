@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import { t } from '../../i18n';
@@ -45,6 +45,27 @@ function CopyButton({ text }: { text: string }): React.JSX.Element {
 
 function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element {
   const modalRef = useRef<HTMLDivElement>(null);
+  const [newVersion, setNewVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    async function check(): Promise<void> {
+      try {
+        const res = await fetch('https://api.github.com/repos/ribaudequin/clavis/releases/latest');
+        const data = await res.json();
+        const tag = (data.tag_name || '').replace(/^v/, '');
+        const current = await (window as { electronAPI?: { getAppVersion?: () => Promise<string> } }).electronAPI?.getAppVersion?.();
+        if (!cancelled && tag && current && tag !== current.replace(/^v/, '')) {
+          setNewVersion(data.tag_name);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    check();
+    return () => { cancelled = true; };
+  }, [isOpen]);
 
   useFocusTrap(modalRef, { isActive: isOpen, onEscape: onClose });
   useModalKeyboard(modalRef, { onEscape: onClose });
@@ -171,6 +192,11 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
                   <GithubIcon className="w-4 h-4 text-gray-600" />
                   GitHub
                 </a>
+                {newVersion ? (
+                  <a href="https://github.com/ribaudequin/clavis/releases/latest" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-green-700 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors bg-green-50">
+                    Nova versão: {newVersion}
+                  </a>
+                ) : null}
                 <a href="https://etherscan.io/address/0x466f0c3ee495a3dc851fafa5c4720ab2fdcd4af4" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
                   <EthIcon className="w-4 h-4 text-gray-600" />
                   ETH
