@@ -8,6 +8,7 @@ import KoFiIcon from '../../../icons/svg/ko-fi.svg?react';
 import GithubIcon from '../../../icons/svg/github.svg?react';
 import EthIcon from '../../../icons/svg/eth.svg?react';
 import SolIcon from '../../../icons/svg/sol.svg?react';
+import ClavisIcon from '../../../icons/svg/clavis.svg?react';
 
 interface CreditsModalProps {
   isOpen: boolean;
@@ -52,12 +53,11 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
     let cancelled = false;
     async function check(): Promise<void> {
       try {
-        const res = await fetch('https://api.github.com/repos/ribaudequin/clavis/releases/latest');
-        const data = await res.json();
-        const tag = (data.tag_name || '').replace(/^v/, '');
+        const res = await (window as { electronAPI?: { checkUpdate?: () => Promise<{ tag_name?: string } | null>; getAppVersion?: () => Promise<string> } }).electronAPI?.checkUpdate?.();
+        const tag = (res?.tag_name || '').replace(/^v/, '');
         const current = await (window as { electronAPI?: { getAppVersion?: () => Promise<string> } }).electronAPI?.getAppVersion?.();
-        if (!cancelled && tag && current && tag !== current.replace(/^v/, '')) {
-          setNewVersion(data.tag_name);
+        if (!cancelled && tag && current && tag !== String(current || '').replace(/^v/, '')) {
+          setNewVersion(res?.tag_name || null);
         }
       } catch {
         // ignore
@@ -114,10 +114,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
         <div className="px-6 pb-2 space-y-3">
           <section className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
-                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-              </svg>
+              <ClavisIcon className="w-4 h-4 flex-shrink-0" />
               <h3 className="text-sm font-semibold text-blue-800 uppercase tracking-wide">About</h3>
             </div>
             <p className="text-sm text-gray-700 leading-relaxed">
@@ -192,11 +189,6 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
                   <GithubIcon className="w-4 h-4 text-gray-600" />
                   GitHub
                 </a>
-                {newVersion ? (
-                  <a href="https://github.com/ribaudequin/clavis/releases/latest" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-green-700 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors bg-green-50">
-                    Nova versão: {newVersion}
-                  </a>
-                ) : null}
                 <a href="https://etherscan.io/address/0x466f0c3ee495a3dc851fafa5c4720ab2fdcd4af4" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
                   <EthIcon className="w-4 h-4 text-gray-600" />
                   ETH
@@ -206,6 +198,12 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
                   SOL
                 </a>
               </div>
+              {newVersion ? (
+                <a href="https://github.com/ribaudequin/clavis/releases/latest" target="_blank" rel="noopener noreferrer" className="w-full mt-3 inline-flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-green-600/20 transition-all">
+                  <GithubIcon className="w-5 h-5 text-white" />
+                  Nova versão disponível: {newVersion}
+                </a>
+              ) : null}
             </div>
           </section>
 
