@@ -59,4 +59,5 @@ export interface ElectronAPI {
   openFile: () => Promise<Result<{ token: string; fileName: string } | null>>;
   restartApp: () => Promise<Result<void>>;
   getAppVersion: () => Promise<string>;
+  checkUpdate: () => Promise<{ tag_name?: string } | null>;
 }

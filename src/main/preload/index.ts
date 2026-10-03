@@ -13,6 +13,7 @@ const api: ElectronAPI = {
   openFile: () => ipcRenderer.invoke(CHANNELS.OPEN_FILE_DIALOG),
   restartApp: () => ipcRenderer.invoke(CHANNELS.RESTART_APP),
   getAppVersion: () => ipcRenderer.invoke(CHANNELS.GET_APP_VERSION),
+  checkUpdate: () => ipcRenderer.invoke(CHANNELS.CHECK_UPDATE),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);

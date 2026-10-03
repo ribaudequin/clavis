@@ -9,4 +9,7 @@ export const CHANNELS = {
   IMPORT_DRAWER: 'import-drawer',
   RESTART_APP: 'restart-app',
   GET_APP_VERSION: 'get-app-version',
+  CHECK_UPDATE: 'check-update',
 } as const;
+
+export type Channel = (typeof CHANNELS)[keyof typeof CHANNELS];
