@@ -303,9 +303,10 @@ if (viewState) {
 
      {showCreateModal && (
        <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center bg-black/50" />}>
-         <CreateDrawerModal
-           key={`create-${drawers.length}`}
-           onClose={() => {
+          <CreateDrawerModal
+            key={`create-${drawers.length}`}
+            existingTitles={drawers.map((drawer) => drawer.title)}
+            onClose={() => {
              setShowCreateModal(false);
              window.focus();
            }}

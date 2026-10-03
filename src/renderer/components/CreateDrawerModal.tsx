@@ -8,16 +8,30 @@ import { toast } from 'react-hot-toast';
 interface CreateDrawerModalProps {
   onClose: () => void;
   onCreated: () => void;
+  existingTitles?: string[];
 }
 
-function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): React.JSX.Element {
+function normalizeTitle(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function findDuplicateTitle(title: string, existingTitles?: string[]): string | null {
+  if (!existingTitles) return null;
+  const target = normalizeTitle(title);
+  if (target === '') return null;
+  return existingTitles.find((candidate) => normalizeTitle(candidate) === target) ?? null;
+}
+
+function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerModalProps): React.JSX.Element {
   const [title, setTitle] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [duplicateTitle, setDuplicateTitle] = useState<string | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  const changeTitleRef = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
   useFocusTrap(modalRef, { isActive: true, onEscape: onClose });
@@ -27,6 +41,12 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
     titleRef.current?.focus();
     window.focus();
   }, []);
+
+  useEffect(() => {
+    if (duplicateTitle !== null) {
+      changeTitleRef.current?.focus();
+    }
+  }, [duplicateTitle]);
 
   function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
     if (pw.length > 0 && pw.length < 8) return { score: 1, label: 'Too short (min 8 chars)', color: '#fca5a5' };
@@ -42,20 +62,7 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
     return { score, label: labels[idx], color: colors[idx] };
   }
 
-  async function handleSubmit(e?: React.FormEvent): Promise<void> {
-    if (e) e.preventDefault();
-    if (title.trim() === '') {
-      toast.error(t('msg.title_empty'));
-      return;
-    }
-    if (password !== confirmPassword) {
-      toast.error(t('msg.password_mismatch'));
-      return;
-    }
-    if (password.length < 8) {
-      toast.error(t('msg.password_too_short'));
-      return;
-    }
+  async function createDrawer(): Promise<void> {
     setIsLoading(true);
     try {
       const result = await window.electronAPI.createDrawer(title, password);
@@ -72,6 +79,37 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
     }
   }
 
+  async function handleSubmit(e?: React.FormEvent): Promise<void> {
+    if (e) e.preventDefault();
+    if (title.trim() === '') {
+      toast.error(t('msg.title_empty'));
+      return;
+    }
+    if (password !== confirmPassword) {
+      toast.error(t('msg.password_mismatch'));
+      return;
+    }
+    if (password.length < 8) {
+      toast.error(t('msg.password_too_short'));
+      return;
+    }
+    const duplicate = findDuplicateTitle(title, existingTitles);
+    if (duplicate !== null) {
+      setDuplicateTitle(duplicate);
+      return;
+    }
+    await createDrawer();
+  }
+
+  async function handleCreateAnyway(): Promise<void> {
+    await createDrawer();
+  }
+
+  function handleChangeTitle(): void {
+    setDuplicateTitle(null);
+    titleRef.current?.focus();
+  }
+
   const strength = getPasswordStrength(password);
 
   return (
@@ -86,7 +124,8 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
         <h2 id="create-drawer-title" className="text-lg font-semibold mb-4">
           {t('label.new_drawer')}
         </h2>
-        <form onSubmit={handleSubmit}>
+        {duplicateTitle === null ? (
+          <form onSubmit={handleSubmit}>
           <div className="space-y-3">
             <div>
               <label htmlFor="drawer-title" className="block text-sm text-gray-600 mb-1">
@@ -193,6 +232,33 @@ function CreateDrawerModal({ onClose, onCreated }: CreateDrawerModalProps): Reac
             </button>
           </div>
         </form>
+        ) : (
+          <div className="space-y-3">
+            <div role="alert" className="bg-yellow-50 border border-yellow-300 rounded p-3">
+              <p className="text-sm text-yellow-800">{t('msg.title_duplicate')}</p>
+              <p className="text-sm text-yellow-800 font-medium mt-1 break-words">{duplicateTitle}</p>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                ref={changeTitleRef}
+                type="button"
+                onClick={handleChangeTitle}
+                disabled={isLoading}
+                className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50"
+              >
+                {t('btn.change_title')}
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateAnyway}
+                disabled={isLoading}
+                className="px-3 py-1 text-sm text-white bg-yellow-600 rounded hover:bg-yellow-700 disabled:opacity-50"
+              >
+                {isLoading ? t('btn.creating') : t('btn.create_anyway')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
