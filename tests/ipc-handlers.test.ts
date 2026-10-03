@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { MockedFunction } from 'vitest';
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn() },
@@ -38,25 +39,59 @@ vi.mock('fs/promises', () => {
 });
 
 import { registerIpcHandlers, __resetAllowedImportPaths } from '../src/main/ipc-handlers';
+import type { IpcListener } from '../src/main/ipc-handlers';
 import * as store from '../src/main/store';
 import * as fsPromises from 'fs/promises';
-import { ErrorCode, Result } from '../src/shared/types';
+import { CHANNELS } from '../src/shared/channels';
+import type { Channel } from '../src/shared/channels';
+import { ErrorCode } from '../src/shared/types';
+import type { ElectronAPI, EncryptedDrawer } from '../src/shared/types';
 
 const VALID_UUID = '123e4567-e89b-12d3-a456-426614174000';
 const VALID_UUID_2 = '123e4567-e89b-12d3-a456-426614174001';
 
-type Handler = (...args: any[]) => Promise<Result<any>>;
+// Maps every IPC channel to the preload-exposed method that invokes it, so the
+// handlers under test are typed by the public ElectronAPI contract instead of
+// hand-written signatures. Any drift between preload and main is a type error.
+const API_BY_CHANNEL = {
+  [CHANNELS.LIST_DRAWERS]: 'listDrawers',
+  [CHANNELS.CREATE_DRAWER]: 'createDrawer',
+  [CHANNELS.UNLOCK_DRAWER]: 'unlockDrawer',
+  [CHANNELS.SAVE_DRAWER]: 'saveDrawer',
+  [CHANNELS.DELETE_DRAWER]: 'deleteDrawer',
+  [CHANNELS.EXPORT_DRAWER]: 'exportDrawer',
+  [CHANNELS.OPEN_FILE_DIALOG]: 'openFile',
+  [CHANNELS.IMPORT_DRAWER]: 'importDrawer',
+  [CHANNELS.RESTART_APP]: 'restartApp',
+  [CHANNELS.GET_APP_VERSION]: 'getAppVersion',
+  [CHANNELS.CHECK_UPDATE]: 'checkUpdate',
+} as const satisfies Record<Channel, keyof ElectronAPI>;
 
-let handlers: Map<string, Handler>;
+type Handler<C extends Channel> = (
+  event: unknown,
+  ...args: Parameters<ElectronAPI[(typeof API_BY_CHANNEL)[C]]>
+) => Awaited<ReturnType<ElectronAPI[(typeof API_BY_CHANNEL)[C]]>>;
+
+let handlers: Map<Channel, IpcListener>;
+
+// `fs/promises` exposes overloaded signatures; these narrow aliases describe the
+// exact overloads the import handler uses, so mock expectations stay typed.
+type MockStats = { isSymbolicLink: () => boolean };
+const lstatMock = fsPromises.lstat as unknown as MockedFunction<
+  (path: string) => Promise<MockStats>
+>;
+const readFileMock = fsPromises.readFile as unknown as MockedFunction<
+  (path: string, encoding: 'utf8') => Promise<string>
+>;
 
 beforeEach(() => {
   vi.clearAllMocks();
   __resetAllowedImportPaths();
-  handlers = new Map<string, Handler>();
+  handlers = new Map<Channel, IpcListener>();
   registerIpcHandlers({
     ipcMain: {
-      handle: (channel: string, fn: Handler) => {
-        handlers.set(channel, fn);
+      handle: (channel, listener) => {
+        handlers.set(channel, listener);
       },
     },
     dialog: {
@@ -65,10 +100,10 @@ beforeEach(() => {
   });
 });
 
-function getHandler<T = any>(channel: string): T {
+function getHandler<C extends Channel>(channel: C): Handler<C> {
   const h = handlers.get(channel);
   if (!h) throw new Error(`Handler not registered: ${channel}`);
-  return h as unknown as T;
+  return h as unknown as Handler<C>;
 }
 
 describe('IPC handlers', () => {
@@ -77,7 +112,7 @@ describe('IPC handlers', () => {
       const items = [{ id: VALID_UUID, title: 't', iconData: 'rgb(0,0,0)' }];
       vi.mocked(store.listDrawers).mockResolvedValue(items);
 
-      const handler = getHandler<(e: any) => Promise<Result<typeof items>>>('list-drawers');
+      const handler = getHandler(CHANNELS.LIST_DRAWERS);
       const result = await handler({});
 
       expect(result).toEqual({ ok: true, data: items });
@@ -87,7 +122,7 @@ describe('IPC handlers', () => {
     it('returns FILE_NOT_FOUND error when store throws', async () => {
       vi.mocked(store.listDrawers).mockRejectedValue(new Error('boom'));
 
-      const handler = getHandler<(e: any) => Promise<Result<any>>>('list-drawers');
+      const handler = getHandler(CHANNELS.LIST_DRAWERS);
       const result = await handler({});
 
       expect(result.ok).toBe(false);
@@ -100,10 +135,21 @@ describe('IPC handlers', () => {
 
   describe('create-drawer', () => {
     it('returns ok with encrypted drawer on success', async () => {
-      const drawer = { id: VALID_UUID, title: 'A', iconData: 'rgb(0,0,0)' } as any;
+      const drawer: EncryptedDrawer = {
+        id: VALID_UUID,
+        title: 'A',
+        iconData: 'rgb(0,0,0)',
+        createdAt: 0,
+        updatedAt: 0,
+        encryptedData: 'e',
+        salt: 's',
+        iv: 'i',
+        authTag: 'a',
+        keyDerivation: { algorithm: 'argon2id', iterations: 3, memory: 262144, parallelism: 4 },
+      };
       vi.mocked(store.createDrawer).mockResolvedValue(drawer);
 
-      const handler = getHandler<(e: any, t: string, p: string) => Promise<Result<any>>>('create-drawer');
+      const handler = getHandler(CHANNELS.CREATE_DRAWER);
       const result = await handler({}, 'My Drawer', 'password12345');
 
       expect(result).toEqual({ ok: true, data: drawer });
@@ -111,7 +157,7 @@ describe('IPC handlers', () => {
     });
 
     it('returns VALIDATION_ERROR on Zod failure (empty title)', async () => {
-      const handler = getHandler<(e: any, t: string, p: string) => Promise<Result<any>>>('create-drawer');
+      const handler = getHandler(CHANNELS.CREATE_DRAWER);
       const result = await handler({}, '', 'password12345');
 
       expect(result.ok).toBe(false);
@@ -123,7 +169,7 @@ describe('IPC handlers', () => {
     });
 
     it('returns VALIDATION_ERROR on Zod failure (password too short)', async () => {
-      const handler = getHandler<(e: any, t: string, p: string) => Promise<Result<any>>>('create-drawer');
+      const handler = getHandler(CHANNELS.CREATE_DRAWER);
       const result = await handler({}, 'Title', 'short');
 
       expect(result.ok).toBe(false);
@@ -136,7 +182,7 @@ describe('IPC handlers', () => {
     it('returns PASSWORD_TOO_SHORT when store throws with password message', async () => {
       vi.mocked(store.createDrawer).mockRejectedValue(new Error('Password must be at least 8 characters'));
 
-      const handler = getHandler<(e: any, t: string, p: string) => Promise<Result<any>>>('create-drawer');
+      const handler = getHandler(CHANNELS.CREATE_DRAWER);
       const result = await handler({}, 'Title', 'whatever1');
 
       expect(result.ok).toBe(false);
@@ -149,7 +195,7 @@ describe('IPC handlers', () => {
     it('returns WRITE_FAILED on generic store error', async () => {
       vi.mocked(store.createDrawer).mockRejectedValue(new Error('disk full'));
 
-      const handler = getHandler<(e: any, t: string, p: string) => Promise<Result<any>>>('create-drawer');
+      const handler = getHandler(CHANNELS.CREATE_DRAWER);
       const result = await handler({}, 'Title', 'password12345');
 
       expect(result.ok).toBe(false);
@@ -165,7 +211,7 @@ describe('IPC handlers', () => {
       const payload = { title: 'A', content: 'hello', iconData: 'rgb(0,0,0)' };
       vi.mocked(store.unlockDrawer).mockResolvedValue(payload);
 
-      const handler = getHandler<(e: any, id: string, p: string) => Promise<Result<any>>>('unlock-drawer');
+      const handler = getHandler(CHANNELS.UNLOCK_DRAWER);
       const result = await handler({}, VALID_UUID, 'password12345');
 
       expect(result).toEqual({ ok: true, data: payload });
@@ -175,7 +221,7 @@ describe('IPC handlers', () => {
     it('returns DECRYPT_FAILED with data:null mapped to error envelope when password wrong', async () => {
       vi.mocked(store.unlockDrawer).mockResolvedValue(null);
 
-      const handler = getHandler<(e: any, id: string, p: string) => Promise<Result<any>>>('unlock-drawer');
+      const handler = getHandler(CHANNELS.UNLOCK_DRAWER);
       const result = await handler({}, VALID_UUID, 'wrong-password');
 
       expect(result.ok).toBe(false);
@@ -187,7 +233,7 @@ describe('IPC handlers', () => {
     });
 
     it('returns VALIDATION_ERROR on invalid id', async () => {
-      const handler = getHandler<(e: any, id: string, p: string) => Promise<Result<any>>>('unlock-drawer');
+      const handler = getHandler(CHANNELS.UNLOCK_DRAWER);
       const result = await handler({}, 'not-a-uuid', 'password12345');
 
       expect(result.ok).toBe(false);
@@ -200,7 +246,7 @@ describe('IPC handlers', () => {
     it('returns DECRYPT_FAILED when store throws', async () => {
       vi.mocked(store.unlockDrawer).mockRejectedValue(new Error('crypto broke'));
 
-      const handler = getHandler<(e: any, id: string, p: string) => Promise<Result<any>>>('unlock-drawer');
+      const handler = getHandler(CHANNELS.UNLOCK_DRAWER);
       const result = await handler({}, VALID_UUID, 'password12345');
 
       expect(result.ok).toBe(false);
@@ -215,7 +261,7 @@ describe('IPC handlers', () => {
     it('returns ok on success', async () => {
       vi.mocked(store.saveDrawer).mockResolvedValue(true);
 
-      const handler = getHandler<(e: any, id: string, p: string, t: string, c: string) => Promise<Result<any>>>('save-drawer');
+      const handler = getHandler(CHANNELS.SAVE_DRAWER);
       const result = await handler({}, VALID_UUID, 'password12345', 'Title', 'content');
 
       expect(result).toEqual({ ok: true, data: undefined });
@@ -225,7 +271,7 @@ describe('IPC handlers', () => {
     it('returns WRITE_FAILED with "invalid ID or password" when store returns false', async () => {
       vi.mocked(store.saveDrawer).mockResolvedValue(false);
 
-      const handler = getHandler<(e: any, id: string, p: string, t: string, c: string) => Promise<Result<any>>>('save-drawer');
+      const handler = getHandler(CHANNELS.SAVE_DRAWER);
       const result = await handler({}, VALID_UUID, 'wrong-password', 'Title', 'content');
 
       expect(result.ok).toBe(false);
@@ -236,7 +282,7 @@ describe('IPC handlers', () => {
     });
 
     it('returns VALIDATION_ERROR on invalid id', async () => {
-      const handler = getHandler<(e: any, id: string, p: string, t: string, c: string) => Promise<Result<any>>>('save-drawer');
+      const handler = getHandler(CHANNELS.SAVE_DRAWER);
       const result = await handler({}, 'bad', 'password12345', 'Title', 'content');
 
       expect(result.ok).toBe(false);
@@ -249,7 +295,7 @@ describe('IPC handlers', () => {
     it('returns WRITE_FAILED when store throws', async () => {
       vi.mocked(store.saveDrawer).mockRejectedValue(new Error('io error'));
 
-      const handler = getHandler<(e: any, id: string, p: string, t: string, c: string) => Promise<Result<any>>>('save-drawer');
+      const handler = getHandler(CHANNELS.SAVE_DRAWER);
       const result = await handler({}, VALID_UUID, 'password12345', 'Title', 'content');
 
       expect(result.ok).toBe(false);
@@ -264,7 +310,7 @@ describe('IPC handlers', () => {
     it('returns ok on success', async () => {
       vi.mocked(store.deleteDrawer).mockResolvedValue(true);
 
-      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('delete-drawer');
+      const handler = getHandler(CHANNELS.DELETE_DRAWER);
       const result = await handler({}, VALID_UUID);
 
       expect(result).toEqual({ ok: true, data: undefined });
@@ -273,7 +319,7 @@ describe('IPC handlers', () => {
     it('returns FILE_NOT_FOUND when store returns false', async () => {
       vi.mocked(store.deleteDrawer).mockResolvedValue(false);
 
-      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('delete-drawer');
+      const handler = getHandler(CHANNELS.DELETE_DRAWER);
       const result = await handler({}, VALID_UUID);
 
       expect(result.ok).toBe(false);
@@ -284,7 +330,7 @@ describe('IPC handlers', () => {
     });
 
     it('returns VALIDATION_ERROR on invalid id', async () => {
-      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('delete-drawer');
+      const handler = getHandler(CHANNELS.DELETE_DRAWER);
       const result = await handler({}, 'not-a-uuid');
 
       expect(result.ok).toBe(false);
@@ -297,7 +343,7 @@ describe('IPC handlers', () => {
     it('returns WRITE_FAILED when store throws', async () => {
       vi.mocked(store.deleteDrawer).mockRejectedValue(new Error('disk error'));
 
-      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('delete-drawer');
+      const handler = getHandler(CHANNELS.DELETE_DRAWER);
       const result = await handler({}, VALID_UUID);
 
       expect(result.ok).toBe(false);
@@ -312,7 +358,7 @@ describe('IPC handlers', () => {
       const raw = '{"id":"x","title":"t"}';
       vi.mocked(store.readDrawerRaw).mockResolvedValue(raw);
 
-      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('export-drawer');
+      const handler = getHandler(CHANNELS.EXPORT_DRAWER);
       const result = await handler({}, VALID_UUID);
 
       expect(result).toEqual({ ok: true, data: raw });
@@ -321,7 +367,7 @@ describe('IPC handlers', () => {
     it('returns FILE_NOT_FOUND when store returns null', async () => {
       vi.mocked(store.readDrawerRaw).mockResolvedValue(null);
 
-      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('export-drawer');
+      const handler = getHandler(CHANNELS.EXPORT_DRAWER);
       const result = await handler({}, VALID_UUID);
 
       expect(result.ok).toBe(false);
@@ -332,7 +378,7 @@ describe('IPC handlers', () => {
     });
 
     it('returns VALIDATION_ERROR on invalid id', async () => {
-      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('export-drawer');
+      const handler = getHandler(CHANNELS.EXPORT_DRAWER);
       const result = await handler({}, 'not-a-uuid');
 
       expect(result.ok).toBe(false);
@@ -345,7 +391,7 @@ describe('IPC handlers', () => {
     it('returns WRITE_FAILED when store throws', async () => {
       vi.mocked(store.readDrawerRaw).mockRejectedValue(new Error('eio'));
 
-      const handler = getHandler<(e: any, id: string) => Promise<Result<any>>>('export-drawer');
+      const handler = getHandler(CHANNELS.EXPORT_DRAWER);
       const result = await handler({}, VALID_UUID);
 
       expect(result.ok).toBe(false);
@@ -360,11 +406,11 @@ describe('IPC handlers', () => {
       const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: [] });
       handlers.clear();
       registerIpcHandlers({
-        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        ipcMain: { handle: (channel, listener) => { handlers.set(channel, listener); } },
         dialog: { showOpenDialog },
       });
 
-      const result = await handlers.get('open-file-dialog')!({});
+      const result = await getHandler(CHANNELS.OPEN_FILE_DIALOG)({});
       expect(result).toEqual({ ok: true, data: null });
       expect(showOpenDialog).toHaveBeenCalledWith({
         properties: ['openFile'],
@@ -376,11 +422,11 @@ describe('IPC handlers', () => {
       const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/home/user/secret.clavis'] });
       handlers.clear();
       registerIpcHandlers({
-        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        ipcMain: { handle: (channel, listener) => { handlers.set(channel, listener); } },
         dialog: { showOpenDialog },
       });
 
-      const result = await handlers.get('open-file-dialog')!({});
+      const result = await getHandler(CHANNELS.OPEN_FILE_DIALOG)({});
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -395,11 +441,11 @@ describe('IPC handlers', () => {
       const showOpenDialog = vi.fn().mockRejectedValue(new Error('dialog crash'));
       handlers.clear();
       registerIpcHandlers({
-        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        ipcMain: { handle: (channel, listener) => { handlers.set(channel, listener); } },
         dialog: { showOpenDialog },
       });
 
-      const result = await handlers.get('open-file-dialog')!({});
+      const result = await getHandler(CHANNELS.OPEN_FILE_DIALOG)({});
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -414,14 +460,14 @@ describe('IPC handlers', () => {
       const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: [] });
       handlers.clear();
       registerIpcHandlers({
-        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        ipcMain: { handle: (channel, listener) => { handlers.set(channel, listener); } },
         dialog: { showOpenDialog },
       });
-      vi.mocked(fsPromises.lstat as any).mockResolvedValue({ isSymbolicLink: () => false });
+      lstatMock.mockResolvedValue({ isSymbolicLink: () => false });
     });
 
     it('returns VALIDATION_ERROR for non-uuid token', async () => {
-      const handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      const handler = getHandler(CHANNELS.IMPORT_DRAWER);
       const result = await handler({}, 'not-a-uuid');
 
       expect(result.ok).toBe(false);
@@ -431,7 +477,7 @@ describe('IPC handlers', () => {
     });
 
     it('returns VALIDATION_ERROR "Invalid or expired import token" for unknown uuid token', async () => {
-      const handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      const handler = getHandler(CHANNELS.IMPORT_DRAWER);
       const result = await handler({}, VALID_UUID);
 
       expect(result.ok).toBe(false);
@@ -439,29 +485,29 @@ describe('IPC handlers', () => {
         expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
         expect(result.error.message).toBe('Invalid or expired import token');
       }
-      expect(fsPromises.readFile).not.toHaveBeenCalled();
+      expect(readFileMock).not.toHaveBeenCalled();
     });
 
     it('returns ok after successful import and consumes token (one-shot)', async () => {
       const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/import.clavis'] });
       handlers.clear();
       registerIpcHandlers({
-        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        ipcMain: { handle: (channel, listener) => { handlers.set(channel, listener); } },
         dialog: { showOpenDialog },
       });
-      const dialogResult = await handlers.get('open-file-dialog')!({});
+      const dialogResult = await getHandler(CHANNELS.OPEN_FILE_DIALOG)({});
       expect(dialogResult.ok).toBe(true);
       if (!dialogResult.ok) throw new Error('expected ok');
       const token = dialogResult.data!.token;
 
-      vi.mocked(fsPromises.readFile as any).mockResolvedValue('{"id":"x","title":"t","iconData":"i","createdAt":0,"updatedAt":0,"encryptedData":"e","salt":"s","iv":"i","authTag":"a","keyDerivation":{"algorithm":"x","iterations":1,"memory":1,"parallelism":1}}');
+      readFileMock.mockResolvedValue('{"id":"x","title":"t","iconData":"i","createdAt":0,"updatedAt":0,"encryptedData":"e","salt":"s","iv":"i","authTag":"a","keyDerivation":{"algorithm":"x","iterations":1,"memory":1,"parallelism":1}}');
       vi.mocked(store.importDrawerRaw).mockResolvedValue(true);
 
-      const handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      const handler = getHandler(CHANNELS.IMPORT_DRAWER);
       const result = await handler({}, token);
 
       expect(result).toEqual({ ok: true, data: undefined });
-      expect(fsPromises.readFile).toHaveBeenCalledWith('/tmp/import.clavis', 'utf8');
+      expect(readFileMock).toHaveBeenCalledWith('/tmp/import.clavis', 'utf8');
       expect(store.importDrawerRaw).toHaveBeenCalledOnce();
 
       const replay = await handler({}, token);
@@ -475,17 +521,17 @@ describe('IPC handlers', () => {
       const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/bad.clavis'] });
       handlers.clear();
       registerIpcHandlers({
-        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        ipcMain: { handle: (channel, listener) => { handlers.set(channel, listener); } },
         dialog: { showOpenDialog },
       });
-      const dialogResult = await handlers.get('open-file-dialog')!({});
+      const dialogResult = await getHandler(CHANNELS.OPEN_FILE_DIALOG)({});
       if (!dialogResult.ok) throw new Error('expected ok');
       const token = dialogResult.data!.token;
 
-      vi.mocked(fsPromises.readFile as any).mockResolvedValue('garbage');
+      readFileMock.mockResolvedValue('garbage');
       vi.mocked(store.importDrawerRaw).mockResolvedValue(false);
 
-      const handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      const handler = getHandler(CHANNELS.IMPORT_DRAWER);
       const result = await handler({}, token);
 
       expect(result.ok).toBe(false);
@@ -499,16 +545,16 @@ describe('IPC handlers', () => {
       const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/missing.clavis'] });
       handlers.clear();
       registerIpcHandlers({
-        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        ipcMain: { handle: (channel, listener) => { handlers.set(channel, listener); } },
         dialog: { showOpenDialog },
       });
-      const dialogResult = await handlers.get('open-file-dialog')!({});
+      const dialogResult = await getHandler(CHANNELS.OPEN_FILE_DIALOG)({});
       if (!dialogResult.ok) throw new Error('expected ok');
       const token = dialogResult.data!.token;
 
-      vi.mocked(fsPromises.readFile as any).mockRejectedValue(new Error('ENOENT'));
+      readFileMock.mockRejectedValue(new Error('ENOENT'));
 
-      const handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      const handler = getHandler(CHANNELS.IMPORT_DRAWER);
       const result = await handler({}, token);
 
       expect(result.ok).toBe(false);
@@ -522,18 +568,16 @@ describe('IPC handlers', () => {
       const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/leak.clavis'] });
       handlers.clear();
       registerIpcHandlers({
-        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        ipcMain: { handle: (channel, listener) => { handlers.set(channel, listener); } },
         dialog: { showOpenDialog },
       });
-      const dialogResult = await handlers.get('open-file-dialog')!({});
+      const dialogResult = await getHandler(CHANNELS.OPEN_FILE_DIALOG)({});
       if (!dialogResult.ok) throw new Error('expected ok');
       const token = dialogResult.data!.token;
 
-      vi.mocked(fsPromises.readFile as any).mockRejectedValue(
-        new Error('read failed: file contents leaked into message')
-      );
+      readFileMock.mockRejectedValue(new Error('read failed: file contents leaked into message'));
 
-      const handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      const handler = getHandler(CHANNELS.IMPORT_DRAWER);
       const result = await handler({}, token);
 
       expect(result.ok).toBe(false);
@@ -547,16 +591,16 @@ describe('IPC handlers', () => {
       const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/link.clavis'] });
       handlers.clear();
       registerIpcHandlers({
-        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        ipcMain: { handle: (channel, listener) => { handlers.set(channel, listener); } },
         dialog: { showOpenDialog },
       });
-      const dialogResult = await handlers.get('open-file-dialog')!({});
+      const dialogResult = await getHandler(CHANNELS.OPEN_FILE_DIALOG)({});
       if (!dialogResult.ok) throw new Error('expected ok');
       const token = dialogResult.data!.token;
 
-      vi.mocked(fsPromises.lstat as any).mockResolvedValue({ isSymbolicLink: () => true });
+      lstatMock.mockResolvedValue({ isSymbolicLink: () => true });
 
-      const handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
+      const handler = getHandler(CHANNELS.IMPORT_DRAWER);
       const result = await handler({}, token);
 
       expect(result.ok).toBe(false);
@@ -564,24 +608,25 @@ describe('IPC handlers', () => {
         expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
         expect(result.error.message).toBe('Refusing to import a symbolic link');
       }
-      expect(fsPromises.readFile).not.toHaveBeenCalled();
+      expect(readFileMock).not.toHaveBeenCalled();
       expect(store.importDrawerRaw).not.toHaveBeenCalled();
     });
   });
 
   describe('handler registration', () => {
-    it('registers all 9 expected channels', () => {
-      const expected = [
-        'list-drawers',
-        'create-drawer',
-        'unlock-drawer',
-        'save-drawer',
-        'delete-drawer',
-        'export-drawer',
-        'open-file-dialog',
-        'import-drawer',
-        'restart-app',
-        'get-app-version',
+    it('registers all expected channels', () => {
+      const expected: Channel[] = [
+        CHANNELS.LIST_DRAWERS,
+        CHANNELS.CREATE_DRAWER,
+        CHANNELS.UNLOCK_DRAWER,
+        CHANNELS.SAVE_DRAWER,
+        CHANNELS.DELETE_DRAWER,
+        CHANNELS.EXPORT_DRAWER,
+        CHANNELS.OPEN_FILE_DIALOG,
+        CHANNELS.IMPORT_DRAWER,
+        CHANNELS.RESTART_APP,
+        CHANNELS.GET_APP_VERSION,
+        CHANNELS.CHECK_UPDATE,
       ];
       for (const channel of expected) {
         expect(handlers.has(channel), `missing handler for ${channel}`).toBe(true);
@@ -593,7 +638,7 @@ describe('IPC handlers', () => {
   describe('Result envelope', () => {
     it('always returns either ok:true with data or ok:false with structured error', async () => {
       vi.mocked(store.listDrawers).mockRejectedValue(new Error('x'));
-      const handler = getHandler<(e: any) => Promise<Result<any>>>('list-drawers');
+      const handler = getHandler(CHANNELS.LIST_DRAWERS);
       const result = await handler({});
       expect('ok' in result).toBe(true);
       expect(result.ok).toBe(false);
@@ -610,21 +655,19 @@ describe('IPC handlers', () => {
       const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/a.clavis'] });
       handlers.clear();
       registerIpcHandlers({
-        ipcMain: { handle: (ch: string, fn: Handler) => handlers.set(ch, fn) },
+        ipcMain: { handle: (channel, listener) => { handlers.set(channel, listener); } },
         dialog: { showOpenDialog },
       });
-      const dlgResult = await handlers.get('open-file-dialog')!({});
+      const dlgResult = await getHandler(CHANNELS.OPEN_FILE_DIALOG)({});
       if (!dlgResult.ok) throw new Error('expected ok');
       const token = dlgResult.data!.token;
 
-      let handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
-      vi.mocked(fsPromises.readFile as any).mockResolvedValue('{}');
+      readFileMock.mockResolvedValue('{}');
       vi.mocked(store.importDrawerRaw).mockResolvedValue(true);
-      await handler({}, token);
+      await getHandler(CHANNELS.IMPORT_DRAWER)({}, token);
 
       __resetAllowedImportPaths();
-      handler = getHandler<(e: any, t: string) => Promise<Result<any>>>('import-drawer');
-      const replay = await handler({}, VALID_UUID_2);
+      const replay = await getHandler(CHANNELS.IMPORT_DRAWER)({}, VALID_UUID_2);
       expect(replay.ok).toBe(false);
       if (!replay.ok) {
         expect(replay.error.message).toBe('Invalid or expired import token');

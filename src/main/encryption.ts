@@ -25,10 +25,10 @@ export const MAX_PARALLELISM = 8;
 // Lazy-load argon2 native module with fallback to Node's scrypt.
 // This prevents the hard crash "is not a valid Win32 application" when the
 // wrong-architecture argon2.node is bundled (cross-build on Linux → Windows).
-let argon2: any = null;
+type Argon2Module = typeof import('argon2');
+let argon2: Argon2Module | null = null;
 let argon2LoadError: Error | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   argon2 = require('argon2');
 } catch (e) {
   argon2LoadError = e instanceof Error ? e : new Error(String(e));
@@ -71,14 +71,14 @@ export async function deriveKey(password: string | Buffer, salt: Buffer, params?
   const parallelism = params?.parallelism ?? DEFAULT_PARALLELISM;
   let hash: Buffer;
   if (argon2) {
-    hash = (await argon2.hash(passwordBuffer, {
+    hash = await argon2.hash(passwordBuffer, {
       type: argon2.argon2id,
       timeCost,
       memoryCost,
       parallelism,
       salt,
       raw: true,
-    })) as Buffer;
+    });
     if (hash.length !== KEY_LENGTH) {
       throw new Error(`Argon2 raw output length ${hash.length} != expected ${KEY_LENGTH}`);
     }

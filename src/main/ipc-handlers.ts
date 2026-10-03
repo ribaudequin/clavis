@@ -2,6 +2,8 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { app } from 'electron';
+import type { Dialog } from 'electron';
+import https from 'https';
 import { z } from 'zod';
 import {
   ensureDataDir,
@@ -25,7 +27,10 @@ import {
 } from './validation.js';
 import { Result, ErrorCode, DrawerListItem, EncryptedDrawer } from '../shared/types.js';
 import { CHANNELS } from '../shared/channels.js';
+import type { Channel } from '../shared/channels.js';
 import { logger } from './logger.js';
+
+export type IpcListener = (event: unknown, ...args: string[]) => unknown;
 
 const allowedImportPaths = new Map<string, string>();
 const importTimers: NodeJS.Timeout[] = [];
@@ -66,10 +71,10 @@ export function __resetAllowedImportPaths(): void {
 }
 
 export interface IpcDeps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ipcMain: { handle: (channel: string, fn: (...args: any[]) => any) => void };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  dialog: any;
+  ipcMain: {
+    handle: (channel: Channel, listener: IpcListener) => void;
+  };
+  dialog: Pick<Dialog, 'showOpenDialog'>;
 }
 
 export function registerIpcHandlers(deps: IpcDeps): void {
@@ -449,6 +454,23 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 
   ipcMain.handle(CHANNELS.GET_APP_VERSION, async (): Promise<string> => {
     return app.getVersion();
+  });
+
+  ipcMain.handle(CHANNELS.CHECK_UPDATE, async (): Promise<{ tag_name?: string } | null> => {
+    return new Promise((resolve) => {
+      https.get('https://api.github.com/repos/ribaudequin/clavis/releases/latest', { headers: { 'User-Agent': 'Clavis' } }, (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(data);
+            resolve({ tag_name: json.tag_name || null });
+          } catch {
+            resolve(null);
+          }
+        });
+      }).on('error', () => resolve(null));
+    });
   });
 
   ipcMain.handle(CHANNELS.RESTART_APP, async (): Promise<Result<void>> => {
