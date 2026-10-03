@@ -89,7 +89,7 @@ Generated in `release_artifacts/`:
 ```
 
 ### Forge Config
-Configured in `forge.config.mts` with:
+Configured in `package.json` → `config.forge` with:
 - Squirrel (Windows installer)
 - DEB (Linux package)
 

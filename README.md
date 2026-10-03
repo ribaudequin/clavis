@@ -93,7 +93,7 @@ git tag v0.1.3-alpha
 git push origin v0.1.3-alpha
 ```
 
-The workflow builds all 6 targets (`.deb`, `.rpm`, `.AppImage` for Linux · Portable `.zip` + installer `.exe` for Windows · `.dmg` for macOS) and publishes them to [GitHub Releases](https://github.com/ribaudequin/clavis/releases). See `.github/workflows/release.yml` and `BUILD_MANUAL.md`.
+The workflow builds all 3 platforms and publishes 6 assets (`.deb` + `.AppImage` for Linux · Portable `.zip` + Squirrel `.exe` + `.nupkg` for Windows · `.dmg` for macOS) to [GitHub Releases](https://github.com/ribaudequin/clavis/releases). See `.github/workflows/release.yml` and `BUILD_MANUAL.md`.
 
 ### Local Build (Linux)
 
@@ -101,7 +101,7 @@ The workflow builds all 6 targets (`.deb`, `.rpm`, `.AppImage` for Linux · Port
 # TypeScript + renderer build
 npm run build
 
-# Linux .deb + .rpm + AppImage (via Electron Forge)
+# Linux .deb + .AppImage (via Electron Forge 6.4.2)
 npm run make
 
 # Or all in one
@@ -113,8 +113,7 @@ Windows/macOS targets are built in CI (native runners) — no Wine cross-compile
 ### Prerequisites (local Linux)
 
 - `dpkg`, `fakeroot` (for .deb)
-- `rpm` (for .rpm)
-- `mksquashfs` (for AppImage)
+- `squashfs-tools` (for AppImage)
 - See `BUILD_MANUAL.md` for full guide
 
 ## Downloads

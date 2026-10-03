@@ -12,7 +12,7 @@ Thank you for your interest in contributing to Clavis!
 
 ## Code conventions
 
-- **Language:** TypeScript (frontend + backend), `.mts` for configs (`forge.config.mts`, `vite.config.mts`, `vitest.config.mts`).
+- **Language:** TypeScript (frontend + backend), `.mts` for configs (`vite.config.mts`, `vitest.config.mts`). Electron Forge config lives in `package.json` → `config.forge` (Forge 6.4.2 ignores `forge.config.mts`).
 - **Style:** `prettier` + `eslint.config.cjs` (see root file).
 - **Tests:** `npm run test` (Vitest + Playwright E2E). All tests must pass (`npm run lint`, `npm run typecheck`, `npm run test`).
 - **Commits:** use short, descriptive messages (e.g., `feat(i18n): add EN fallback`). Check `CONVENTIONAL_COMMITS.md` if it exists.
@@ -50,7 +50,7 @@ npm install
 npm run build
 npm start          # Dev mode (Electron + Vite)
 npm run test       # Vitest
-npm run make       # Build Linux targets (.deb, .AppImage, .rpm)
+npm run make       # Build Linux targets (.deb, .AppImage)
 ```
 
 ## Code of conduct

@@ -17,7 +17,7 @@
 | P2.19 | Dirty-check back nav (`ViewDrawer`) | `TODO.md` P2.19 | ❌ Pendente |
 | P2.20 | Modal backdrop standardization | `TODO.md` P2.20 | ❌ Pendente |
 | P2.21 | Loading spinner (`ViewDrawer` save) | `TODO.md` P2.21 | ❌ Pendente |
-| BS-06 | Auto-updater `latest.yml` (`electron-updater`) ou documentado | `PLANO.md` P1.11 / `TODO.md` | ❌ Pendente (404) |
+| BS-06 | Auto-updater `latest.yml` (`electron-updater`) ou documentado | `PLANO.md` P1.11 / `TODO.md` | ✅ Resolvido 2026-10-01 / limpo 2026-10-03 — `electron-updater` removido; update-check manual via GitHub Releases (`CreditsModal.checkUpdate`) |
 
 **Critério de release beta:** Todos os itens acima fechados + `npm run lint` 0 erros + `npm run typecheck` ✅ + `npm run test` 79/79 ✅ + `npm run make` Linux `.deb` + `.AppImage` OK + CI `.github/workflows/release.yml` verde (`needs: quality` passa).
 
@@ -57,7 +57,7 @@
 
 - `forge.config.mts` removido; `package.json` `config.forge` é a fonte única (resolvido `v0.3.7`).
 - Flatpak manifest versão corrigida (`0.3.7` vs `0.3.2`) — `BS-09` / `P3`.
-- `BS-03` (`@electron-forge/maker-rpm`) — documentar omissão intencional se não for implementado.
+- `BS-03` (`@electron-forge/maker-rpm`) — **omissão intencional documentada** em `BUILD_MANUAL.md` e `docs/clavis-ci-cd-setup.md` (`rpmbuild` não consegue fazer strip aos prebuilds do argon2); Linux = `.deb` + `.AppImage`.
 - `BS-16` — atualizar dependências (`electron`, `react`, `typescript`, etc.) — avaliar risco antes de v1.
 
 ---
