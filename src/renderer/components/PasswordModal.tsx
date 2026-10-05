@@ -18,12 +18,7 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
   const inputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  useModalKeyboard(modalRef, {
-    onEscape: onClose,
-    onEnter: () => {
-      if (!isLoading && password.trim()) handleSubmit();
-    },
-  });
+  useModalKeyboard(modalRef, { onEscape: onClose });
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -33,7 +28,7 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
 
   async function handleSubmit(e?: React.FormEvent): Promise<void> {
     if (e) e.preventDefault();
-    if (password.trim() === '') return;
+    if (isLoading || password.trim() === '') return;
     setIsLoading(true);
     try {
       await onSubmit(password);
@@ -105,7 +100,7 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
               disabled={isLoading}
               className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
             >
-              {isLoading ? t('btn.importing') : t('btn.open')}
+              {isLoading ? t('btn.decrypting') : t('btn.open')}
             </button>
           </div>
         </form>

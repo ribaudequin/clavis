@@ -24,8 +24,10 @@ export function useModalKeyboard(
         const target = e.target as HTMLElement;
         const tag = target.tagName.toLowerCase();
         const isTextArea = tag === 'textarea';
+        const isButton = tag === 'button';
+        const isSelect = tag === 'select';
         const isContentEditable = target.getAttribute('contenteditable') === 'true';
-        if (!isTextArea && !isContentEditable) {
+        if (!isTextArea && !isButton && !isSelect && !isContentEditable) {
           e.preventDefault();
           onEnter();
         }
