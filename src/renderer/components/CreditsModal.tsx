@@ -44,7 +44,7 @@ function CopyButton({ text }: { text: string }): React.JSX.Element {
   );
 }
 
-function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element {
+function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element | null {
   const modalRef = useRef<HTMLDivElement>(null);
   const [newVersion, setNewVersion] = useState<string | null>(null);
 

@@ -7,7 +7,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }): Reac
       {children}
       <Toaster
         position="bottom-right"
-        reverseOrderFamilies={false}
         toastOptions={{
           className: 'text-sm',
           duration: 4000,

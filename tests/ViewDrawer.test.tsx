@@ -9,6 +9,7 @@ afterEach(() => cleanup());
 vi.mock('../src/renderer/hooks/useFocusTrap', () => ({ useFocusTrap: () => {} }));
 vi.mock('../src/renderer/hooks/useModalKeyboard', () => ({ useModalKeyboard: () => {} }));
 import ViewDrawer from '../src/renderer/pages/ViewDrawer';
+import { Result } from '../src/shared/types';
 
 describe('ViewDrawer', () => {
   it('renders title and content inputs', () => {
@@ -18,8 +19,8 @@ describe('ViewDrawer', () => {
         password="pw"
         initialTitle="My Drawer"
         initialContent="Hello"
-        onSave={async () => ({ ok: true, data: undefined })}
-        onDelete={async () => ({ ok: true, data: undefined })}
+        onSave={async (): Promise<Result<void>> => ({ ok: true, data: undefined })}
+        onDelete={async (): Promise<Result<void>> => ({ ok: true, data: undefined })}
         onBack={() => {}}
       />
     );
@@ -35,8 +36,8 @@ describe('ViewDrawer', () => {
         password="pw"
         initialTitle=""
         initialContent=""
-        onSave={async () => ({ ok: true, data: undefined })}
-        onDelete={async () => ({ ok: true, data: undefined })}
+        onSave={async (): Promise<Result<void>> => ({ ok: true, data: undefined })}
+        onDelete={async (): Promise<Result<void>> => ({ ok: true, data: undefined })}
         onBack={onBack}
       />
     );
@@ -45,7 +46,7 @@ describe('ViewDrawer', () => {
   });
 
   it('calls onSave with updated data', async () => {
-    const onSave = vi.fn(async () => ({ ok: true, data: undefined }));
+    const onSave = vi.fn(async (): Promise<Result<void>> => ({ ok: true, data: undefined }));
     render(
       <ViewDrawer
         drawerId="1"
@@ -53,7 +54,7 @@ describe('ViewDrawer', () => {
         initialTitle="T"
         initialContent="C"
         onSave={onSave}
-        onDelete={async () => ({ ok: true, data: undefined })}
+        onDelete={async (): Promise<Result<void>> => ({ ok: true, data: undefined })}
         onBack={() => {}}
       />
     );
@@ -70,8 +71,8 @@ describe('ViewDrawer', () => {
         password="pw"
         initialTitle="Del"
         initialContent=""
-        onSave={async () => ({ ok: true, data: undefined })}
-        onDelete={async () => ({ ok: true, data: undefined })}
+        onSave={async (): Promise<Result<void>> => ({ ok: true, data: undefined })}
+        onDelete={async (): Promise<Result<void>> => ({ ok: true, data: undefined })}
         onBack={() => {}}
       />
     );

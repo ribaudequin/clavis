@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { DrawerListItem, EncryptedDrawer, ElectronAPI } from '../../shared/types';
-import SkeletonLoader, { SkeletonLoaders } from '../components/SkeletonLoader';
+import { SkeletonLoaders } from '../components/SkeletonLoader';
 import { t } from '../../i18n';
 import { toast } from 'react-hot-toast';
 

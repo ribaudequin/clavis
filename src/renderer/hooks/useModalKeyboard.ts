@@ -6,7 +6,7 @@ interface UseModalKeyboardOptions {
 }
 
 export function useModalKeyboard(
-  containerRef: RefObject<HTMLElement>,
+  containerRef: RefObject<HTMLElement | null>,
   options: UseModalKeyboardOptions = {}
 ): void {
   const { onEscape, onEnter } = options;
