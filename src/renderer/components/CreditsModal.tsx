@@ -21,9 +21,9 @@ function CopyButton({ text }: { text: string }): React.JSX.Element {
   async function handleCopy(): Promise<void> {
     try {
       await navigator.clipboard.writeText(text);
-      toast.success('Address copied');
+      toast.success(t('msg.address_copied'));
     } catch {
-      toast.error('Failed to copy');
+      toast.error(t('msg.copy_failed'));
     }
   }
 
@@ -33,8 +33,8 @@ function CopyButton({ text }: { text: string }): React.JSX.Element {
       type="button"
       onClick={handleCopy}
       className="p-0.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
-      aria-label="Copy address"
-      title="Copy address"
+      aria-label={t('btn.copy_address')}
+      title={t('btn.copy_address')}
     >
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -115,13 +115,13 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
           <section className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <ClavisIcon className="w-4 h-4 flex-shrink-0" />
-              <h3 className="text-sm font-semibold text-blue-800 uppercase tracking-wide">About</h3>
+              <h3 className="text-sm font-semibold text-blue-800 uppercase tracking-wide">{t('label.about')}</h3>
             </div>
             <p className="text-sm text-gray-700 leading-relaxed">
-              Clavis is an open-source, cross-platform encrypted notes app built to keep your passwords, PINs, bank details, and safe codes private and secure.
+              {t('msg.about_description')}
             </p>
             <p className="text-sm text-gray-700 leading-relaxed mt-2">
-              Source code, issues, and contributions are welcome on{' '}
+              {t('msg.source_welcome')}{' '}
               <a href="https://github.com/ribaudequin/clavis" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 hover:underline font-medium">
                 GitHub
               </a>.
@@ -136,14 +136,14 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
               </svg>
-              <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wide">Credits</h3>
+              <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wide">{t('label.credits')}</h3>
             </div>
             <ul className="space-y-2">
               <li className="text-sm text-gray-700">
-                <span className="font-medium">Concept, design & development:</span> Marcelo Salvador
+                <span className="font-medium">{t('label.credits_role')}</span> Marcelo Salvador
               </li>
               <li className="text-sm text-gray-500 italic">
-                Thanks to all contributors and early testers
+                {t('msg.thanks_contributors')}
               </li>
             </ul>
           </section>
@@ -151,10 +151,10 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
           <section className="bg-amber-50/60 rounded-xl p-4 border border-amber-100">
             <div className="flex items-center gap-2 mb-3">
               <HeartIcon className="w-4 h-4 text-amber-500" />
-              <h3 className="text-sm font-semibold text-amber-800 uppercase tracking-wide">Support this project</h3>
+              <h3 className="text-sm font-semibold text-amber-800 uppercase tracking-wide">{t('label.support_project')}</h3>
             </div>
             <p className="text-sm text-gray-700 leading-relaxed mb-3">
-              Clavis is free and open source. If it&apos;s useful to you, consider supporting its development — every bit helps keep it maintained and improving.
+              {t('msg.support_description')}
             </p>
             <a
               href="https://ko-fi.com/A0383T5"
@@ -163,11 +163,11 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
               className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
             >
               <KoFiIcon className="w-4 h-4" />
-              Buy me a coffee
+              {t('btn.buy_coffee')}
             </a>
 
             <div className="mt-4 pt-3 border-t border-amber-200">
-              <p className="text-sm font-medium text-gray-800 mb-2">Cryptocurrency <span className="font-normal text-gray-600">(any EVM-compatible chain for ETH):</span></p>
+              <p className="text-sm font-medium text-gray-800 mb-2">{t('label.cryptocurrency')} <span className="font-normal text-gray-600">{t('msg.crypto_network_hint')}</span></p>
               <ul className="space-y-2">
                 <li className="flex items-center gap-1">
                   <span className="text-sm font-medium text-gray-700 w-8 flex-shrink-0">ETH:</span>
@@ -201,7 +201,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
               {newVersion ? (
                 <a href="https://github.com/ribaudequin/clavis/releases/latest" target="_blank" rel="noopener noreferrer" className="w-full mt-3 inline-flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-green-600/20 transition-all">
                   <GithubIcon className="w-5 h-5 text-white" />
-                  Nova versão disponível: {newVersion}
+                  {t('msg.update_available', { version: newVersion })}
                 </a>
               ) : null}
             </div>
@@ -209,7 +209,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
 
           <p className="text-center italic text-xs text-gray-400 pt-3 border-t border-gray-100">
             <HeartIcon className="w-3 h-3 inline-block mr-1 text-gray-300" />
-            From Portugal, with love.
+            {t('msg.from_portugal')}
           </p>
         </div>
 

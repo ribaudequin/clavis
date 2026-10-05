@@ -2,7 +2,7 @@ export interface TranslationDict {
   [key: string]: string;
 }
 
-const translations: Record<string, TranslationDict> = {
+export const translations: Record<string, TranslationDict> = {
   'pt-PT': {
     'app.title': 'Clavis',
     'btn.new': 'Nova Gaveta',
@@ -52,56 +52,27 @@ const translations: Record<string, TranslationDict> = {
     'msg.irreversible': 'Esta ação é irreversível. Uma vez eliminada, a gaveta e todo o seu conteúdo não podem ser recuperados.',
     'msg.import_overwrite': 'Gaveta já existe — a sobrescrita está bloqueada.',
     'msg.import_too_large': 'Ficheiro demasiado grande.',
-  },
-  'pt-BR': {
-    'app.title': 'Clavis',
-    'btn.new': 'Nova Gaveta',
-    'btn.import': 'Importar',
-    'btn.importing': 'Importando...',
-    'btn.export': 'Exportar',
-    'btn.exporting': 'Exportando...',
-    'btn.delete': 'Excluir',
-    'btn.deleting': 'Excluindo...',
-    'btn.close': 'Fechar',
-    'btn.ok': 'OK',
-    'btn.open': 'Abrir',
-    'btn.creating': 'Criando...',
-    'btn.cancel': 'Cancelar',
-    'btn.create_first': 'Criar sua primeira gaveta',
-    'btn.create_anyway': 'Criar mesmo assim',
-    'btn.change_title': 'Alterar título',
-    'msg.no_drawers': 'Nenhuma gaveta criada.',
-    'msg.drawer_exported': 'Gaveta exportada com sucesso.',
-    'msg.drawer_deleted': 'Gaveta excluída com sucesso.',
-    'msg.imported': 'Importada com sucesso.',
-    'msg.error_export': 'Erro ao exportar:',
-    'msg.error_delete': 'Erro ao excluir:',
-    'msg.error_import': 'Erro ao importar:',
-    'msg.title_empty': 'O título não pode ser vazio.',
-    'msg.title_duplicate': 'Já existe uma gaveta com este nome. Quer criar outra mesmo assim?',
-    'msg.password_mismatch': 'As senhas não coincidem.',
-    'msg.password_too_short': 'A senha deve ter pelo menos 8 caracteres.',
-    'msg.drawer_created': 'Gaveta criada com sucesso.',
-    'msg.error_create': 'Erro ao criar a gaveta.',
-    'msg.error_save': 'Erro ao salvar:',
-    'label.password': 'Senha',
-    'label.confirm_password': 'Confirmar senha',
-    'label.title': 'Título',
-    'label.content': 'Conteúdo',
-    'label.credits_title': 'Créditos e suporte',
-    'label.hide_password': 'Ocultar senha',
-    'label.show_password': 'Mostrar senha',
-    'label.new_drawer': 'Nova Gaveta',
-    'label.drawer_not_found': 'Gaveta não encontrada.',
-    'label.incorrect_password': 'Senha incorreta.',
-    'btn.back': 'Voltar',
-    'btn.delete_drawer': 'Excluir gaveta',
-    'btn.save_and_back': 'Salvar e voltar',
-    'msg.saving': 'Salvando...',
-    'msg.deleting': 'Excluindo...',
-    'msg.irreversible': 'Esta ação é irreversível. Uma vez excluída, a gaveta e todo o seu conteúdo não podem ser recuperados.',
-    'msg.import_overwrite': 'Gaveta já existe — a sobrescrita está bloqueada.',
-    'msg.import_too_large': 'Arquivo muito grande.',
+    'msg.address_copied': 'Endereço copiado.',
+    'msg.copy_failed': 'Falha ao copiar.',
+    'btn.copy_address': 'Copiar endereço',
+    'label.about': 'Sobre',
+    'msg.about_description': 'A Clavis é uma aplicação de notas cifradas, de código aberto e multiplataforma, criada para manter as suas palavras-passe, PINs, dados bancários e códigos seguros privados e protegidos.',
+    'msg.source_welcome': 'O código-fonte, os problemas e as contribuições são bem-vindos no',
+    'label.credits': 'Créditos',
+    'label.credits_role': 'Conceito, design e desenvolvimento:',
+    'msg.thanks_contributors': 'Agradecemos a todos os colaboradores e primeiros testadores',
+    'label.support_project': 'Apoiar este projeto',
+    'msg.support_description': 'A Clavis é gratuita e de código aberto. Se lhe for útil, considere apoiar o seu desenvolvimento — cada contributo ajuda a mantê-la ativa e em evolução.',
+    'btn.buy_coffee': 'Paga-me um café',
+    'label.cryptocurrency': 'Criptomoeda',
+    'msg.crypto_network_hint': '(qualquer cadeia compatível com EVM para ETH):',
+    'msg.update_available': 'Nova versão disponível: {version}',
+    'msg.from_portugal': 'De Portugal, com amor.',
+    'label.error_title': 'Algo correu mal',
+    'msg.error_restart_hint': 'Ocorreu um erro inesperado. Reinicie a aplicação para continuar.',
+    'label.error_details': 'Detalhes do erro',
+    'btn.restart': 'Reiniciar',
+    'label.loading_drawers': 'A carregar gavetas',
   },
   'en': {
     'app.title': 'Clavis',
@@ -152,19 +123,42 @@ const translations: Record<string, TranslationDict> = {
     'msg.irreversible': 'This action is irreversible. Once deleted, the drawer and all its contents cannot be recovered.',
     'msg.import_overwrite': 'Drawer already exists — overwrite blocked.',
     'msg.import_too_large': 'File too large.',
+    'msg.address_copied': 'Address copied',
+    'msg.copy_failed': 'Failed to copy',
+    'btn.copy_address': 'Copy address',
+    'label.about': 'About',
+    'msg.about_description': 'Clavis is an open-source, cross-platform encrypted notes app built to keep your passwords, PINs, bank details, and safe codes private and secure.',
+    'msg.source_welcome': 'Source code, issues, and contributions are welcome on',
+    'label.credits': 'Credits',
+    'label.credits_role': 'Concept, design & development:',
+    'msg.thanks_contributors': 'Thanks to all contributors and early testers',
+    'label.support_project': 'Support this project',
+    'msg.support_description': "Clavis is free and open source. If it's useful to you, consider supporting its development — every bit helps keep it maintained and improving.",
+    'btn.buy_coffee': 'Buy me a coffee',
+    'label.cryptocurrency': 'Cryptocurrency',
+    'msg.crypto_network_hint': '(any EVM-compatible chain for ETH):',
+    'msg.update_available': 'New version available: {version}',
+    'msg.from_portugal': 'From Portugal, with love.',
+    'label.error_title': 'Something went wrong',
+    'msg.error_restart_hint': 'An unexpected error occurred. Please restart the app to continue.',
+    'label.error_details': 'Error details',
+    'btn.restart': 'Restart',
+    'label.loading_drawers': 'Loading drawers',
   },
 };
 
 function detectLocale(): string {
   if (process.env.CI) return 'en';
   const lang = navigator.language || 'en';
-  if (lang.startsWith('pt-BR')) return 'pt-BR';
-  if (lang.startsWith('pt')) return 'pt-PT';
+  const primarySubtag = lang.trim().replace(/_/g, '-').split('-')[0].toLowerCase();
+  if (primarySubtag === 'pt') return 'pt-PT';
   return 'en';
 }
 
-export function t(key: string): string {
+export function t(key: string, params?: Record<string, string>): string {
   const locale = detectLocale();
   const dict = translations[locale] || translations['en'];
-  return dict[key] !== undefined ? dict[key] : (translations['en'][key] !== undefined ? translations['en'][key] : key);
+  const value = dict[key] !== undefined ? dict[key] : (translations['en'][key] !== undefined ? translations['en'][key] : key);
+  if (!params) return value;
+  return value.replace(/\{(\w+)\}/g, (token: string, name: string) => (params[name] !== undefined ? params[name] : token));
 }

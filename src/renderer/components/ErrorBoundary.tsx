@@ -1,4 +1,5 @@
 import React from 'react';
+import { t } from '../../i18n';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -36,13 +37,13 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="bg-white rounded-lg p-6 w-96 shadow-lg">
-            <h1 className="text-xl font-semibold text-gray-800 mb-2">Something went wrong</h1>
+            <h1 className="text-xl font-semibold text-gray-800 mb-2">{t('label.error_title')}</h1>
             <p className="text-gray-600 text-sm mb-4">
-              An unexpected error occurred. Please restart the app to continue.
+              {t('msg.error_restart_hint')}
             </p>
             {this.state.error && (
               <details className="mb-4 text-xs text-gray-500 bg-gray-50 p-2 rounded max-h-32 overflow-auto">
-                <summary>Error details</summary>
+                <summary>{t('label.error_details')}</summary>
                 <pre className="mt-1 whitespace-pre-wrap break-words">{this.state.error.toString()}</pre>
               </details>
             )}
@@ -51,7 +52,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
                 onClick={this.handleRestart}
                 className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
               >
-                Restart
+                {t('btn.restart')}
               </button>
             </div>
           </div>

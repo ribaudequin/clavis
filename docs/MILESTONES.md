@@ -33,11 +33,11 @@
 |---|---|---|
 | P3.22 | `ErrorBoundary` `role="alert"`, `aria-live` (`ErrorBoundary.tsx`) | `PLANO.md` P3.22 |
 | P3.23 | `SkeletonLoader` `aria-hidden`, `aria-busy` (`SkeletonLoader.tsx`) | `PLANO.md` P3.23 |
-| P3.24 | `CreditsModal` i18n — 12 strings (`pt-PT`, `pt-BR`, `en`) | `PLANO.md` P3.24 |
-| P3.25 | `ErrorBoundary` i18n — 4 strings | `PLANO.md` P3.25 |
-| P3.26 | Toast messages i18n (`CreditsModal.tsx`) | `PLANO.md` P3.26 |
+| P3.24 | `CreditsModal` i18n — ~19 strings (`pt-PT`, `en`) | `PLANO.md` P3.24 · **done 2026-10-05** (`ADR-009`) |
+| P3.25 | `ErrorBoundary` i18n — 4 strings | `PLANO.md` P3.25 · **done 2026-10-05** |
+| P3.26 | Toast messages i18n (`CreditsModal.tsx`) | `PLANO.md` P3.26 · **done 2026-10-05** |
 | P3.27 | Remover `|| 'fallback'` redundante (`ViewDrawer.tsx`) | `PLANO.md` P3.27 |
-| P3.28 | Language selector (`src/i18n/index.ts`) | `PLANO.md` P3.28 |
+| P3.28 | Language selector | **CANCELLED 2026-10-05** — a app segue a lingua do sistema |
 | P3.29 | `useCallback` (`HomeScreen.tsx`) | `PLANO.md` P3.29 |
 | P3.30 | Documentar `0o600` Windows (`README`) | `PLANO.md` P3.30 |
 | P3.31 | Testes: 15 ficheiros (`main/index`, `logger`, `preload`, `i18n`, `CreateDrawerModal`, `ErrorBoundary`, `CreditsModal`, `DeleteConfirmModal`, `ToastProvider`, `SkeletonLoader`, `useFocusTrap`, `useModalKeyboard`, `types`, `channels`) | `TODO.md` P3.31 |

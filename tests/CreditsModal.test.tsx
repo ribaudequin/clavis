@@ -8,10 +8,27 @@ vi.mock('../src/renderer/hooks/useModalKeyboard', () => ({ useModalKeyboard: () 
 import CreditsModal from '../src/renderer/components/CreditsModal';
 import { DrawerListItem, ElectronAPI, EncryptedDrawer, Result } from '../src/shared/types';
 
-const UPDATE_LABEL = /Nova versão disponível/i;
+const UPDATE_LINK_SELECTOR = 'a[href*="releases/latest"]';
 const RELEASES_URL = 'https://github.com/ribaudequin/clavis/releases/latest';
 const CLOSE_BUTTON = /^(close|fechar)$/i;
 const CREDITS_TITLE = /créditos|credits/i;
+const ORIGINAL_LANGUAGE = window.navigator.language;
+
+function setLanguage(lang: string): void {
+  Object.defineProperty(window.navigator, 'language', { value: lang, configurable: true });
+}
+
+function queryUpdateLink(): HTMLAnchorElement | null {
+  return document.querySelector<HTMLAnchorElement>(UPDATE_LINK_SELECTOR);
+}
+
+async function findUpdateLink(): Promise<HTMLAnchorElement> {
+  return await waitFor(() => {
+    const link = queryUpdateLink();
+    if (!link) throw new Error('update link not rendered');
+    return link;
+  });
+}
 
 function buildStub(): Window['electronAPI'] {
   return {
@@ -50,8 +67,15 @@ async function settle(): Promise<void> {
   });
 }
 
-beforeEach(() => installStub(null, '0.4.3-beta'));
-afterEach(() => cleanup());
+beforeEach(() => {
+  vi.stubEnv('CI', undefined);
+  installStub(null, '0.4.3-beta');
+});
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+  setLanguage(ORIGINAL_LANGUAGE);
+});
 
 describe('CreditsModal', () => {
   it('shows the "new version available" link when the latest release is newer than the installed version', async () => {
@@ -59,7 +83,7 @@ describe('CreditsModal', () => {
 
     render(<CreditsModal isOpen onClose={() => {}} />);
 
-    const link = await screen.findByRole('link', { name: UPDATE_LABEL });
+    const link = await findUpdateLink();
     expect(link.textContent).toMatch(/v0\.4\.4-beta/);
     expect(link.getAttribute('href')).toBe(RELEASES_URL);
     expect(link.getAttribute('target')).toBe('_blank');
@@ -77,7 +101,7 @@ describe('CreditsModal', () => {
     expect(checkUpdate).toHaveBeenCalledTimes(1);
     expect(getAppVersion).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('dialog')).toBeTruthy();
-    expect(screen.queryByRole('link', { name: UPDATE_LABEL })).toBeNull();
+    expect(queryUpdateLink()).toBeNull();
   });
 
   it('does not show the update link when the update check returns null', async () => {
@@ -89,7 +113,7 @@ describe('CreditsModal', () => {
     expect(checkUpdate).toHaveBeenCalledTimes(1);
     expect(getAppVersion).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('dialog')).toBeTruthy();
-    expect(screen.queryByRole('link', { name: UPDATE_LABEL })).toBeNull();
+    expect(queryUpdateLink()).toBeNull();
   });
 
   it('compares versions after stripping the leading v from both the tag and the installed version', async () => {
@@ -97,7 +121,7 @@ describe('CreditsModal', () => {
 
     render(<CreditsModal isOpen onClose={() => {}} />);
 
-    const link = await screen.findByRole('link', { name: UPDATE_LABEL });
+    const link = await findUpdateLink();
     expect(link.textContent).toMatch(/v0\.4\.4-beta/);
     expect(link.getAttribute('href')).toBe(RELEASES_URL);
   });
@@ -107,7 +131,7 @@ describe('CreditsModal', () => {
 
     render(<CreditsModal isOpen onClose={() => {}} />);
 
-    const link = await screen.findByRole('link', { name: UPDATE_LABEL });
+    const link = await findUpdateLink();
     expect(link.textContent).toMatch(/0\.4\.4-beta/);
   });
 
@@ -117,7 +141,7 @@ describe('CreditsModal', () => {
     render(<CreditsModal isOpen onClose={() => {}} />);
     await settle();
 
-    expect(screen.queryByRole('link', { name: UPDATE_LABEL })).toBeNull();
+    expect(queryUpdateLink()).toBeNull();
   });
 
   it('does not show the update link when the versions match and only the installed version carries a leading v', async () => {
@@ -128,7 +152,7 @@ describe('CreditsModal', () => {
 
     expect(checkUpdate).toHaveBeenCalledTimes(1);
     expect(getAppVersion).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('link', { name: UPDATE_LABEL })).toBeNull();
+    expect(queryUpdateLink()).toBeNull();
   });
 
   it('swallows a rejected update check without crashing or leaking an unhandled rejection', async () => {
@@ -150,7 +174,7 @@ describe('CreditsModal', () => {
       await settle();
 
       expect(screen.getByRole('dialog')).toBeTruthy();
-      expect(screen.queryByRole('link', { name: UPDATE_LABEL })).toBeNull();
+      expect(queryUpdateLink()).toBeNull();
       expect(getAppVersion).not.toHaveBeenCalled();
       expect(unhandled).toEqual([]);
     } finally {
@@ -179,7 +203,7 @@ describe('CreditsModal', () => {
 
     rerender(<CreditsModal isOpen onClose={() => {}} />);
 
-    const link = await screen.findByRole('link', { name: UPDATE_LABEL });
+    const link = await findUpdateLink();
     expect(link.textContent).toMatch(/v0\.4\.4-beta/);
     expect(checkUpdate).toHaveBeenCalledTimes(1);
     expect(getAppVersion).toHaveBeenCalledTimes(1);
@@ -210,7 +234,7 @@ describe('CreditsModal', () => {
 
     expect(checkUpdate).toHaveBeenCalledTimes(2);
     expect(screen.getByRole('dialog')).toBeTruthy();
-    expect(screen.queryByRole('link', { name: UPDATE_LABEL })).toBeNull();
+    expect(queryUpdateLink()).toBeNull();
   });
 
   it('renders the dialog with its title and close buttons', async () => {
@@ -224,7 +248,7 @@ describe('CreditsModal', () => {
     expect(screen.getAllByRole('button', { name: CLOSE_BUTTON })).toHaveLength(2);
 
     await settle();
-    expect(screen.queryByRole('link', { name: UPDATE_LABEL })).toBeNull();
+    expect(queryUpdateLink()).toBeNull();
   });
 
   it('calls onClose when the close button is clicked', async () => {
@@ -234,5 +258,22 @@ describe('CreditsModal', () => {
     fireEvent.click(screen.getAllByRole('button', { name: CLOSE_BUTTON })[1]);
 
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+
+  it('translates the update link label per detected locale and keeps the version in both', async () => {
+    installStub('v0.4.4-beta', '0.4.3-beta');
+
+    setLanguage('pt-PT');
+    const { unmount } = render(<CreditsModal isOpen onClose={() => {}} />);
+    const ptText = (await findUpdateLink()).textContent ?? '';
+    unmount();
+
+    setLanguage('en-US');
+    render(<CreditsModal isOpen onClose={() => {}} />);
+    const enText = (await findUpdateLink()).textContent ?? '';
+
+    expect(ptText).toContain('v0.4.4-beta');
+    expect(enText).toContain('v0.4.4-beta');
+    expect(ptText).not.toBe(enText);
   });
 });

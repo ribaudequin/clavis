@@ -1,4 +1,5 @@
 import React from 'react';
+import { t } from '../../i18n';
 
 export function SkeletonCard(): React.JSX.Element {
   return (
@@ -22,7 +23,7 @@ export function SkeletonCard(): React.JSX.Element {
 
 export function SkeletonLoaders({ count = 3 }: { count?: number }): React.JSX.Element {
   return (
-    <div className="space-y-2" role="status" aria-label="Loading drawers">
+    <div className="space-y-2" role="status" aria-label={t('label.loading_drawers')}>
       {Array.from({ length: count }).map((_, i) => (
         <SkeletonCard key={i} />
       ))}
