@@ -62,6 +62,8 @@ no others, and there is no theme file.
 | `--strength-good` | `#fde047` | Password meter, score 3 |
 | `--strength-strong` | `#86efac` | Password meter, score 4 |
 | `--strength-excellent` | `#4ade80` | Password meter, score 5 |
+| `--heart-surface` | `#e11d48` | The heart badge fill — the app's single warm accent |
+| `--heart-on-surface` | `#ffffff` | The heart glyph inside that badge |
 
 **Why tokens rather than utilities.** Two APIs in this codebase accept colour but not Tailwind
 classes, because they are not `className`:
@@ -431,12 +433,39 @@ Icons come from three sources, and they do not behave the same way:
 1. **Inline SVG, `stroke="currentColor"`** — the copy, close and eye icons. Fully controllable by
    a Tailwind colour class.
 2. **`icons/svg/*.svg` imported with `?react`** (SVGR). `heart.svg` uses `style="fill:currentColor"`
-   and is therefore controllable by a colour class. It follows its context — `text-red-500` on the
-   credits header tile, `text-amber-700` in the support section, `text-gray-500` in the footer,
-   `text-gray-600` on `HomeScreen`. It is no longer one salmon accent everywhere.
+   and is therefore controllable. It is the app's single warm accent and stays one colour
+   everywhere — see [The heart accent](#the-heart-accent) below for why it is a badge rather than
+   a coloured glyph.
 3. **Brand marks** — `ko-fi.svg`, `github.svg`, `eth.svg`, `sol.svg`. These carry baked
    `fill="#..."` presentation attributes and are rendered **uncoloured**, with no class. They must
    stay that way: recolouring the GitHub, ETH, SOL or Ko-fi logos would destroy recognition.
+
+### The heart accent
+
+The heart is the app's only warm accent, and it is **one colour in all four places it appears**.
+An earlier iteration made it follow its surroundings instead; the owner rejected that, correctly —
+it fixed the contrast but destroyed the accent, because a repeated colour is a signature and a
+colour-that-matches-whatever-is-behind-it is not.
+
+It is therefore a **badge, not a coloured glyph**: a rounded square filled with `--heart-surface`
+(`#e11d48`) holding a white heart. That is what makes a single tone possible at all:
+
+| Placement | Heart | Surface behind it | Measured |
+|---|---|---|---|
+| Credits header tile | white on `--heart-surface` | — | **4.70:1** |
+| Credits support section | white on `--heart-surface` | — | **4.70:1** |
+| Credits footer | `--heart-surface` | white | **4.70:1** |
+| `HomeScreen` header | `--heart-surface` | white | **4.70:1** |
+
+The badge is load-bearing. Painting the heart directly at `#e11d48` cannot reach 4.5:1 on any of
+the surfaces it actually sits on — it measures 3.85:1 on the header tile's red, 4.27:1 on
+`gray-100`, and no lighter red reaches the bar either (`red-50` gives 4.29:1). The old baked salmon
+`#f8585e` was worse still: 2.63–3.21:1, failing even the 3:1 that an icon carrying meaning needs.
+Inverting the relationship — coloured surface, white glyph — is what makes one consistent accent
+survive the contrast requirement.
+
+Use `--heart-surface` and `--heart-on-surface` rather than a raw hex, so the accent stays a single
+editable decision.
 
 **The rule.** A `text-*` class sets the CSS `color` property. An SVG that paints itself with a
 literal `fill` — whether `fill="#f8585e"` as a presentation attribute, or `style="fill:#f8585e"`

@@ -92,8 +92,8 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
       >
         <div className="relative p-6 pb-2">
           <div className="flex items-start gap-3 mb-5">
-            <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <HeartIcon className="w-5 h-5 text-red-500" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: 'var(--heart-surface)' }}>
+              <HeartIcon className="w-5 h-5" style={{ color: 'var(--heart-on-surface)' }} />
             </div>
             <h2 id="credits-title" className="text-xl font-bold text-gray-900 text-pretty leading-tight">
               {t('label.credits_title')}
@@ -150,7 +150,9 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
 
           <section className="bg-amber-50/60 rounded-xl p-4 border border-amber-100">
             <div className="flex items-center gap-2 mb-3">
-              <HeartIcon className="w-4 h-4 text-amber-700" />
+              <span className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--heart-surface)' }}>
+                <HeartIcon className="w-4 h-4" style={{ color: 'var(--heart-on-surface)' }} />
+              </span>
               <h3 className="text-sm font-semibold text-amber-800 uppercase tracking-wide">{t('label.support_project')}</h3>
             </div>
             <p className="text-sm text-gray-700 leading-relaxed mb-3">
@@ -208,7 +210,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
           </section>
 
           <p className="text-center italic text-xs text-gray-500 pt-3 border-t border-gray-100">
-            <HeartIcon className="w-3 h-3 inline-block mr-1 text-gray-500" />
+            <HeartIcon className="w-3 h-3 inline-block mr-1" style={{ color: 'var(--heart-surface)' }} />
             {t('msg.from_portugal')}
           </p>
         </div>

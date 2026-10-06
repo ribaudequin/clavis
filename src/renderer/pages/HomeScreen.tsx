@@ -244,7 +244,7 @@ if (viewState) {
                   aria-label={t('label.credits_title')}
                   title={t('label.credits_title')}
                 >
-                  <HeartIcon className="w-5 h-5 text-gray-600" />
+                  <HeartIcon className="w-5 h-5" style={{ color: 'var(--heart-surface)' }} />
                 </button>
               </Suspense>
           </div>

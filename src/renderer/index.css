@@ -20,6 +20,8 @@
   --strength-good: #fde047;
   --strength-strong: #86efac;
   --strength-excellent: #4ade80;
+  --heart-surface: #e11d48;
+  --heart-on-surface: #ffffff;
 }
 
 *:focus {
