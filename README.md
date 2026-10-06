@@ -2,31 +2,48 @@
 
 **Clavis** is a cross-platform encrypted notes application for storing sensitive data such as banking information, PINs, website passwords, safe codes, and door codes.
 
+Everything stays on your machine. Drawers are encrypted with AES-256-GCM, each one has its own password, and there is no account, no sync, and no analytics.
+
 ## Features
 
 - **Encrypted Drawers**: Store data in encrypted "drawers" (passwords, PINs, bank details, etc.)
-- **Per-Drawer Passwords**: Each drawer can have its own unique password or use a global master password
-- **Easy Backup**: Export/import encrypted drawer files for secure backups
-- **Import Drawers**: Import `.clavis` files via the **Import** button in the header
-- **Deterministic Icons**: Each drawer generates a unique visual icon based on its hash
-- **Cross-Platform Support**: Native experience on Linux (.deb, AppImage), Windows (NSIS + Portable), and Flatpak
+- **Per-Drawer Passwords**: Every drawer has its own password. There is no global master password.
+- **Export & Import**: Back up any drawer as an encrypted `.clavis` file and import it back later
+- **Deterministic Icons**: Each drawer gets a 3×3 colour grid generated from a hash of its own ID — the same drawer always looks the same
+- **Unsaved-Changes Guard**: Leaving an edited drawer asks whether to save, discard, or cancel
+- **In-App Update Check**: The Credits screen tells you when a newer release is published
+- **Localised Interface**: European Portuguese or English, chosen from your system language
 
 ## Architecture
 
 - **Electron + TypeScript**: Cross-platform desktop application
 - **React + Tailwind CSS**: Modern frontend framework
-- **AES-256-GCM**: Standard encryption for drawer contents
-- **Argon2id**: Memory-hard key derivation for password-based encryption
+- **AES-256-GCM**: Authenticated encryption for drawer contents
+- **Argon2id**: Memory-hard key derivation for password-based encryption (with a `scrypt` fallback — see [SECURITY.md](SECURITY.md))
 - **Electron Forge**: Single build system for all platforms (built via GitHub Actions)
 
 ## Installation
+
+Pre-built binaries for every release: [GitHub Releases](https://github.com/ribaudequin/clavis/releases).
+
+Each release publishes 6 files:
+
+| Platform | Files |
+|----------|-------|
+| Linux    | `.deb`, `.AppImage` |
+| Windows  | `Setup.exe`, `.nupkg`, portable `.zip` |
+| macOS    | `.dmg` |
+
+> **Unsigned builds.** Clavis is deliberately unsigned (see [SECURITY.md](SECURITY.md)). On Windows, SmartScreen shows "unknown publisher" — choose *More info → Run anyway*. On macOS, the `.dmg` is unnotarized, so right-click the app and choose **Open**, or run `xattr -d com.apple.quarantine /Applications/Clavis.app`.
+
+> **Flatpak**: a manifest exists in `flatpak/` but is experimental and does not currently build.
 
 ### From Source
 
 1. Clone this repository:
 
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/ribaudequin/clavis.git
    cd clavis
    ```
 
@@ -36,85 +53,78 @@
    npm install
    ```
 
-3. Build the application:
+3. Package the application for your platform:
 
    ```bash
-   npm run build
+   npm run make
    ```
 
-4. Run the application:
+   Artifacts are written to `out/make/`. On Linux, install the `.deb`, run the `.AppImage`, or extract the portable `.zip`.
 
-   ```bash
-   npm start
-   ```
+> **Running from source:** `npm start` expects a Vite dev server on port 3000. In a plain checkout there is no `dev` script to start it, so `npm start` alone opens a blank window. Either run `npx vite` in a second terminal first, or skip this step and run the packaged artifact from `out/make/`.
 
 ## Usage
 
 ### Creating a New Drawer
 
 1. Click the **"New Drawer"** button in the header
-2. Enter drawer title, password, and confirm password
-3. The drawer will appear in your list with a unique icon
+2. Enter drawer title, password, and confirm password (minimum 8 characters, maximum 128)
+3. The drawer appears in your list with its own icon
 
 ### Accessing a Drawer
 
 1. Click on a drawer in the list
 2. Enter the drawer's password
-3. View and edit the drawer contents
+3. View and edit the contents, then save
 
-### Importing a Drawer
+### Exporting and Importing a Drawer
 
-1. Click the **"Import"** button in the header
-2. Select a `.clavis` file from the file dialog
-3. The drawer is imported and appears in your list
+Export uses the **Export** button on each drawer row in the list — there is no application menu bar.
+
+- **Export**: Click **Export** on a drawer row. The file is downloaded automatically, with no destination prompt, into your OS default downloads folder and named `<drawer-uuid>.clavis`. Move it somewhere safe.
+- **Import**: Click **Import** in the header and choose a `.clavis` file. Importing never overwrites an existing drawer.
+
+### Leaving an Edited Drawer
+
+Pressing **Back** with unsaved edits opens a dialog with three choices: **Cancel**, **Discard and leave**, or **Save and leave**.
+
+> This guard applies to the **Back button only**. There is no `beforeunload` handler, so closing the app window with unsaved edits still discards them. Save before you quit.
 
 ### Viewing Credits and Support
 
 1. Click the **heart icon** (❤️) in the top-right of the header
-2. The Credits modal displays project info: maintainer, design, icons, security features
-3. Use the **Support** section to back the project via Ko-fi, GitHub, ETH, or SOL
-4. Click **OK** or the **close button** to dismiss
-
-### Managing Drawers
-
-- **Save**: Encrypts and saves changes to the drawer
-- **Delete**: Removes the drawer permanently (with confirmation)
-- **Export**: Back up drawer data as an encrypted file
-- **Import**: Load a `.clavis` file into the app
+2. The Credits modal shows project info: maintainer, design, icons, security features, and support options (Ko-fi, GitHub, ETH, SOL)
+3. If a newer release exists, a green **"New version available: vX.Y.Z"** button links straight to it
+4. Close with the **Close** button, the ✕, a click outside the modal, or `Esc`
 
 ## Building for Distribution
 
 ### All Platforms (GitHub Actions, recommended)
 
-Release binaries are built **remotely on GitHub Actions** native runners (Linux, Windows, macOS) and published to a GitHub Release automatically. Just push a version tag:
+Release binaries are built **remotely on GitHub Actions** native runners (Linux, Windows, macOS) and published to a GitHub Release automatically. Just push a version tag matching `package.json`:
 
 ```bash
-git tag v0.1.3-alpha
-git push origin v0.1.3-alpha
+git tag v0.4.6-beta
+git push origin v0.4.6-beta
 ```
 
-The workflow builds all 3 platforms and publishes 6 assets (`.deb` + `.AppImage` for Linux · Portable `.zip` + Squirrel `.exe` + `.nupkg` for Windows · `.dmg` for macOS) to [GitHub Releases](https://github.com/ribaudequin/clavis/releases). See `.github/workflows/release.yml` and `BUILD_MANUAL.md`.
+The workflow builds all 3 platforms and publishes 6 assets (`.deb` + `.AppImage` for Linux · Squirrel `Setup.exe` + `.nupkg` + portable `.zip` for Windows · `.dmg` for macOS) to [GitHub Releases](https://github.com/ribaudequin/clavis/releases). See `.github/workflows/release.yml` and `BUILD_MANUAL.md`.
 
 ### Local Build (Linux)
 
 ```bash
-# TypeScript + renderer build
-npm run build
-
-# Linux .deb + .AppImage (via Electron Forge 6.4.2)
-npm run make
-
-# Or all in one
-npm run release
+npm run build    # TypeScript + preload + renderer
+npm run make     # .deb + .AppImage
+npm run release  # clean + build + make
 ```
 
-Windows/macOS targets are built in CI (native runners) — no Wine cross-compile needed.
+Windows and macOS targets are built in CI on native runners — no Wine cross-compile needed.
 
 ### Prerequisites (local Linux)
 
-- `dpkg`, `fakeroot` (for .deb)
-- `squashfs-tools` (for AppImage)
-- See `BUILD_MANUAL.md` for full guide
+- Node.js 20+ (CI uses Node 22) and npm 10+ — see `BUILD_MANUAL.md`
+- `dpkg-dev` and `fakeroot` for the `.deb`
+- `squashfs-tools` for the AppImage
 
 ## Downloads
 
@@ -151,15 +161,17 @@ This project is open source and available under the MIT License.
 
 ## Security Notes
 
-- All drawer contents are encrypted using AES-256-GCM
-- Passwords are processed using Argon2id (memory-hard)
-- Only drawer titles and metadata are stored unencrypted
-- Use strong, unique passwords for each drawer
-- Backup your encrypted drawer files securely
+- Drawer contents are encrypted with AES-256-GCM using a key derived from that drawer's password
+- Drawer titles, timestamps, and the icon colour data are stored in plaintext inside the `.clavis` file
+- Passwords are irreversible: there is no recovery. If you lose a drawer's password, its content is gone
+- Drawer passwords are never written to disk — not to the `.clavis` file, and not to any OS keychain
+- Use strong, unique passwords per drawer, and keep your exported `.clavis` files backed up somewhere safe
+
+Full details, including known limitations, are in [SECURITY.md](SECURITY.md).
 
 ## UI Notes
 
-- No native menu bar (Electron menu disabled)
-- Header features: application title, "New Drawer" button, and a Credits button (❤️)
-- In-app Credits modal shows project info and support options
+- No menu bar at all: the application menu is disabled. The only menu is the right-click cut/copy/paste context menu
+- Header contains the application title, an **Import** button, and a Credits button (❤️)
+- The interface is localised (European Portuguese and English) from your system language; there is no in-app language selector
 - All icons use inline SVG for reliability across packaging formats
