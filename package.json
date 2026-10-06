@@ -1,7 +1,7 @@
 {
   "name": "clavis",
   "productName": "clavis",
-  "version": "0.4.5-beta",
+  "version": "0.4.6-beta",
   "description": "Cross-platform encrypted notes application for storing banking info, PINs, passwords, and safe codes.",
   "main": "dist/main/index.js",
   "author": "Marcelo Salvador",
@@ -28,6 +28,7 @@
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
+    "memory:snapshot": "bash scripts/snapshot-memory.sh",
     "flatpak-make": "flatpak-builder --repo=repo build-dir flatpak/com.github.marcelosalvador.Clavis.yaml",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
