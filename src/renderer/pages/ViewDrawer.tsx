@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Result } from '../../shared/types';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import DiscardChangesModal from '../components/DiscardChangesModal';
 import { t } from '../../i18n';
 import { toast } from 'react-hot-toast';
 
@@ -20,6 +21,9 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
+  const isDirty = title !== initialTitle || content !== initialContent;
 
   async function doDelete(): Promise<void> {
     setShowDeleteConfirm(false);
@@ -63,10 +67,33 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
     setShowDeleteConfirm(true);
   }
 
+  function handleBack(): void {
+    if (!isDirty) {
+      onBack();
+      return;
+    }
+    setShowDiscardConfirm(true);
+  }
+
+  function closeDiscardConfirm(): void {
+    setShowDiscardConfirm(false);
+    window.focus();
+  }
+
+  function handleDiscardAndLeave(): void {
+    setShowDiscardConfirm(false);
+    onBack();
+  }
+
+  function handleSaveAndLeave(): void {
+    setShowDiscardConfirm(false);
+    void handleSave();
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b px-6 py-4 flex items-center cursor-default">
-        <button onClick={onBack} className="text-blue-600 hover:text-blue-800 mr-4 text-sm">
+        <button onClick={handleBack} className="text-blue-600 hover:text-blue-800 mr-4 text-sm">
           ← {t('btn.back') || 'Back'}
         </button>
         <h1 className="text-xl font-semibold text-gray-800">Clavis</h1>
@@ -119,6 +146,15 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
             setShowDeleteConfirm(false);
             window.focus();
           }}
+        />
+      )}
+
+      {showDiscardConfirm && (
+        <DiscardChangesModal
+          onSaveAndLeave={handleSaveAndLeave}
+          onDiscard={handleDiscardAndLeave}
+          onCancel={closeDiscardConfirm}
+          saving={saving}
         />
       )}
     </div>

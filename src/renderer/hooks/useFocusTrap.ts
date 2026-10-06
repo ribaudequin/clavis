@@ -11,6 +11,11 @@ export function useFocusTrap(
 ): void {
   const { isActive = true, onEscape } = options;
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  const onEscapeRef = useRef<(() => void) | undefined>(onEscape);
+
+  useEffect(() => {
+    onEscapeRef.current = onEscape;
+  }, [onEscape]);
 
   useEffect(() => {
     if (!isActive) {
@@ -52,9 +57,10 @@ export function useFocusTrap(
     }
 
     function handleEscape(e: KeyboardEvent) {
-      if (e.key === 'Escape' && onEscape) {
+      const escape = onEscapeRef.current;
+      if (e.key === 'Escape' && escape) {
         e.preventDefault();
-        onEscape();
+        escape();
       }
     }
 
@@ -69,5 +75,5 @@ export function useFocusTrap(
       }
       previouslyFocused.current = null;
     };
-  }, [containerRef, isActive, onEscape]);
+  }, [containerRef, isActive]);
 }

@@ -74,6 +74,10 @@ export const translations: Record<string, TranslationDict> = {
     'label.error_details': 'Detalhes do erro',
     'btn.restart': 'Reiniciar',
     'label.loading_drawers': 'A carregar gavetas',
+    'msg.unsaved_changes_title': 'Alterações por guardar',
+    'msg.unsaved_changes_desc': 'Existem alterações por guardar nesta gaveta. Se sair sem guardar, serão perdidas.',
+    'btn.save_and_leave': 'Guardar e sair',
+    'btn.discard_and_leave': 'Descartar e sair',
   },
   'en': {
     'app.title': 'Clavis',
@@ -146,6 +150,10 @@ export const translations: Record<string, TranslationDict> = {
     'label.error_details': 'Error details',
     'btn.restart': 'Restart',
     'label.loading_drawers': 'Loading drawers',
+    'msg.unsaved_changes_title': 'Unsaved changes',
+    'msg.unsaved_changes_desc': 'This drawer has unsaved changes. If you leave without saving, they will be lost.',
+    'btn.save_and_leave': 'Save and leave',
+    'btn.discard_and_leave': 'Discard and leave',
   },
 };
 
