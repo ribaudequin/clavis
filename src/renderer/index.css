@@ -2,12 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design tokens: single source of truth for colours used outside Tailwind utilities
+   (inline style objects in react-hot-toast and the password-strength meter). */
+:root {
+  --focus-ring: #3b82f6;
+  --surface: #ffffff;
+  --text-primary: #1f2937;
+  --border-default: #e5e7eb;
+  --danger-border: #fca5a5;
+  --danger-text: #7f1d1d;
+  --success-border: #86efac;
+  --success-text: #14532d;
+  --info-border: #bfdbfe;
+  --info-text: #1e3a8a;
+  --strength-weak: #fca5a5;
+  --strength-fair: #fdba74;
+  --strength-good: #fde047;
+  --strength-strong: #86efac;
+  --strength-excellent: #4ade80;
+}
+
 *:focus {
   outline: none;
 }
 
 *:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 2px;
 }

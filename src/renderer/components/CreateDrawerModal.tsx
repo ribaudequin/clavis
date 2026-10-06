@@ -49,15 +49,15 @@ function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerM
   }, [duplicateTitle]);
 
   function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
-    if (pw.length > 0 && pw.length < 8) return { score: 1, label: 'Too short (min 8 chars)', color: '#fca5a5' };
-    if (pw.length === 0) return { score: 0, label: '', color: '#e5e7eb' };
+    if (pw.length > 0 && pw.length < 8) return { score: 1, label: 'Too short (min 8 chars)', color: 'var(--strength-weak)' };
+    if (pw.length === 0) return { score: 0, label: '', color: 'var(--border-default)' };
     let score = 1;
     if (pw.length >= 12) score++;
     if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
     if (/[0-9]/.test(pw)) score++;
     if (/[^A-Za-z0-9]/.test(pw)) score++;
     const labels = ['', 'Weak', 'Fair', 'Good', 'Strong', 'Excellent'];
-    const colors = ['#e5e7eb', '#fca5a5', '#fdba74', '#fde047', '#86efac', '#4ade80'];
+    const colors = ['var(--border-default)', 'var(--strength-weak)', 'var(--strength-fair)', 'var(--strength-good)', 'var(--strength-strong)', 'var(--strength-excellent)'];
     const idx = Math.min(score, 5);
     return { score, label: labels[idx], color: colors[idx] };
   }
@@ -177,7 +177,7 @@ function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerM
                         className="flex-1 rounded"
                         style={{
                           height: '6px',
-                          backgroundColor: i < strength.score ? strength.color : '#e5e7eb',
+                          backgroundColor: i < strength.score ? strength.color : 'var(--border-default)',
                         }}
                       />
                     ))}
@@ -252,7 +252,7 @@ function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerM
                 type="button"
                 onClick={handleCreateAnyway}
                 disabled={isLoading}
-                className="px-3 py-1 text-sm text-white bg-yellow-600 rounded hover:bg-yellow-700 disabled:opacity-50"
+                className="px-3 py-1 text-sm text-white bg-yellow-700 rounded hover:bg-yellow-800 disabled:opacity-50"
               >
                 {isLoading ? t('btn.creating') : t('btn.create_anyway')}
               </button>

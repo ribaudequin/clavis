@@ -11,31 +11,31 @@ export function ToastProvider({ children }: { children: React.ReactNode }): Reac
           className: 'text-sm',
           duration: 4000,
           style: {
-            background: '#fff',
-            color: '#1f2937',
-            border: '1px solid #e5e7eb',
+            background: 'var(--surface)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-default)',
             boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
             padding: '12px 16px',
             borderRadius: '8px',
           },
           error: {
             style: {
-              border: '1px solid #fca5a5',
-              color: '#7f1d1d',
+              border: '1px solid var(--danger-border)',
+              color: 'var(--danger-text)',
             },
             icon: '❌',
           },
           success: {
             style: {
-              border: '1px solid #86efac',
-              color: '#14532d',
+              border: '1px solid var(--success-border)',
+              color: 'var(--success-text)',
             },
             icon: '✅',
           },
           loading: {
             style: {
-              border: '1px solid #bfdbfe',
-              color: '#1e3a8a',
+              border: '1px solid var(--info-border)',
+              color: 'var(--info-text)',
             },
             icon: '⏳',
           },

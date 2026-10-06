@@ -32,7 +32,7 @@ function CopyButton({ text }: { text: string }): React.JSX.Element {
       ref={ref}
       type="button"
       onClick={handleCopy}
-      className="p-0.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+      className="p-0.5 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-600 transition-colors"
       aria-label={t('btn.copy_address')}
       title={t('btn.copy_address')}
     >
@@ -101,7 +101,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
           </div>
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             aria-label={t('btn.close')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -150,7 +150,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
 
           <section className="bg-amber-50/60 rounded-xl p-4 border border-amber-100">
             <div className="flex items-center gap-2 mb-3">
-              <HeartIcon className="w-4 h-4 text-amber-500" />
+              <HeartIcon className="w-4 h-4 text-amber-700" />
               <h3 className="text-sm font-semibold text-amber-800 uppercase tracking-wide">{t('label.support_project')}</h3>
             </div>
             <p className="text-sm text-gray-700 leading-relaxed mb-3">
@@ -160,7 +160,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
               href="https://ko-fi.com/A0383T5"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white text-sm font-medium rounded-lg transition-colors"
             >
               <KoFiIcon className="w-4 h-4" />
               {t('btn.buy_coffee')}
@@ -182,33 +182,33 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
               </ul>
               <div className="flex gap-2 mt-3">
                 <a href="https://ko-fi.com/A0383T5" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                  <KoFiIcon className="w-4 h-4 text-gray-600" />
+                  <KoFiIcon className="w-4 h-4" />
                   Ko-fi
                 </a>
                 <a href="https://github.com/ribaudequin/clavis" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                  <GithubIcon className="w-4 h-4 text-gray-600" />
+                  <GithubIcon className="w-4 h-4" />
                   GitHub
                 </a>
                 <a href="https://etherscan.io/address/0x466f0c3ee495a3dc851fafa5c4720ab2fdcd4af4" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                  <EthIcon className="w-4 h-4 text-gray-600" />
+                  <EthIcon className="w-4 h-4" />
                   ETH
                 </a>
                 <a href="https://solscan.io/account/Hnw5z47sk1hS6FsnCLfgX8pZhDryQVnZpzWJjSSRV5Nf" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                  <SolIcon className="w-4 h-4 text-gray-600" />
+                  <SolIcon className="w-4 h-4" />
                   SOL
                 </a>
               </div>
               {newVersion ? (
                 <a href="https://github.com/ribaudequin/clavis/releases/latest" target="_blank" rel="noopener noreferrer" className="w-full mt-3 inline-flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-green-600/20 transition-all">
-                  <GithubIcon className="w-5 h-5 text-white" />
+                  <GithubIcon className="w-5 h-5" />
                   {t('msg.update_available', { version: newVersion })}
                 </a>
               ) : null}
             </div>
           </section>
 
-          <p className="text-center italic text-xs text-gray-400 pt-3 border-t border-gray-100">
-            <HeartIcon className="w-3 h-3 inline-block mr-1 text-gray-300" />
+          <p className="text-center italic text-xs text-gray-500 pt-3 border-t border-gray-100">
+            <HeartIcon className="w-3 h-3 inline-block mr-1 text-gray-500" />
             {t('msg.from_portugal')}
           </p>
         </div>
@@ -216,7 +216,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
         <div className="px-6 pb-6 pt-2 flex justify-end">
           <button
             onClick={onClose}
-            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 transition-colors"
+            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white focus-visible:ring-opacity-100 transition-colors"
           >
             {t('btn.close')}
           </button>
