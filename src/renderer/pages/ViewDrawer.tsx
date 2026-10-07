@@ -108,7 +108,7 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
           onChange={(e) => setTitle(e.target.value)}
           disabled={saving || deleting}
           placeholder={t('label.title')}
-          className="w-full border rounded px-3 py-2 text-sm mb-4 bg-white disabled:opacity-50"
+          className="w-full border border-input rounded px-3 py-2 text-sm mb-4 bg-white disabled:opacity-50"
         />
         <label htmlFor="drawer-content-textarea" className="sr-only">{t('label.content') || 'Content'}</label>
         <textarea
@@ -117,7 +117,7 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
           onChange={(e) => setContent(e.target.value)}
           disabled={saving || deleting}
           placeholder={t('label.content') || 'Content'}
-          className="flex-1 w-full border rounded px-3 py-2 text-sm bg-white resize-none min-h-[300px] disabled:opacity-50"
+          className="flex-1 w-full border border-input rounded px-3 py-2 text-sm bg-white resize-none min-h-[300px] disabled:opacity-50"
         />
       </main>
 

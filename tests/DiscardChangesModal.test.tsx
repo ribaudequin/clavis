@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 
 vi.mock('../src/renderer/hooks/useFocusTrap', () => ({ useFocusTrap: vi.fn() }));
@@ -15,6 +15,7 @@ const CANCEL = /^(cancel|cancelar)$/i;
 const SAVING = /saving|a guardar/i;
 const UNSAVED_TITLE = /unsaved changes|alterações por guardar/i;
 
+beforeEach(() => vi.clearAllMocks());
 afterEach(() => cleanup());
 
 describe('DiscardChangesModal', () => {
@@ -70,12 +71,17 @@ describe('DiscardChangesModal', () => {
     expect((screen.getByRole('button', { name: CANCEL }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('wires onCancel as the escape handler of both accessibility hooks', () => {
+  it('gives Escape exactly one owner: useModalKeyboard, never useFocusTrap', () => {
     const onCancel = vi.fn();
     render(<DiscardChangesModal onSaveAndLeave={() => {}} onDiscard={() => {}} onCancel={onCancel} saving={false} />);
 
-    const options = { onEscape: onCancel };
-    expect(useFocusTrap).toHaveBeenCalledWith(expect.anything(), { ...options, isActive: true });
-    expect(useModalKeyboard).toHaveBeenCalledWith(expect.anything(), options);
+    expect(vi.mocked(useFocusTrap).mock.calls.length).toBeGreaterThan(0);
+    for (const [, options] of vi.mocked(useFocusTrap).mock.calls) {
+      expect(options).toEqual({ isActive: true });
+      expect('onEscape' in (options ?? {})).toBe(false);
+    }
+
+    expect(vi.mocked(useModalKeyboard).mock.calls.length).toBeGreaterThan(0);
+    expect(useModalKeyboard).toHaveBeenCalledWith(expect.anything(), { onEscape: onCancel });
   });
 });

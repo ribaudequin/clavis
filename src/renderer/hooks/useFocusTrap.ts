@@ -2,20 +2,14 @@ import React, { useEffect, useRef, RefObject } from 'react';
 
 interface UseFocusTrapOptions {
   isActive?: boolean;
-  onEscape?: () => void;
 }
 
 export function useFocusTrap(
   containerRef: RefObject<HTMLElement | null>,
   options: UseFocusTrapOptions = {}
 ): void {
-  const { isActive = true, onEscape } = options;
+  const { isActive = true } = options;
   const previouslyFocused = useRef<HTMLElement | null>(null);
-  const onEscapeRef = useRef<(() => void) | undefined>(onEscape);
-
-  useEffect(() => {
-    onEscapeRef.current = onEscape;
-  }, [onEscape]);
 
   useEffect(() => {
     if (!isActive) {
@@ -56,20 +50,10 @@ export function useFocusTrap(
       }
     }
 
-    function handleEscape(e: KeyboardEvent) {
-      const escape = onEscapeRef.current;
-      if (e.key === 'Escape' && escape) {
-        e.preventDefault();
-        escape();
-      }
-    }
-
     container.addEventListener('keydown', handleTab);
-    container.addEventListener('keydown', handleEscape);
 
     return () => {
       container.removeEventListener('keydown', handleTab);
-      container.removeEventListener('keydown', handleEscape);
       if (previouslyFocused.current && document.body.contains(previouslyFocused.current)) {
         previouslyFocused.current.focus();
       }

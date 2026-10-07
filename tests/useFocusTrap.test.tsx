@@ -45,7 +45,7 @@ describe('useFocusTrap keeps focus stable across re-renders', () => {
     expect(dialog.contains(document.activeElement)).toBe(true);
   });
 
-  it('still fires the latest onEscape callback after a re-render', () => {
+  it('closes the modal on Escape after a re-render without invoking the drawer onBack', () => {
     const onBack = vi.fn();
     const { rerender } = render(<ViewDrawer {...props({ onBack })} />);
     const dialog = openDialog();

@@ -34,7 +34,7 @@ function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerM
   const changeTitleRef = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  useFocusTrap(modalRef, { isActive: true, onEscape: onClose });
+  useFocusTrap(modalRef, { isActive: true });
   useModalKeyboard(modalRef, { onEscape: onClose });
 
   useEffect(() => {
@@ -138,7 +138,7 @@ function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerM
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 disabled={isLoading}
-                className="w-full border rounded px-2 py-1 text-sm disabled:opacity-50"
+                className="w-full border border-input rounded px-2 py-1 text-sm disabled:opacity-50"
                 placeholder={t('label.title')}
               />
             </div>
@@ -153,7 +153,7 @@ function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerM
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
-                  className="w-full border rounded px-2 py-1 text-sm pr-8 disabled:opacity-50"
+                  className="w-full border border-input rounded px-2 py-1 text-sm pr-8 disabled:opacity-50"
                   placeholder={t('label.password')}
                   autoComplete="new-password"
                 />
@@ -197,7 +197,7 @@ function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerM
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={isLoading}
-                  className="w-full border rounded px-2 py-1 text-sm pr-8 disabled:opacity-50"
+                  className="w-full border border-input rounded px-2 py-1 text-sm pr-8 disabled:opacity-50"
                   placeholder={t('label.confirm_password')}
                   autoComplete="new-password"
                 />
@@ -234,7 +234,7 @@ function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerM
         </form>
         ) : (
           <div className="space-y-3">
-            <div role="alert" className="bg-yellow-50 border border-yellow-300 rounded p-3">
+            <div role="alert" className="bg-yellow-50 border border-yellow-700 rounded p-3">
               <p className="text-sm text-yellow-800">{t('msg.title_duplicate')}</p>
               <p className="text-sm text-yellow-800 font-medium mt-1 break-words">{duplicateTitle}</p>
             </div>

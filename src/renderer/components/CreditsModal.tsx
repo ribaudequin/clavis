@@ -67,7 +67,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
     return () => { cancelled = true; };
   }, [isOpen]);
 
-  useFocusTrap(modalRef, { isActive: isOpen, onEscape: onClose });
+  useFocusTrap(modalRef, { isActive: isOpen });
   useModalKeyboard(modalRef, { onEscape: onClose });
 
   function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>): void {

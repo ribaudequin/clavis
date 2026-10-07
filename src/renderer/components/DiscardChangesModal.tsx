@@ -14,7 +14,7 @@ export default function DiscardChangesModal({ onSaveAndLeave, onDiscard, onCance
   const saveRef = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  useFocusTrap(modalRef, { isActive: true, onEscape: onCancel });
+  useFocusTrap(modalRef, { isActive: true });
   useModalKeyboard(modalRef, { onEscape: onCancel });
 
   useEffect(() => {

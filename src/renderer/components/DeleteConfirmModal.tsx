@@ -15,7 +15,7 @@ function DeleteConfirmModal({ drawerTitle, onConfirm, onCancel }: DeleteConfirmM
   const modalRef = useRef<HTMLDivElement>(null);
   const [isConfirming, setIsConfirming] = useState(false);
 
-  useFocusTrap(modalRef, { isActive: true, onEscape: onCancel });
+  useFocusTrap(modalRef, { isActive: true });
   useModalKeyboard(modalRef, { onEscape: onCancel });
 
   useEffect(() => {

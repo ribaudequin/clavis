@@ -24,7 +24,7 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
     inputRef.current?.focus();
   }, []);
 
-  useFocusTrap(modalRef, { isActive: true, onEscape: onClose });
+  useFocusTrap(modalRef, { isActive: true });
 
   async function handleSubmit(e?: React.FormEvent): Promise<void> {
     if (e) e.preventDefault();
@@ -63,7 +63,7 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
-                className="w-full border rounded px-2 py-1 text-sm pr-8 disabled:opacity-50"
+                className="w-full border border-input rounded px-2 py-1 text-sm pr-8 disabled:opacity-50"
                 placeholder={t('label.password')}
                 autoComplete="current-password"
                 aria-invalid={error ? 'true' : 'false'}
@@ -81,7 +81,7 @@ function PasswordModal({ drawerTitle, onClose, onSubmit, error }: PasswordModalP
               </button>
             </div>
             {error && (
-              <p id="password-error" className="text-red-500 text-xs mt-1" role="alert">
+              <p id="password-error" className="text-red-700 text-xs mt-1" role="alert">
                 {error}
               </p>
             )}
