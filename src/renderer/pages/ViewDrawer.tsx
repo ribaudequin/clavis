@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Result } from '../../shared/types';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import DiscardChangesModal from '../components/DiscardChangesModal';
-import { t } from '../../i18n';
+import { t, tError } from '../../i18n';
 import { toast } from 'react-hot-toast';
 
 interface ViewDrawerProps {
@@ -31,7 +31,7 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
     try {
       const result = await onDelete(drawerId);
       if (!result.ok) {
-        toast.error(`${t('msg.error_delete')} ${result.error.message}`);
+        toast.error(tError(result.error));
         return;
       }
       toast.success(t('msg.drawer_deleted'));
@@ -52,7 +52,7 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
     try {
       const result = await onSave(drawerId, password, title, content);
       if (!result.ok) {
-        toast.error(`${t('msg.error_save')} ${result.error.message}`);
+        toast.error(tError(result.error));
         return;
       }
       onBack();

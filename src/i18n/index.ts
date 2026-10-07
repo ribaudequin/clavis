@@ -1,3 +1,5 @@
+import { AppError, ErrorCode } from '../shared/types';
+
 export interface TranslationDict {
   [key: string]: string;
 }
@@ -44,7 +46,6 @@ export const translations: Record<string, TranslationDict> = {
     'label.show_password': 'Mostrar palavra-passe',
     'label.new_drawer': 'Nova Gaveta',
     'label.drawer_not_found': 'Gaveta não encontrada.',
-    'label.incorrect_password': 'Palavra-passe incorreta.',
     'btn.back': 'Voltar',
     'btn.delete_drawer': 'Eliminar gaveta',
     'btn.save_and_back': 'Guardar e voltar',
@@ -78,6 +79,13 @@ export const translations: Record<string, TranslationDict> = {
     'msg.unsaved_changes_desc': 'Existem alterações por guardar nesta gaveta. Se sair sem guardar, serão perdidas.',
     'btn.save_and_leave': 'Guardar e sair',
     'btn.discard_and_leave': 'Descartar e sair',
+    'error.invalid_id': 'Identificador de gaveta inválido.',
+    'error.password_too_short': 'A palavra-passe deve ter pelo menos 8 caracteres.',
+    'error.decrypt_failed': 'Palavra-passe incorreta ou gaveta não encontrada.',
+    'error.write_failed': 'Não foi possível concluir a operação.',
+    'error.file_not_found': 'Não foi possível encontrar a gaveta.',
+    'error.invalid_json': 'O ficheiro não é uma gaveta Clavis válida.',
+    'error.validation_error': 'A data introduzida não é válida.',
   },
   'en': {
     'app.title': 'Clavis',
@@ -120,7 +128,6 @@ export const translations: Record<string, TranslationDict> = {
     'label.show_password': 'Show password',
     'label.new_drawer': 'New Drawer',
     'label.drawer_not_found': 'Drawer not found.',
-    'label.incorrect_password': 'Incorrect password.',
     'btn.back': 'Back',
     'btn.delete_drawer': 'Delete drawer',
     'btn.save_and_back': 'Save drawer and back to menu',
@@ -154,6 +161,13 @@ export const translations: Record<string, TranslationDict> = {
     'msg.unsaved_changes_desc': 'This drawer has unsaved changes. If you leave without saving, they will be lost.',
     'btn.save_and_leave': 'Save and leave',
     'btn.discard_and_leave': 'Discard and leave',
+    'error.invalid_id': 'Invalid drawer identifier.',
+    'error.password_too_short': 'The password must be at least 8 characters long.',
+    'error.decrypt_failed': 'Incorrect password or drawer not found.',
+    'error.write_failed': 'The operation could not be completed.',
+    'error.file_not_found': 'The drawer could not be found.',
+    'error.invalid_json': 'That file is not a valid Clavis drawer.',
+    'error.validation_error': 'The supplied data is not valid.',
   },
 };
 
@@ -171,4 +185,25 @@ export function t(key: string, params?: Record<string, string>): string {
   const value = dict[key] !== undefined ? dict[key] : (translations['en'][key] !== undefined ? translations['en'][key] : key);
   if (!params) return value;
   return value.replace(/\{(\w+)\}/g, (token: string, name: string) => (params[name] !== undefined ? params[name] : token));
+}
+
+const ERROR_MESSAGE_KEYS: Record<ErrorCode, string> = {
+  [ErrorCode.INVALID_ID]: 'error.invalid_id',
+  [ErrorCode.PASSWORD_TOO_SHORT]: 'error.password_too_short',
+  [ErrorCode.DECRYPT_FAILED]: 'error.decrypt_failed',
+  [ErrorCode.WRITE_FAILED]: 'error.write_failed',
+  [ErrorCode.FILE_NOT_FOUND]: 'error.file_not_found',
+  [ErrorCode.INVALID_JSON]: 'error.invalid_json',
+  [ErrorCode.VALIDATION_ERROR]: 'error.validation_error',
+};
+
+export function tError(error: AppError): string {
+  const key = ERROR_MESSAGE_KEYS[error.code];
+  if (key !== undefined) {
+    const translated = t(key);
+    if (translated !== key && translated.trim() !== '') return translated;
+  }
+  return typeof error.message === 'string' && error.message.trim() !== ''
+    ? error.message
+    : t('label.error_title');
 }

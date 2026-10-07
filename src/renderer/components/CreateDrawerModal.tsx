@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import { EyeOpenIcon, EyeClosedIcon } from '../components/EyeIcons';
-import { t } from '../../i18n';
+import { t, tError } from '../../i18n';
 import { toast } from 'react-hot-toast';
 
 interface CreateDrawerModalProps {
@@ -67,7 +67,7 @@ function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerM
     try {
       const result = await window.electronAPI.createDrawer(title, password);
       if (!result.ok) {
-        toast.error(`Error: ${result.error.message}`);
+        toast.error(tError(result.error));
         return;
       }
       toast.success(t('msg.drawer_created'));

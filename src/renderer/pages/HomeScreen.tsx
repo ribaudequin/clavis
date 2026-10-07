@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { DrawerListItem, EncryptedDrawer, ElectronAPI } from '../../shared/types';
+import { DrawerListItem, EncryptedDrawer, ElectronAPI, ErrorCode } from '../../shared/types';
 import { SkeletonLoaders } from '../components/SkeletonLoader';
-import { t } from '../../i18n';
+import { t, tError } from '../../i18n';
 import { toast } from 'react-hot-toast';
 
 declare global {
@@ -81,7 +81,7 @@ function HomeScreen(): React.JSX.Element {
     try {
       const result = await api().exportDrawer(id);
       if (!result.ok) {
-        toast.error(`${t('msg.error_export')} ${result.error.message}`);
+        toast.error(tError(result.error));
         return;
       }
       const blob = new Blob([result.data], { type: 'application/json' });
@@ -112,7 +112,7 @@ function HomeScreen(): React.JSX.Element {
     try {
       const result = await api().deleteDrawer(id);
       if (!result.ok) {
-        toast.error(`${t('msg.error_delete')} ${result.error.message}`);
+        toast.error(tError(result.error));
         window.focus();
         return;
       }
@@ -131,14 +131,14 @@ function HomeScreen(): React.JSX.Element {
     try {
       const result = await api().openFile();
       if (!result.ok) {
-        toast.error(`${t('msg.error_import')} ${result.error.message}`);
+        toast.error(tError(result.error));
         return;
       }
       if (!result.data) return;
       try {
         const importResult = await api().importDrawer(result.data.token);
         if (!importResult.ok) {
-          toast.error(`${t('msg.error_import')} ${importResult.error.message}`);
+          toast.error(tError(importResult.error));
           return;
         }
         toast.success(t('msg.imported'));
@@ -162,7 +162,7 @@ function HomeScreen(): React.JSX.Element {
     try {
       const result = await api().unlockDrawer(unlockDrawerId, password);
       if (!result.ok) {
-        setUnlockError(result.error.message);
+        setUnlockError(tError(result.error));
         return;
       }
       if (result.data === null) {
@@ -177,7 +177,7 @@ function HomeScreen(): React.JSX.Element {
         content: result.data.content,
       });
     } catch {
-      setUnlockError(t('label.incorrect_password'));
+      setUnlockError(tError({ code: ErrorCode.DECRYPT_FAILED, message: 'Failed to unlock drawer' }));
     }
   }
 
