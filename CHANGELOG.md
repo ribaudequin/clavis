@@ -1,5 +1,22 @@
 # Changelog — Clavis
 
+## v0.4.7-beta (2026-10-07)
+
+### Accessibility — four live WCAG AA failures closed
+
+- **1.4.3** — `PasswordModal` error text was `text-red-500` at 3.76:1, below the 4.5:1 that 12px text needs. Now `text-red-700` at 6.47:1.
+- **1.4.11** — every form control boundary used bare `border` (`#e5e7eb`) at 1.24:1. New token `--border-input` (`#8a8a8a`) reaches 3.45:1 on white, 3.30:1 on `gray-50` and 3.14:1 on `gray-100`. `gray-400` was rejected at 2.54:1 (still failing) and `gray-500` at 4.83:1 (visibly heavy on every form).
+- **1.4.11** — the duplicate-title alert's `border-yellow-300` measured 1.39:1 against `yellow-50` (previously recorded as 1.27:1; `yellow-300` is `#fcd34d`, not `#fde047`). Now `border-yellow-700` at 4.76:1 — `yellow-600` would have been 2.84:1, so the ramp could not be fixed one step up.
+
+### Fixes
+
+- **Escape fired twice per keypress.** `useFocusTrap` and `useModalKeyboard` each attached a `keydown` listener for it on the same container ref. It stayed invisible only because every `onEscape` was an idempotent `setState(false)`. `useFocusTrap` no longer handles Escape — Escape is modal-keyboard behaviour, not focus-containment — so `useModalKeyboard` is the sole owner. The `[containerRef, isActive]` dependency remains load-bearing: its cleanup restores focus to the pre-modal element.
+- **Errors shown in the wrong language.** The renderer surfaced `result.error.message`, the main process's English diagnostic string, at 8 sites — a wrong password read "Incorrect password or drawer not found" inside a fully Portuguese UI, and the `msg.error_*` prefixes produced mixed text. Errors are now resolved from `AppError.code` via `tError()`; the main-process message is log text only.
+
+### Verification
+
+152/152 tests (green under `CI=true` too), `typecheck`/`typecheck:test`/`lint` clean. Both fixes validated in a locally built AppImage with an isolated `userData` — the accessibility fixes by runtime computed style (10/10) and the i18n fix by rendering the real wrong-password flow under `navigator.language` pt-PT (5/5). The Escape fix carries a negative control: `tests/escapeSingleInvocation.test.tsx` uses non-idempotent handlers and fails 4 of 5 tests at a 2:1 ratio when the duplicate handler is reintroduced.
+
 ## v0.3.4-alpha (2026-09-14)
 - `CHAN-01` resolved: preload imports `CHANNELS` from `src/shared/channels.ts` (single source of truth)
 - Preload bundled via Vite (`scripts/build-preload.mjs`) — self-contained `dist/main/preload.js`, `electron` external, `CHANNELS` inlined
