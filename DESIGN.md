@@ -50,7 +50,8 @@ no others, and there is no theme file.
 | `--focus-ring` | `#3b82f6` | The global `:focus-visible` outline |
 | `--surface` | `#ffffff` | Toast background |
 | `--text-primary` | `#1f2937` | Toast body text |
-| `--border-default` | `#e5e7eb` | Toast border, empty strength bar |
+| `--border-default` | `#e5e7eb` | Toast border, empty strength bar. Also the value bare `border` reaches — see [Form controls](#form-controls) |
+| `--border-input` | `#8a8a8a` | **Every** form control boundary — the only boundary that has to carry a control |
 | `--danger-border` | `#fca5a5` | Error toast border |
 | `--danger-text` | `#7f1d1d` | Error toast text |
 | `--success-border` | `#86efac` | Success toast border |
@@ -77,11 +78,20 @@ These 15 properties replaced **18 hard-coded hex literals** — 9 in `ToastProvi
 `CreateDrawerModal.tsx`. The values are **structure, not restyling**: every one is byte-identical
 to what it replaced, so every pairing still measures what it measured before. (`--focus-ring` is
 the fifteenth and is the exception — it replaced `#2563eb` in this same file, in the fix described
-under [Focus indicators](#focus-indicators).)
+under [Focus indicators](#focus-indicators).) `--border-input` is the **sixteenth**, added later,
+and is an exception in the other direction: it replaced nothing. It is a new value, chosen for a
+measurement — see [Form controls](#form-controls).
 
 The rule that follows: **prefer the utility whenever there is a choice.** A token is the fallback
-for the cases a utility cannot reach. The app currently emits exactly **35** Tailwind colour
-utilities, all of which are used.
+for the cases a utility cannot reach. The tokenisation pass left exactly **35** Tailwind colour
+utilities in the app, all of them used; `border-input` is the thirty-sixth.
+
+**One token breaks the rule's rationale, on purpose.** `--border-input` is the only entry in the
+table above that a `className` *can* reach — `tailwind.config.cjs` binds it to the `border-input`
+utility. It is a token anyway because the value has to be stated once and justified once, next to
+the measurement that chose it, rather than repeated as a bare hex across every form control in the
+app. Every other token above is unreachable from a `className` and needs the token for exactly that
+reason.
 
 ### Measured contrast
 
@@ -121,6 +131,31 @@ All ratios are foreground-on-white unless stated otherwise.
 **The marked entries are not options.** They are listed so the reason they are absent from the
 codebase is on the record: `amber-500` and `yellow-600` were both live WCAG AA failures, measured
 at 2.15:1 and 2.94:1 against 14px white labels, and were raised to `-700` in commit `5ad6892`.
+`red-500` was the same story at 3.76:1 and, until the fix recorded under
+[Form controls](#form-controls), was still live as `text-red-500 text-xs` on `PasswordModal`'s
+error line — a 12px string held to 4.5:1. All three bans are now enforced in code, not just in
+this table.
+
+**Control boundaries** — a different criterion, and measured against the surface each one is
+actually drawn on:
+
+| Boundary | Surface | Ratio | Verdict |
+|---|---|---|---|
+| `--border-input` (`#8a8a8a`) | white `#ffffff` | **3.45** | Pass |
+| `--border-input` (`#8a8a8a`) | `gray-50` `#f9fafb` | **3.30** | Pass |
+| `--border-input` (`#8a8a8a`) | `gray-100` `#f3f4f6` | **3.14** | Pass |
+| `border` / `--border-default` (`#e5e7eb`) | white | 1.24 | Fail — the old input edge |
+| `gray-400` (`#9ca3af`) | white | 2.54 | Fail |
+| `gray-500` (`#6b7280`) | white | 4.83 | Pass, but visually heavy |
+| `yellow-700` (`#a16207`) | `yellow-50` `#fefce8` | **4.76** | Pass — the duplicate-title alert |
+| `yellow-600` (`#ca8a04`) | `yellow-50` | 2.84 | Fail — so the alert could not step up one |
+| `yellow-300` (`#fcd34d`) | `yellow-50` | 1.39 | Fail — the old alert edge |
+
+Two corrections are folded into that table rather than left as folklore. `yellow-300` in
+tailwindcss 3.4 is `#fcd34d`, **not** `#fde047`, and against `yellow-50` it measures **1.39:1** —
+an earlier version of this document recorded 1.27:1 for it, computed from the wrong hex. And
+because `yellow-600` only reaches 2.84:1 here, the duplicate-title alert **could not have been
+fixed one step up the ramp**: it had to jump to `yellow-700`.
 
 ### What the table implies
 
@@ -132,6 +167,9 @@ at 2.15:1 and 2.94:1 against 14px white labels, and were raised to `-700` in com
 - On `red-50`, `red-700` measures 5.91 and `red-800` 7.60 — both fine. Destructive text on the
   destructive panel uses the `-700`/`-800` end of the ramp.
 - On `yellow-50`, `yellow-800` measures 6.62 — fine.
+- **A boundary and a body of text are not the same object.** 3:1 is the bar for an edge, 4.5:1 for
+  a word. That is why `--border-input` at 3.45:1 is a pass and `red-500` at 3.76:1 is a ban, and why
+  the two decisions cannot be made from one number.
 
 ---
 
@@ -292,31 +330,92 @@ fill by one step.
 ### Form controls
 
 ```
-w-full border rounded px-2 py-1 text-sm disabled:opacity-50          dialogs
-w-full border rounded px-3 py-2 text-sm mb-4 bg-white                ViewDrawer
-w-full border rounded px-3 py-2 text-sm bg-white resize-none         textarea
+w-full border border-input rounded px-2 py-1 text-sm disabled:opacity-50            dialogs
+w-full border border-input rounded px-3 py-2 text-sm mb-4 bg-white                  ViewDrawer
+w-full border border-input rounded px-3 py-2 text-sm bg-white resize-none           textarea
 ```
 
-Notes:
+**The boundary rule.** An input's edge is the only thing telling you where the control is, so
+WCAG 1.4.11 requires **3:1** of it. Bare `border` — `#e5e7eb`, the same value as `--border-default`
+reached the other way — measures **1.24:1 on white**. Every control boundary therefore carries
+`border-input`, and it clears 3:1 on all three surfaces an input is drawn on: **3.45:1 on white**,
+**3.30:1 on `gray-50`**, **3.14:1 on `gray-100`**.
 
-- Bare `border` is Tailwind's default `#e5e7eb` — the same value as `--border-default`, reached the
-  other way. It measures **1.24:1 on white**, which fails the 3:1 that WCAG 1.4.11 asks of a
-  control boundary. This is a live gap, not a solved problem; see [Known gaps](#known-gaps).
+`#8a8a8a` sits between `gray-400` and `gray-500` on the grey ramp, and both neighbours were
+measured before it was picked:
+
+| Candidate | Ratio on white | Verdict |
+|---|---|---|
+| `border` / `--border-default` `#e5e7eb` | 1.24 | Fail |
+| `gray-400` `#9ca3af` | 2.54 | Fail — one step too light |
+| `--border-input` `#8a8a8a` | **3.45** | **Pass** |
+| `gray-500` `#6b7280` | 4.83 | Pass — but visibly heavy on every form in the app |
+
+**`--border-default` is unchanged and still correct** for the borders it was chosen for. This fix
+added a second token rather than moving the first, so no decorative border in the app shifted by
+one pixel.
+
+> ### `border border-input`, both classes. Never `border-input` alone.
+>
+> `border-input` sets only `border-color`. Tailwind's preflight resets `border-width: 0` on every
+> element, so a lone `border-input` paints a **zero-width** border: invisible, and a strictly worse
+> 1.4.11 failure than the one it was introduced to fix. The compiled CSS keeps the two concerns in
+> separate rules, which is why one class cannot stand in for the other:
+>
+> ```
+> .border{border-width:1px}
+> .border-input{border-color:var(--border-input)}
+> ```
+>
+> **Do not "tidy" `border border-input` down to `border-input`.** Six class strings carry the
+> pair. An editor collapsing them breaks every form in the app with no build error, no type error
+> and no failing test — the fields simply stop having a visible edge.
+
+The six elements that changed: `PasswordModal.tsx:66`, `CreateDrawerModal.tsx:141`, `:156`, `:200`
+(five inputs) and `ViewDrawer.tsx:111`, `:120` (an input and a textarea).
+
+**Scope: control boundaries, not every border.** The 3:1 requirement was applied only to edges that
+are the sole affordance for the thing they surround. The rest were deliberately left alone, and each
+one below is at or below the threshold:
+
+| Left alone | Measured | Why it is exempt |
+|---|---|---|
+| `HomeScreen.tsx:224` and `ViewDrawer.tsx:95`/`:124` header and footer rules (bare `border`) | 1.24 | Rules between regions. Nothing depends on the line to be found or understood |
+| `CreditsModal` section and footer rules (`border-amber-100` 1.09, `border-amber-200` 1.22, `border-gray-100` 1.10) | 1.09–1.22 | Same. The surrounding text carries all the content |
+| `DiscardChangesModal` panel and cancel button, `DeleteConfirmModal` cancel button (`border-gray-300`) | 1.47 | A dialog heading and a visible button label already identify these; the edge is not the only thing doing so, which is WCAG 1.4.11's own exemption |
+| The outlined destructive buttons (`border-red-300`) | 1.90 | Same, and the label is `red-700` at 6.47:1 |
+| `DeleteConfirmModal`'s panel border (`border-red-600`, 2px) | 4.41 on `red-50` | Clears 3:1 on its own |
+
+That exemption is already argued for the toast borders under [Toasts](#toasts). The line is drawn
+at *is this edge the only affordance for the thing it surrounds?* — not at *is this a border?* —
+which is why `border-red-300` on a button and `border-yellow-700` on the duplicate-title alert get
+different answers. The alert is the whole message: nothing inside it is a boundary.
+
+Other notes:
+
 - Every input has a real `<label htmlFor>`. There are no placeholder-only fields.
 - Password fields carry `autoComplete` (`new-password` / `current-password`).
 - The reveal toggle is an absolutely-positioned `text-gray-500` button with `aria-label` and
   `aria-pressed`; the input carries `pr-8` to clear it.
-- Validation errors render in a `role="alert"` element.
+- Validation errors render in a `role="alert"` element, and in `text-red-700` (6.47:1 on white) —
+  never `text-red-500`, which cannot carry a 12px string.
 
 ### Alerts and inline messages
 
 Two patterns, both tinted backgrounds with a matching border:
 
 ```
-bg-yellow-50 border border-yellow-300 rounded p-3 + text-yellow-800   duplicate title
+bg-yellow-50 border border-yellow-700 rounded p-3 + text-yellow-800   duplicate title
 bg-red-50 border-2 border-red-600 rounded-lg                          delete dialog panel
 bg-amber-50/60 rounded-xl p-4 border border-amber-100                 support section
 ```
+
+**The duplicate-title alert's border is a control boundary, not a tint.** It is `yellow-700`
+(`#a16207`) against the `yellow-50` (`#fefce8`) panel — **4.76:1**, up from 1.39:1 with the
+`yellow-300` it replaced. `yellow-600` was not an option: one step up the ramp from `yellow-700`
+it measures 2.84:1 there and still fails 1.4.11, so the fix had to skip a step. The inner text was
+already `text-yellow-800`, which measures 6.62:1 on the same panel. **A tinted alert panel is a
+surface; its border is the boundary of the message, and the 3:1 bar applies.**
 
 ### Modals
 
@@ -324,11 +423,15 @@ There is **no base `Modal` component and no portal**. Each modal hand-rolls the 
 composes the same two hooks. This is the contract to follow when adding a sixth.
 
 ```
-useFocusTrap(modalRef, { isActive: true, onEscape })
+useFocusTrap(modalRef, { isActive: true })
 useModalKeyboard(modalRef, { onEscape })
 ```
 
-Both hooks attach `keydown` listeners to the **container ref**, so they must share it.
+Both hooks attach `keydown` listeners to the **container ref**, so they must share it — and because
+they share it, **each key must have exactly one owner.** Escape belongs to `useModalKeyboard`
+alone. `useFocusTrap` takes no `onEscape` at all. See
+[Escape has exactly one owner](#escape-has-exactly-one-owner) for why that is a rule and not a
+detail.
 
 **Overlay.** All five use `fixed inset-0 … flex items-center justify-center z-50`. The opacity
 is not uniform, and this is drift rather than intent:
@@ -381,26 +484,64 @@ has three actions and its primary is *saving*, so it uses `blue-600` for save, a
 red skull above a dialog whose main button saves would mislabel the whole thing. **The icon has to
 agree with the action the dialog recommends, not with the presence of a destructive option.**
 
-### The `onEscape` dependency trap
+### Escape has exactly one owner
 
-`useFocusTrap` holds `onEscape` in a latest-value ref, updated by its own effect, and the main
-effect depends only on `[containerRef, isActive]`. **This is load-bearing. Do not put `onEscape`
-back in the dependency array.**
+**Escape is modal-keyboard behaviour, not focus-containment behaviour.** `useFocusTrap` keeps Tab
+inside the panel and restores focus when the modal unmounts. It should never have handled a key.
+`useModalKeyboard` is the sole owner of Escape and Enter, and it is the hook every modal passes
+`onEscape` to. `onEscape` is not in `useFocusTrap`'s options interface at all — the option, the
+latest-value ref that held it, and the effect that synced that ref are all gone.
 
-Every caller passes an inline arrow (`onEscape: onCancel`), so a new function identity arrives on
-every parent render. With `onEscape` in the dependency array that re-runs the effect, and the
-effect's cleanup restores focus to whatever was focused *before the modal opened* — which is
-outside the dialog. Reproduced by running both hook shapes against the same test:
+All five modals pass `{ isActive: true }` to `useFocusTrap`, except `CreditsModal`, the one modal
+that mounts conditionally, which passes `{ isActive: isOpen }`. The old escape handler also called
+`e.preventDefault()`; `useModalKeyboard` does the same, so that behaviour is preserved exactly.
+
+**What the double fire measured.** Both hooks used to attach a `keydown` listener for Escape to the
+same container ref, so one press invoked `onEscape` twice. Reintroducing the duplicate handler
+reproduces it exactly:
+
+| Escape presses | `onEscape` invocations | Ratio |
+|---|---|---|
+| 1 | 2 | 2:1 |
+| 2 | 4 | 2:1 |
+
+It was invisible in the app only because every `onEscape` happens to be an idempotent
+`setState(false)` — setting a boolean false twice is the same as setting it once. Any handler that
+was not idempotent would have fired twice per press: a counter, an append, a request, an analytics
+event, a nested confirm. **A double fire hidden by an idempotent handler is still a double fire.**
+That is also why it survived review — nothing in the app could exhibit it.
+
+**The dependency trap, and why it outlived the fix.** `useFocusTrap`'s main effect still depends
+only on `[containerRef, isActive]`, and **that is still load-bearing.** Its cleanup restores focus
+to whatever was focused *before* the modal opened, which is outside the dialog. Add any unstable
+dependency and a parent re-render re-runs the effect, firing that cleanup:
 
 | `useFocusTrap` shape | Focus after a parent re-render |
 |---|---|
-| As written — latest-value ref, deps `[containerRef, isActive]` | stays on the dialog's own control |
-| `onEscape` added to the deps | jumps back to the opener, outside the dialog |
+| As written — deps `[containerRef, isActive]` | stays on the dialog's own control |
+| Any added dependency | jumps back to the opener, outside the dialog |
 
-The trap is not torn down visibly — the modal stays open and the listener is re-attached — so the
-symptom is a focus escape, not a crash. Note that `useModalKeyboard` does **not** use this pattern;
-it lists `onEscape` and `onEnter` as ordinary dependencies. That is safe there because it has no
-cleanup that restores focus. The asymmetry is deliberate, not an oversight.
+The second row was measured against the old two-key shape, but the cleanup code that produces it is
+unchanged, so it still holds for any dependency you might be tempted to add. Every caller passes an
+inline arrow to `useModalKeyboard`, so a new function identity arrives on every parent render. The
+trap is now avoided by not having the key in this hook at all, rather than by a ref to make it
+stable — but the consequence is identical, and the reason has not changed.
+
+The symptom is a **focus escape, not a crash**: the modal stays open and the listener re-attaches,
+so this never appears in an error report. Note that `useModalKeyboard` lists `onEscape` and
+`onEnter` as ordinary dependencies, which is correct there because it has no focus-restoring
+cleanup. The asymmetry is no longer a difference in technique; it is a difference in
+responsibility, and it is the intended one.
+
+**What guards it.** `tests/escapeSingleInvocation.test.tsx` — 5 tests, **no hook mocked**, because
+the point is the real wiring — asserts the single-owner contract using **non-idempotent handlers**:
+a state counter that must advance by exactly one per keypress. An idempotent `setState(false)`
+cannot observe a double fire at all, which is precisely why the previous suite missed this.
+Reintroducing the duplicate handler fails 4 of the 5 at exactly the 2:1 ratios above. Two more
+guards sit alongside it: `tests/DiscardChangesModal.test.tsx` asserts statically that `onEscape` is
+absent from the `useFocusTrap` options, and `tests/useFocusTrap.test.tsx` asserts that focus stays
+inside the dialog across a caller re-render while Escape still closes it. The suite went from 143
+to 148 tests with this fix; all five new ones fail if the double handling returns.
 
 ### Toasts
 
@@ -497,14 +638,11 @@ is fully conformant.
 |---|---|---|
 | `danger.svg` contains **two** `style="fill"` declarations — `#f32929` and `#131112` — and the near-black one is painted last | `#131112` on the `red-50` panel is **17.19:1**; the icon is effectively invisible | Undiagnosed. Whether `#131112` was meant to be a stroke or is an export artefact is unknown. Needs an asset decision. |
 | The GitHub mark on the `green-600` update button | **1.20:1** | Pre-existing. Fixing it needs a brand-asset or surface decision — the mark cannot be recoloured without ceasing to be the GitHub logo. |
-| `PasswordModal` error text is `text-red-500 text-xs` on white | **3.76:1**, below the 4.5:1 that 12px text needs | Live WCAG AA text failure. Not touched by commit `5ad6892`; it was outside that pass's scope. Use `text-red-700` (5.91:1 on `red-50`, 6.47:1 on white) or the `--danger-text` token. |
-| Input boundaries use bare `border` (`#e5e7eb`) on white | **1.24:1**, below the 3:1 that WCAG 1.4.11 requires of a control boundary | Live. Would need a `-400` or `-500` border, which changes the visual weight of every form in the app. |
-| The duplicate-title alert's `border-yellow-300` on `yellow-50` | **1.27:1** | Live boundary failure, same criterion. |
 | `CreditsModal` never focuses anything on mount | ESC does not close it until the user clicks or tabs into the panel | Live. Add the mount `focus()` + `window.focus()` the other four have. |
-| Both hooks attach `keydown` on the same container, so ESC invokes `onEscape` **twice** per press | Measured: 2 invocations | Benign today only because every `onEscape` is an idempotent `setState(false)`. A non-idempotent handler would fire twice. |
 | No `prefers-reduced-motion` support | 0 occurrences in `src/` | The `animate-in`/`animate-pulse` transitions do not degrade for users who have asked for reduced motion. |
 | Residual i18n leaks in the strength meter | `CreateDrawerModal.tsx:52` and `:59` hardcode `'Too short (min 8 chars)'`, `'Weak'`, `'Fair'`, `'Good'`, `'Strong'`, `'Excellent'` in English, while every other string goes through `t()`. The colours on those same lines are tokenised; the labels are not. | Part of the "not everything is tokenised yet" set. |
 | **No dark mode** | — | `tailwind.config.cjs` sets `darkMode: 'class'` and the CSS is structured to allow it, but no `dark:` variant exists anywhere and no theme is defined. Deliberately deferred. Do not infer that adding `dark:` classes will work. |
+| `--border-input` has no dark-mode companion value | `#8a8a8a` is a static hex under `:root`, with no `.dark` or `@media (prefers-color-scheme)` override | Currently inert, because nothing in `src/renderer` uses a `dark:` variant (0 occurrences) — so the light value is the only value that can ever be read. It becomes a live gap the moment either of those two things changes. It also has no `prefers-color-scheme` story, so a user whose OS is dark and whose app is light gets the same 3.45:1 with no adaptation. |
 | `index.html`'s `<meta name="theme-color" content="#ffffff">` | — | Outside the CSS cascade, so it cannot be tokenised. Must be changed by hand. |
 | `PasswordModal`'s `aria-describedby="password-error"` | — | Points at an element that only exists when there is an error. |
 
