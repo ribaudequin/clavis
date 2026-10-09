@@ -1,4 +1,17 @@
-# Clavis
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ribaudequin/ribaudequin/main/assets/bandua-dark.svg">
+    <img src="https://raw.githubusercontent.com/ribaudequin/ribaudequin/main/assets/bandua-light.svg" alt="Bandua Studio" width="64">
+  </picture>
+</p>
+
+<h1 align="center">clavis</h1>
+
+<p align="center">Encrypted notes for passwords, PINs, bank details and safe codes.</p>
+
+<p align="center"><sub>A <b>Bandua Studio</b> project · by Marcelo Salvador</sub></p>
+
+---
 
 **Clavis** is a cross-platform encrypted notes application for storing sensitive data such as banking information, PINs, website passwords, safe codes, and door codes.
 
