@@ -166,14 +166,11 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
               <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wide">{t('label.credits')}</h3>
             </div>
             <ul className="space-y-2">
-              <li className="text-sm text-gray-700">
-                <span className="font-medium">{t('label.credits_role')}</span> Marcelo Salvador
-              </li>
-              <li className="flex items-center gap-2">
+              <li className="flex items-center justify-center gap-2">
                 <BanduaIcon className="w-8 h-8 flex-shrink-0" aria-hidden="true" />
                 <span className="text-sm text-gray-700 text-pretty">{t('about.studio')}</span>
               </li>
-              <li className="pl-10 flex items-center gap-2">
+              <li className="flex items-center justify-center gap-4">
                 <a
                   href={X_URL}
                   target="_blank"
@@ -192,9 +189,6 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
                   <LinkedInIcon className="w-4 h-4 flex-shrink-0" />
                   LinkedIn
                 </a>
-              </li>
-              <li className="text-sm text-gray-500 italic">
-                {t('msg.thanks_contributors')}
               </li>
             </ul>
           </section>
