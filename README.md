@@ -183,7 +183,7 @@ These addresses are also available in the app's **Credits** modal (click the ❤
 
 ## License
 
-This project is open source and available under the MIT License.
+[MIT](./LICENSE) — see the [LICENSE](LICENSE) file for details.
 
 ## Security Notes
 
