@@ -11,9 +11,13 @@ import EthIcon from '../../../icons/svg/eth.svg?react';
 import SolIcon from '../../../icons/svg/sol.svg?react';
 import ClavisIcon from '../../../icons/svg/clavis.svg?react';
 import BanduaIcon from '../../../icons/svg/bandua.svg?react';
+import XIcon from '../../../icons/svg/x.svg?react';
+import LinkedInIcon from '../../../icons/svg/linkedin.svg?react';
 
 const REPO_URL = 'https://github.com/ribaudequin/clavis';
 const LICENSE_URL = `${REPO_URL}/blob/main/LICENSE`;
+const X_URL = 'https://x.com/banduastudio';
+const LINKEDIN_URL = 'https://www.linkedin.com/in/bandua-marcelo-salvador';
 
 interface CreditsModalProps {
   isOpen: boolean;
@@ -167,7 +171,27 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
               </li>
               <li className="flex items-center gap-2">
                 <BanduaIcon className="w-8 h-8 flex-shrink-0" aria-hidden="true" />
-                <span className="text-sm text-gray-700">{t('about.studio')}</span>
+                <span className="text-sm text-gray-700 text-pretty">{t('about.studio')}</span>
+              </li>
+              <li className="pl-10 flex items-center gap-2">
+                <a
+                  href={X_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  <XIcon className="w-4 h-4 flex-shrink-0" />
+                  X
+                </a>
+                <a
+                  href={LINKEDIN_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  <LinkedInIcon className="w-4 h-4 flex-shrink-0" />
+                  LinkedIn
+                </a>
               </li>
               <li className="text-sm text-gray-500 italic">
                 {t('msg.thanks_contributors')}

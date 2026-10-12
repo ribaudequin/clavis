@@ -538,6 +538,45 @@ describe('CreditsModal — required About content', () => {
     expect(screen.getAllByRole('link', { name: 'GitHub' })).toHaveLength(2);
   });
 
+  it('links the studio profiles named in ABOUT.md §4.1, beside the identity line', async () => {
+    render(<CreditsModal isOpen onClose={() => {}} />);
+    await settle();
+
+    const x = screen.getByRole('link', { name: 'X' });
+    const linkedin = screen.getByRole('link', { name: 'LinkedIn' });
+    expect(x.getAttribute('href')).toBe('https://x.com/banduastudio');
+    expect(linkedin.getAttribute('href')).toBe('https://www.linkedin.com/in/bandua-marcelo-salvador');
+    for (const link of [x, linkedin]) {
+      expect(link.getAttribute('target')).toBe('_blank');
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    }
+
+    // They belong with the studio identity, not in the chip row: these are the studio's
+    // profiles, while that row is the project's repository and the two explorers.
+    const studio = querySpan(/Bandua Studio/);
+    const credits = studio?.closest('ul');
+    expect(credits?.contains(x)).toBe(true);
+    expect(credits?.contains(linkedin)).toBe(true);
+    const chips = document.querySelector('a[href*="etherscan"]')?.parentElement;
+    expect(chips?.contains(x)).toBe(false);
+  });
+
+  it('keeps the studio profile names identical in both locales, because they are names', async () => {
+    setLanguage('pt-PT');
+    const { unmount } = render(<CreditsModal isOpen onClose={() => {}} />);
+    await settle();
+    const pt = screen.getByRole('link', { name: 'LinkedIn' }).textContent?.trim();
+    unmount();
+
+    setLanguage('en-US');
+    render(<CreditsModal isOpen onClose={() => {}} />);
+    await settle();
+    const en = screen.getByRole('link', { name: 'LinkedIn' }).textContent?.trim();
+
+    expect(pt).toBe('LinkedIn');
+    expect(en).toBe(pt);
+  });
+
   it('links Patreon to the canonical studio page', async () => {
     render(<CreditsModal isOpen onClose={() => {}} />);
     await settle();
