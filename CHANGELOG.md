@@ -1,5 +1,11 @@
 # Changelog — Clavis
 
+## Unreleased
+
+- The X profile link's label reads `@banduastudio` instead of `X`. Cut into the next release rather than
+  folded into `v0.4.8-beta`: that one was already published, with six assets, while this was still being
+  decided, and moving its tag would make the provenance of a downloaded artefact ambiguous.
+
 ## v0.4.8-beta (2026-10-12)
 
 ### About / Credits screen — brought into line with the Bandua Studio brand rules

@@ -254,6 +254,16 @@ Requested as "make the About screen follow the brand rules". Authority: `~/Herme
 - [x] **BR-16** §3.1 now **requires** both profiles, and `check-about-references.py` enforces them. Writing the
       check exposed that it could not tell a *declared* URL from a *linked* one: `const X_URL = '...'` satisfied
       the substring search even with the `href` hardcoded to somewhere else. Added a usage needle per constant.
+- [x] **BR-18b** Credits card reduced to **two centred rows** — the identity line with the Pixel Arc, and the X
+      and LinkedIn profiles. Both `Concept, design & development: Marcelo Salvador` and the thanks line removed:
+      the role line sat directly above *… · por Marcelo Salvador* and said the same thing twice. Owner call.
+      No required element was lost — §3.1 still requires the author, §3.5 still names them. Dead keys
+      `label.credits_role` and `msg.thanks_contributors` deleted from both locales rather than left live-looking.
+      Measured in the AppImage: both rows centred at x=435, the card's exact centre.
+- [x] **BR-19** X label changed from `X` to `@banduastudio`. The logo already *is* the letter, so "X" beside it
+      repeated the icon; `x.com` would have named the platform rather than the account, and two accounts share
+      that domain. LinkedIn keeps its platform name because its handle is long enough to unbalance a two-link row.
+      Both mutations negative-controlled. **Lands after `v0.4.8-beta`, so it ships in the next release.**
 - [x] **BR-17** `text-pretty` on the identity line — without it "Marcelo / Salvador" split across lines.
 - [ ] **BR-18** GitHub mark — **deferred by the owner out of v0.4.8-beta, measured and ready.** `github-dark.svg`
       (black) and `github-light.svg` (white) exist in `icons/svg/` but are **uncommitted and unused**. Two live
