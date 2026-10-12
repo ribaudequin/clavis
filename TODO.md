@@ -255,6 +255,14 @@ Requested as "make the About screen follow the brand rules". Authority: `~/Herme
       check exposed that it could not tell a *declared* URL from a *linked* one: `const X_URL = '...'` satisfied
       the substring search even with the `href` hardcoded to somewhere else. Added a usage needle per constant.
 - [x] **BR-17** `text-pretty` on the identity line — without it "Marcelo / Salvador" split across lines.
+- [ ] **BR-18** GitHub mark — **deferred by the owner out of v0.4.8-beta, measured and ready.** `github-dark.svg`
+      (black) and `github-light.svg` (white) exist in `icons/svg/` but are **uncommitted and unused**. Two live
+      1.4.11 failures, only one of which was ever recorded:
+      - **Chip, on white: 2.76:1** — the current mark is `#2ba1fd`, a blue that is not even the GitHub brand
+        colour. **This one was never in DESIGN.md's Known gaps.** `github-dark.svg` reads **21.00:1**.
+      - **Update button, on `green-600`: 1.20:1** — the gap recorded since 2026-10-06. `github-light.svg`
+        reads **3.30:1**.
+      Two imports fix both. Left alone for a follow-up release by owner decision.
 - [ ] **BR-8g** `icons/svg/ko-fi.svg` (the old badge) is now imported by nothing. **Kept and flagged, not deleted** —
       removing an asset is the owner's call. Delete it if it is not wanted for a light surface.
 - [x] **BR-9** Contrast measured for all six new text/surface pairs; tightest is the MIT link at **4.62:1** on
