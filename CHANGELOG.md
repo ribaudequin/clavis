@@ -20,7 +20,14 @@ piece of information that screen exists to state was never displayed.
 - **The studio identity line** — *A Bandua Studio app · by Marcelo Salvador* — with the Bandua
   **Pixel Arc** beside it, shipped as a local asset at the brand's 32 px minimum with one block of
   clear space.
+- **The studio's X and LinkedIn profiles** sit with that line rather than in the navigation row:
+  they are the studio's channels, while the repository and the two block explorers are the
+  project's.
 - **Patreon** joins Ko-fi as a support channel, as the brand requires of every About screen.
+- **The Credits card is now exactly two centred rows** — the identity line and the profiles. The
+  role line (*Concept, design & development: Marcelo Salvador*) sat directly above *… · by Marcelo
+  Salvador* and said the same thing twice; the thanks line added a third sentence to a card read
+  once and never again. Neither took a required element with them.
 
 **The app's palette stays the app's own.** The studio contributes the mark, the line and the links —
 never a colour. This is also the only defensible reading of the brand's own contrast rules, where
