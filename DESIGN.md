@@ -128,6 +128,26 @@ All ratios are foreground-on-white unless stated otherwise.
 | `--success-text` (`#14532d`) | 9.11 | Pass |
 | `--info-text` (`#1e3a8a`) | 10.36 | Pass |
 
+**The About card's tinted surface**
+
+The credits modal's About card is a `blue-50` → `indigo-50` gradient, so its text sits on `#eff6ff`
+at one end and `#eef2ff` at the other. Both ends are listed; the lower of the two is the one that
+has to pass.
+
+| Element | Colour | On `blue-50` | On `indigo-50` | Verdict |
+|---|---|---|---|---|
+| App name | `gray-900` | 16.30 | 15.86 | Pass |
+| Version | `gray-600` | 6.94 | 6.76 | Pass |
+| Description, credits role | `gray-700` | 9.47 | 9.22 | Pass |
+| GitHub link, MIT link | `blue-600` | 4.75 | **4.62** | Pass — the tightest text in the modal |
+
+The Pixel Arc beside the studio identity line is an image, not text, but its two fills were
+measured anyway since the mark's whole job is to stay legible on a light surface: Deep `#0f2a2e` on
+`gray-50` is **14.45:1** and Teal `#1f5f66` is **6.96:1**. Both clear AA text comfortably, which is
+why the light-background variant of the mark is the one to ship. In the packaged AppImage the mark
+measures exactly **32.00 × 32.00 px** at `devicePixelRatio` 1.25, which is the `BRAND.md` §4.4
+minimum; `w-8 h-8` is asserted in the test suite so it cannot silently shrink.
+
 **The marked entries are not options.** They are listed so the reason they are absent from the
 codebase is on the record: `amber-500` and `yellow-600` were both live WCAG AA failures, measured
 at 2.15:1 and 2.94:1 against 14px white labels, and were raised to `-700` in commit `5ad6892`.
@@ -478,6 +498,39 @@ focus; without it the first keypress can be swallowed by the OS.
 **`CreditsModal` has no mount focus at all.** Until the user clicks or tabs into the panel, ESC
 does nothing. This is a live gap — see below.
 
+**The support CTA row holds two buttons, and the chip row below it holds three links.** Ko-fi is the
+left button, Patreon the right one, both `flex-1` at **172 px** with identical styling — the two
+support channels carry equal weight, which is what `band/ABOUT.md` §4.2 asks for. Above them sits a
+single short line, **"If it's useful to you, support the work."** / **"Se lhe for útil, pode
+apoiar o trabalho."** — one sentence, because it sits directly above two buttons whose labels are
+bare platform names. The "free and open source" claim it used to carry is not lost: it is in the
+description at the top of the About card.
+
+**Both CTA labels are platform names, so both are data and neither is translated** (`ABOUT.md`
+§3.3). They were once prose — "Buy me a coffee" / "Paga-me um café" — and that was measured as
+unworkable: at 172 px, minus 32 px of padding, 16 px of icon and an 8 px gap, the label had **116 px**
+and "Paga-me um café" needs **119 px**, so it wrapped onto two lines and the two buttons ended up
+different heights. The measurement is in the test suite as a length bound, since jsdom has no
+layout to wrap with.
+
+The chip row under the crypto block is **GitHub · ETH · SOL**, spread with `justify-between` so both
+rows share the same two edges, and it holds `flex-wrap` as the guard that a fourth chip would wrap
+rather than overflow.
+
+The chip row was originally five chips — Ko-fi, Patreon, GitHub, ETH, SOL — and **overflowed**:
+`scrollWidth` **455** against `clientWidth` **433** in a `max-w-md` panel, the SOL link 7 px past the
+edge, producing a horizontal scrollbar under the copy buttons. With five items the only two outcomes
+were overflow or a lone chip stranded on a second line, which is why it was restructured rather than
+merely wrapped. Three chips measure ~188 px and sit on one line: `scrollWidth` **433** =
+`clientWidth` **433**. This is the one defect in the modal no unit test can see, because jsdom has
+no layout; it was found by measuring the running AppImage.
+
+**Both CTA icons are light glyphs, and that is a measurement, not a preference.** The upstream marks
+are solid black (`simple-icons`). Black on the `amber-700` fill is 4.18:1 — passing — but on the
+`amber-800` **hover** state it falls to **2.96:1**, under the 3:1 that 1.4.11 requires of a graphic
+carrying meaning. White gives **5.02:1** on the fill and **7.09:1** on hover. A dark-background
+variant of a solid mark is the same pattern `bandua-icon-light.svg` already uses.
+
 **Danger actions are red; the primary is blue.** `DiscardChangesModal` is the interesting case: it
 has three actions and its primary is *saving*, so it uses `blue-600` for save, an outlined
 `red-700`/`red-300` button for discard-and-leave, and it **deliberately omits `danger.svg`**. A
@@ -577,9 +630,40 @@ Icons come from three sources, and they do not behave the same way:
    and is therefore controllable. It is the app's single warm accent and stays one colour
    everywhere — see [The heart accent](#the-heart-accent) below for why it is a badge rather than
    a coloured glyph.
-3. **Brand marks** — `ko-fi.svg`, `github.svg`, `eth.svg`, `sol.svg`. These carry baked
-   `fill="#..."` presentation attributes and are rendered **uncoloured**, with no class. They must
-   stay that way: recolouring the GitHub, ETH, SOL or Ko-fi logos would destroy recognition.
+3. **Brand marks** — `github.svg`, `eth.svg`, `sol.svg`, `patreon.svg`, `kofi-light.svg`, `bandua.svg`.
+   These carry baked `fill="#..."` presentation attributes and are rendered **uncoloured**, with no
+   class. They must stay that way: recolouring the GitHub, ETH, SOL, Ko-fi or Patreon logos would
+   destroy recognition.
+
+   **The `-dark` / `-light` suffix follows `BRAND.md` §4.3, and it means the mark's colour relative
+   to the surface it sits on** — `-dark` is the dark-coloured mark for a light background, `-light`
+   is the light-coloured mark for a dark background. It does **not** name the background. Two files
+   were originally added the other way round, `kofi-dark.svg` holding white and `kofi-light.svg`
+   holding black, which would have put an invisible white mark on any light surface the moment
+   someone reached for the name that sounded right.
+
+   `bandua.svg` is the **Pixel Arc**, the Bandua Studio mark. It is a byte-identical copy of
+   `~/Hermes/Bandua Studio/brand/bandua-icon-dark.svg` and is covered by the same rule as the
+   brand's `assets/` copies: re-copy it when the brand icons change. `brand/ABOUT.md` §3.5 owns the
+   rules — 32 px minimum, one 8 px block of clear space, and the studio identity line beside it.
+
+   It is a **brand** mark, not an app accent, and that distinction is load-bearing. The studio's
+   palette is not the app's: `brand/ABOUT.md` §3.7 forbids the product UI from adopting Teal, Mist,
+   Deep or Moss. The mark carries those colours as an image; the app keeps its own blue and amber
+   everywhere else.
+
+   **`patreon.svg` and `kofi-light.svg` deliberately have no `role` and no `<title>`.** The links
+   already spell *Patreon* and *Ko-fi* as text; an accessible name inside the icon as well makes
+   the link's name "Ko-fi Ko-fi", which breaks every `getByRole('link', { name: 'Ko-fi' })`
+   assertion. The upstream `simple-icons` sources ship both attributes, so this has to be stripped
+   on every import — verified by negative control.
+
+   > **Dead file, flagged not deleted.** `ko-fi.svg` — the old circular badge with the red-and-blue
+   > cup — is no longer imported by anything. It is the reason the Ko-fi CTA was reworked: its blue
+   > cup measured **2.66:1** against its own white disc and its red **3.03:1**, both at or under the
+   > 3:1 that 1.4.11 requires of a graphic carrying meaning. The white glyph replaced it and the
+   > problem went with it. The file is kept only because deleting an asset is the owner's call, not
+   > because anything uses it.
 
 ### The heart accent
 

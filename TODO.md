@@ -210,7 +210,82 @@
 - [ ] Icon path standardization (cosmetic cleanup) — maintenance sprint
 - [ ] Code signing (EV certs, Apple notarization) — post-v1.0 if needed
 
+## Brand alignment — About / Credits screen (2026-10-12)
+
+Requested as "make the About screen follow the brand rules". Authority: `~/Hermes/Bandua Studio/brand/ABOUT.md`
+(§3.1 required elements), with two standing constraints from the owner: **this agent is clavis-only**, and
+**an app's colour palette is the app's own** — the Bandua palette never enters product UI.
+
+- [x] **BR-1** Application name shown, as shipped (`clavis`, lowercase) — §3.1. Was absent entirely.
+- [x] **BR-2** Version shown, read at runtime — §3.1, §8. `getAppVersion()` was already called on every open and
+      the value discarded, so the one thing this screen exists to state was never displayed.
+- [x] **BR-3** Version made **independent of the update check** — one effect, `Promise.allSettled`, each request
+      called exactly once. A rejected update check must not blank the version; a test pins that.
+- [x] **BR-4** Licence shown: `Licença: MIT`, linking to the repository `LICENSE` (verified 200) — §3.1.
+- [x] **BR-5** Studio identity line, required by §3.5: `A Bandua Studio app · by Marcelo Salvador`, frame from the
+      locale dictionary, `Bandua Studio` / `Marcelo Salvador` identical in both locales and asserted as such.
+- [x] **BR-6** Pixel Arc shipped beside it — `icons/svg/bandua.svg`, byte-identical copy of
+      `brand/bandua-icon-dark.svg`, `w-8 h-8` (32.00 × 32.00 px measured at dpr 1.25, the §4.4 minimum), 8 px clear space.
+- [x] **BR-7** Patreon added to the support links — §4.2 / open decision 1. `icons/svg/patreon.svg` with **no**
+      `role` and **no** `<title>`, or the link's accessible name becomes "Patreon Patreon".
+- [x] **BR-8** Support links restructured — **regression found in the real AppImage**, not by tests: five chips
+      overflowed the `max-w-md` panel, `scrollWidth` 455 vs `clientWidth` 433, SOL 7 px past the edge, producing a
+      horizontal scrollbar. jsdom has no layout, so no unit test can see this.
+- [x] **BR-8b** Reworked again after the owner's visual review: `flex-wrap` stopped the overflow but left **one chip
+      stranded alone on a second line**, which is not an acceptable fix. Now **two CTA buttons on one row** —
+      Ko-fi left, Patreon right (`ml-auto`), identical styling so neither channel outranks the other — and the chip
+      row reduced to **GitHub · ETH · SOL**. Three chips ≈ 188 px on one line; 433 = 433 in the rebuilt AppImage.
+- [x] **BR-8c** `icons/svg/patreon.svg` filled **white**, measured: black is 4.18:1 on the `amber-700` fill but
+      **2.96:1 on the `amber-800` hover**, under the 3:1 of WCAG 1.4.11. White gives 5.02:1 / 6.62:1.
+- [x] **BR-8d** Ko-fi icon reworked to the white glyph, which **closed** the pre-existing failure the previous pass
+      had only diagnosed: the old circular badge's blue cup measured **2.66:1** on its own white disc and its red
+      **3.03:1**, both at or under the 3:1 of WCAG 1.4.11. The white glyph gives **5.02:1** on `amber-700` and
+      **7.09:1** on hover, and makes both CTAs the same kind of mark.
+- [x] **BR-8e** `kofi-dark.svg` / `kofi-light.svg` were **named backwards** — "dark" held white, "light" held black,
+      the opposite of `BRAND.md` §4.3 where the suffix names the mark's colour relative to the surface. Contents
+      swapped, and the convention written into `DESIGN.md` and `ABOUT.md` after it had already been got wrong once.
+- [x] **BR-8f** Both icon glyphs stripped of `role="img"` and `<title>` — the upstream `simple-icons` sources ship
+      both, and with them the link's accessible name became "Ko-fi Ko-fi". Negative-controlled: re-adding the
+      `<title>` fails two tests.
+- [x] **BR-15** Studio X and LinkedIn profiles added (`ABOUT.md` §4.1) — **these were missing and §3.1 never
+      required them, which is why they went unnoticed.** They now sit under the identity line in the Credits card,
+      not in the chip row: they are the *studio's* channels while that row is the *project's* repository and
+      explorers. The chip row also has no room — three chips already use 242px of 351px.
+- [x] **BR-16** §3.1 now **requires** both profiles, and `check-about-references.py` enforces them. Writing the
+      check exposed that it could not tell a *declared* URL from a *linked* one: `const X_URL = '...'` satisfied
+      the substring search even with the `href` hardcoded to somewhere else. Added a usage needle per constant.
+- [x] **BR-17** `text-pretty` on the identity line — without it "Marcelo / Salvador" split across lines.
+- [ ] **BR-8g** `icons/svg/ko-fi.svg` (the old badge) is now imported by nothing. **Kept and flagged, not deleted** —
+      removing an asset is the owner's call. Delete it if it is not wanted for a light surface.
+- [x] **BR-9** Contrast measured for all six new text/surface pairs; tightest is the MIT link at **4.62:1** on
+      `indigo-50`, identical to the GitHub link beside it. Recorded in `DESIGN.md`.
+- [x] **BR-10** `DESIGN.md` updated — the two new brand marks registered, the About card's tinted surface measured,
+      and the `flex-wrap` constraint written down with its numbers.
+- [x] **BR-11** `band/ABOUT.md` updated — §3.1 gained the studio line, §3.2 got a **scoped exemption** for the
+      version check instead of the ban being quietly ignored, §3.7 records palette independence, §6 line numbers
+      corrected 176 → 203, §7.1 documents the reference implementation, §10 marks decisions 1 and 3 settled.
+- [x] **BR-12b** 2 further tests pin the layout decision (same parent **and that parent is `flex`**; one link per
+      channel; chip row is exactly ETH + SOL). Both negative-controlled — and the first versions of them were **too
+      weak and had to be rewritten**: one passed with `flex` removed, and one mutation silently failed to apply
+      because the search string omitted `className="`, so the green run was reporting nothing.
+- [x] **BR-12** `check-about-references.py` gained four checks (§3.1 elements, prose keys in **both** locales,
+      Pixel Arc still byte-identical, no brand colour in `src/renderer`). All negative-controlled by hand; one of
+      them caught a defect in the checker itself on first run — it looked for prose in the component instead of the
+      locale dictionary.
+- [ ] **BR-13** Re-verify the bandua copy after any change to the brand icons. The checker fails if they drift, but
+      the copy has to be refreshed deliberately — `ABOUT.md` §3.5, same rule as `BRAND.md` §4.3's `assets/`.
+- [ ] **BR-14** Not done, and deliberately: EPUBShelf and ValidadorPT About screens. Open decisions 2 and 4 in
+      `ABOUT.md` §10 stay open — outside this agent's scope.
+
 ## Progress
+- **Current focus (2026-10-12) — the Credits/About screen aligned with the Bandua Studio brand rules, and the alignment was only real because it was measured in the packaged AppImage.** Four of the eight elements `brand/ABOUT.md` §3.1 requires were missing (app name, version, licence, studio identity), plus Patreon. All closed — see **BR-1…BR-14** above, plus the layout rework in **BR-8b/BR-8e/BR-8f** and the studio profiles in **BR-15…BR-17**. `171/171` tests (was 152), green under `CI=true`, both typechecks and lint clean.
+  **The rule that governs all of it: an app's palette is the app's own.** The studio contributes the mark, the line and the links — never a colour. Now `ABOUT.md` §3.7 and an enforced check, because it is also the only defensible reading of `BRAND.md` §5: Moss fails 4.5:1 on Mist and Teal on Deep fails even 3:1, and those numbers only hold on a 4-swatch brandboard.
+  **Fourth time the same lesson: a green suite is not evidence — and this time the suite was what hid a regression I introduced.** All 26 `CreditsModal` tests passed while the support row overflowed its panel (455 vs 433). Found by driving the real AppImage with Playwright on `DISPLAY=:0`, fixed with `flex-wrap`.
+  **A naive implementation of the version change was wrong and the suite caught it:** a second `useEffect` calls `getAppVersion` twice, and the existing `toHaveBeenCalledTimes(1)` failed immediately. The fix is one effect with `Promise.allSettled`, so neither request can cancel the other. One existing assertion changed on purpose — it asserted `getAppVersion` was *not* called when the update check rejects, which was true only because the two calls were sequential.
+  **Two traps:** the simple-icons Patreon SVG carries `role="img"` + `<title>`, which next to the link text makes the accessible name "Patreon Patreon"; and `settle()` in the test file was one microtask deep, which stopped being enough once `allSettled` added a tick — one full-suite run failed right after a bulk file restore, was not reproducible in 13 subsequent full runs, and rather than dismiss it the timing assumption was removed.
+  **A mistake of mine:** `git checkout scripts/check-about-references.py`, to undo a temporary mutation, discarded the session's work on that file. **Undo a mutation with a file copy, never with `git checkout` on a file you have been editing.**
+  **Still open:** P2.21 (save spinner) · C6-N16 (Ctrl+S) · P3.27 (`|| 'fallback'`) · P3.32 (`lang="en"` with a pt-PT UI, WCAG 3.1.1) · `DESIGN.md` known gaps: `danger.svg`'s invisible `#131112`, the GitHub mark at 1.20:1 on `green-600`, `::placeholder` at 2.54:1, and `CreditsModal` still never focusing on mount. Housekeeping: the repo's **private vulnerability reporting needs confirming** (`gh api` timed out again this session) — if disabled, SECURITY.md's advisory link dead-ends, though the file documents a fallback.
+
 - **Done**: All 23 audit-2026-08-30 findings fixed, full drawer flow (+ import UI), security hardening, store extraction. **v0.1.9.1-alpha** (2026-09-08): preload fix + CI artifact fix — preload runtime fix (inlined CHANNELS constants to fix `module not found: ../../shared/channels.js`), CI workflow artifact name fix (include version in artifact name `clavis-${os}-${tag}`). **v0.1.8-alpha** (2026-09-07): Phase 2 P0 a11y + ErrorBoundary fix — 3 P0 a11y blockers (focus indicator, drawer rows as buttons, credits modal focus trap) + 10 P1 quick wins + **Preload runtime fix** (inlined CHANNELS constants to fix `module not found: ../../shared/channels.js`). **ErrorBoundary.restartApp** end-to-end. **v0.1.7-alpha** (2026-09-07): IPC-layer hardening — B2 symlink rejection + strip `details: e`, B3 decrypt size cap 10 MB, B5 `CHANNELS` const (kills drift risk), doc sweep. **v0.1.6-alpha** (2026-09-04): P0 UX (toast system, focus traps, skeleton loaders, password visibility toggle, strength meter in CreateDrawerModal only). **v0.1.4-alpha** (2026-09-03): DeleteConfirmModal + `danger.svg`. **v0.1.3-alpha** (2026-09-03): first CI-built green run `33781273256`. **v0.1.2-alpha** baseline: import drawer button. **v0.1.1-alpha**: fixed `argon2` Win32 `PE32+` via `afterPack` + `scrypt` fallback, save/delete `Result` mismatch, Windows `confirm()` focus steal.
 - [x] **Tested**: Encryption round-trip, wrong-password rejection, drawer CRUD, path-traversal rejection, import drawer flow, HomeScreen rendering, all build targets, ASAR content, AppImage runtime, Windows `PE32+` verified, save/delete `Result` flow, Windows modal focus after delete, CI-built `v0.1.3-alpha` (AppImage Linux + ZIP Windows 11), CI-built `v0.1.4-alpha` (AppImage delete-confirm UI), **v0.1.7-alpha (54/54 tests)** — symlink rejection, decrypt size cap, CHANNELS const, all 8 IPC handlers, **v0.1.8-alpha (58/58 tests)** — a11y fixes, preload fix, ErrorBoundary restartApp, **duplicate-title warning (86/86 tests)** — `CreateDrawerModal.test.tsx` 7/7, mutation-checked (fails 4/7 when detection is stubbed), **visually confirmed by the user in the local AppImage `0.4.2-beta` (250M)**: creating a drawer named "Notas" and submitting that same name again shows the inline confirm step
 - [x] **Audit 2026-09-01**: 14 recommendations validated by 4 specialized sub-agents; consolidated into 4-phase roadmap (Phase 0-3, ~35h total; MVP target 18.75h)
