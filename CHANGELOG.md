@@ -56,6 +56,13 @@ The support link row overflowed its panel: five chips against a 433 px content b
 wrapped — the two support channels became buttons and the row below them is GitHub · ETH · SOL,
 spread so both rows share the same edges. No unit test could have caught this; jsdom has no layout.
 
+### Known, deliberately not fixed here
+
+The GitHub mark ships in `#2ba1fd`, a blue that is not the GitHub brand colour, and fails 1.4.11 in
+two places: **2.76:1** on the white chip row — a failure that was not recorded anywhere before — and
+**1.20:1** on the update button's `green-600` fill. Correct variants measure 21.00:1 and 3.30:1
+respectively, are already in `icons/svg/`, and are staged for a follow-up release.
+
 ### Verification
 
 169/169 tests (green under `CI=true` too), `typecheck`/`typecheck:test`/`lint` clean. Every new
