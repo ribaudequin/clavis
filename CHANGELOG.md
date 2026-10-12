@@ -1,5 +1,62 @@
 # Changelog — Clavis
 
+## v0.4.8-beta (2026-10-12)
+
+### About / Credits screen — brought into line with the Bandua Studio brand rules
+
+The About screen is the only place inside the app where the user meets the studio, and it was
+missing four of the eight elements the brand requires: the application name, **the version**, the
+licence, and any studio identity at all. `getAppVersion()` was already being called every time the
+dialog opened — purely to compare against the release tag — and its result was discarded, so the one
+piece of information that screen exists to state was never displayed.
+
+- **The app name is shown**, as shipped: `clavis`, lowercase, identical in both locales. It is data,
+  not prose, so it is never translated — and that is now asserted.
+- **The version is shown**, read from `app.getVersion()` at runtime, never typed into the markup.
+- **The version no longer depends on the update check.** Both requests start together and settle
+  separately, so an unreachable GitHub endpoint can no longer blank it. A test covers exactly that:
+  the update check rejects, the version still renders.
+- **`Licença: MIT`** links to the repository's `LICENSE` file.
+- **The studio identity line** — *A Bandua Studio app · by Marcelo Salvador* — with the Bandua
+  **Pixel Arc** beside it, shipped as a local asset at the brand's 32 px minimum with one block of
+  clear space.
+- **Patreon** joins Ko-fi as a support channel, as the brand requires of every About screen.
+
+**The app's palette stays the app's own.** The studio contributes the mark, the line and the links —
+never a colour. This is also the only defensible reading of the brand's own contrast rules, where
+one accent fails 4.5:1 on the light background and the primary fails even 3:1 on the dark one.
+
+### Accessibility — a live failure closed, and two avoided
+
+- **1.4.11 — the Ko-fi icon on the support button.** The old circular badge's blue cup measured
+  **2.66:1** against its own white disc, and its red **3.03:1** — both at or under the 3:1 that a
+  graphic carrying meaning requires. Replaced with the flat white glyph, which measures **5.02:1**
+  on the button and **7.09:1** on its hover state, and which also makes both support buttons the
+  same kind of mark instead of a badge beside a glyph.
+- **Avoided by measurement:** the flat black mark reads 4.18:1 on the button but falls to **2.96:1**
+  on hover, so both glyphs ship light. The upstream icon sources also carry `role` and `<title>`,
+  which would have given the links the accessible names "Ko-fi Ko-fi" and "Patreon Patreon"; both
+  are stripped, and re-adding one fails the suite.
+- **Avoided by measurement:** with two equal-width buttons, the previous label *Paga-me um café* had
+  116 px of room and needed 119, so it wrapped and left the buttons different heights. The labels are
+  now the platform names — data, identical in both locales — and the ask is one short line above
+  the buttons.
+
+### Layout
+
+The support link row overflowed its panel: five chips against a 433 px content box measured
+`scrollWidth` 455, putting a horizontal scrollbar under the copy buttons. Restructured rather than
+wrapped — the two support channels became buttons and the row below them is GitHub · ETH · SOL,
+spread so both rows share the same edges. No unit test could have caught this; jsdom has no layout.
+
+### Verification
+
+169/169 tests (green under `CI=true` too), `typecheck`/`typecheck:test`/`lint` clean. Every new
+assertion was negative-controlled: six layout mutations, two accessible-name mutations and two
+copy mutations all fail as they should, and one of the brand-side checks caught a defect in the
+checker itself. All layout and contrast figures above were measured in a locally built AppImage
+rather than in jsdom.
+
 ## v0.4.7-beta (2026-10-07)
 
 ### Accessibility — four live WCAG AA failures closed
