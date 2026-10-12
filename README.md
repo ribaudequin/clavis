@@ -143,26 +143,39 @@ Windows and macOS targets are built in CI on native runners — no Wine cross-co
 
 Pre-built binaries for each release: [GitHub Releases](https://github.com/ribaudequin/clavis/releases)
 
-# Credits & support
-
-Clavis is an open-source, cross-platform encrypted notes app built to keep your passwords, PINs, bank details, and safe codes private and secure.
-
-Source code, issues, and contributions are welcome on [GitHub](https://github.com/ribaudequin/clavis).
-
 ## Credits
 
 - **Concept, design & development:** Marcelo Salvador
 - **Thanks to:** all contributors and early testers
 
-## Support this project
+Source code, issues, and contributions are welcome on [GitHub](https://github.com/ribaudequin/clavis).
 
-Clavis is free and open source. If it's useful to you, consider supporting its development — every bit helps keep it maintained and improving.
+## Support
 
-**Ko-fi:** https://ko-fi.com/A0383T5
+Clavis is free and open source. If it's useful to you, you can support the work:
 
-**Cryptocurrency** (any EVM-compatible chain for ETH):
-- **ETH:** `0x466f0c3ee495a3dc851fafa5c4720ab2fdcd4af4`
-- **SOL:** `Hnw5z47sk1hS6FsnCLfgX8pZhDryQVnZpzWJjSSRV5Nf`
+<p>
+  <a href="https://ko-fi.com/A0383T5"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-ff5f5f?style=flat&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+  <a href="https://www.patreon.com/banduastudio"><img src="https://img.shields.io/badge/Patreon-Support-f96854?style=flat&logo=patreon&logoColor=white" alt="Patreon"></a>
+</p>
+
+**Cryptocurrency** — the ETH address accepts any EVM-compatible chain:
+
+| Coin | Address | Explorer |
+|---|---|---|
+| ETH | `0x466f0c3ee495a3dc851fafa5c4720ab2fdcd4af4` | [Etherscan](https://etherscan.io/address/0x466f0c3ee495a3dc851fafa5c4720ab2fdcd4af4) |
+| SOL | `Hnw5z47sk1hS6FsnCLfgX8pZhDryQVnZpzWJjSSRV5Nf` | [Solscan](https://solscan.io/account/Hnw5z47sk1hS6FsnCLfgX8pZhDryQVnZpzWJjSSRV5Nf) |
+
+These addresses are also available in the app's **Credits** modal (click the ❤️ icon in the header).
+
+## Elsewhere
+
+<p>
+  <a href="https://x.com/banduastudio">X</a> ·
+  <a href="https://www.linkedin.com/in/bandua-marcelo-salvador">LinkedIn</a> ·
+  <a href="https://ko-fi.com/A0383T5">Ko-fi</a> ·
+  <a href="https://www.patreon.com/banduastudio">Patreon</a>
+</p>
 
 ---
 
