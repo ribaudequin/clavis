@@ -506,6 +506,14 @@ apoiar o trabalho."** — one sentence, because it sits directly above two butto
 bare platform names. The "free and open source" claim it used to carry is not lost: it is in the
 description at the top of the About card.
 
+**The two profile links carry different kinds of label, on purpose.** The X link reads
+**@banduastudio** and the LinkedIn link reads **LinkedIn**. Putting "X" beside the X logo repeated
+what the icon already said; putting "x.com" would have named the *platform* rather than the
+account, and two accounts share that domain. The handle says which account it is. LinkedIn keeps
+its platform name because its handle — `bandua-marcelo-salvador` — is long enough to unbalance a
+two-link row. Both labels are data: neither is translated, and the test asserts a bare "X" cannot
+creep back in as the label.
+
 **Both CTA labels are platform names, so both are data and neither is translated** (`ABOUT.md`
 §3.3). They were once prose — "Buy me a coffee" / "Paga-me um café" — and that was measured as
 unworkable: at 172 px, minus 32 px of padding, 16 px of icon and an 8 px gap, the label had **116 px**

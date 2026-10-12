@@ -542,7 +542,9 @@ describe('CreditsModal — required About content', () => {
     render(<CreditsModal isOpen onClose={() => {}} />);
     await settle();
 
-    const x = screen.getByRole('link', { name: 'X' });
+    // The X label is the handle, not "X": the icon already is the letter, so repeating it
+    // said nothing, while the handle says which account this is.
+    const x = screen.getByRole('link', { name: '@banduastudio' });
     const linkedin = screen.getByRole('link', { name: 'LinkedIn' });
     expect(x.getAttribute('href')).toBe('https://x.com/banduastudio');
     expect(linkedin.getAttribute('href')).toBe('https://www.linkedin.com/in/bandua-marcelo-salvador');
@@ -557,6 +559,9 @@ describe('CreditsModal — required About content', () => {
     const credits = studio?.closest('ul');
     expect(credits?.contains(x)).toBe(true);
     expect(credits?.contains(linkedin)).toBe(true);
+    // The handle comes from BRAND.md §9; a bare "X" must not creep back in as the label.
+    expect(x.textContent?.trim()).toBe('@banduastudio');
+    expect(screen.queryByRole('link', { name: 'X' })).toBeNull();
     const chips = document.querySelector('a[href*="etherscan"]')?.parentElement;
     expect(chips?.contains(x)).toBe(false);
   });

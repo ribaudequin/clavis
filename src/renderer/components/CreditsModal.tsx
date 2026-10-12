@@ -178,7 +178,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
                   className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors"
                 >
                   <XIcon className="w-4 h-4 flex-shrink-0" />
-                  X
+                  @banduastudio
                 </a>
                 <a
                   href={LINKEDIN_URL}
