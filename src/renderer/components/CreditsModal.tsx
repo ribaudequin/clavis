@@ -4,15 +4,27 @@ import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import { t } from '../../i18n';
 import { toast } from 'react-hot-toast';
 import HeartIcon from '../../../icons/svg/heart.svg?react';
-import KoFiIcon from '../../../icons/svg/ko-fi.svg?react';
+import KoFiIcon from '../../../icons/svg/kofi-light.svg?react';
+import PatreonIcon from '../../../icons/svg/patreon.svg?react';
 import GithubIcon from '../../../icons/svg/github.svg?react';
 import EthIcon from '../../../icons/svg/eth.svg?react';
 import SolIcon from '../../../icons/svg/sol.svg?react';
 import ClavisIcon from '../../../icons/svg/clavis.svg?react';
+import BanduaIcon from '../../../icons/svg/bandua.svg?react';
+
+const REPO_URL = 'https://github.com/ribaudequin/clavis';
+const LICENSE_URL = `${REPO_URL}/blob/main/LICENSE`;
 
 interface CreditsModalProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+interface UpdateAPI {
+  electronAPI?: {
+    checkUpdate?: () => Promise<{ tag_name?: string } | null>;
+    getAppVersion?: () => Promise<string>;
+  };
 }
 
 function CopyButton({ text }: { text: string }): React.JSX.Element {
@@ -47,23 +59,24 @@ function CopyButton({ text }: { text: string }): React.JSX.Element {
 function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element | null {
   const modalRef = useRef<HTMLDivElement>(null);
   const [newVersion, setNewVersion] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
-    async function check(): Promise<void> {
-      try {
-        const res = await (window as { electronAPI?: { checkUpdate?: () => Promise<{ tag_name?: string } | null>; getAppVersion?: () => Promise<string> } }).electronAPI?.checkUpdate?.();
-        const tag = (res?.tag_name || '').replace(/^v/, '');
-        const current = await (window as { electronAPI?: { getAppVersion?: () => Promise<string> } }).electronAPI?.getAppVersion?.();
-        if (!cancelled && tag && current && tag !== String(current || '').replace(/^v/, '')) {
-          setNewVersion(res?.tag_name || null);
-        }
-      } catch {
-        // ignore
-      }
+    // Both requests start together and settle independently: the version must still
+    // reach the screen when the update check fails, and neither may be called twice.
+    async function load(): Promise<void> {
+      const api = (window as UpdateAPI).electronAPI;
+      const [update, current] = await Promise.allSettled([api?.checkUpdate?.(), api?.getAppVersion?.()]);
+      if (cancelled) return;
+      const version = current.status === 'fulfilled' ? String(current.value || '').replace(/^v/, '') : '';
+      if (version) setAppVersion(version);
+      if (update.status !== 'fulfilled') return;
+      const tag = (update.value?.tag_name || '').replace(/^v/, '');
+      if (tag && version && tag !== version) setNewVersion(update.value?.tag_name || null);
     }
-    check();
+    load();
     return () => { cancelled = true; };
   }, [isOpen]);
 
@@ -117,14 +130,24 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
               <ClavisIcon className="w-4 h-4 flex-shrink-0" />
               <h3 className="text-sm font-semibold text-blue-800 uppercase tracking-wide">{t('label.about')}</h3>
             </div>
+            <p className="text-sm font-semibold text-gray-900 leading-relaxed">
+              <span>{t('about.app_name')}</span>
+              {appVersion ? <span className="font-normal text-gray-600"> · {t('about.version', { version: appVersion })}</span> : null}
+            </p>
             <p className="text-sm text-gray-700 leading-relaxed">
               {t('msg.about_description')}
             </p>
             <p className="text-sm text-gray-700 leading-relaxed mt-2">
               {t('msg.source_welcome')}{' '}
-              <a href="https://github.com/ribaudequin/clavis" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 hover:underline font-medium">
+              <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 hover:underline font-medium">
                 GitHub
               </a>.
+            </p>
+            <p className="text-sm text-gray-700 leading-relaxed mt-2">
+              {t('label.licence')}:{' '}
+              <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 hover:underline font-medium">
+                MIT
+              </a>
             </p>
           </section>
 
@@ -142,6 +165,10 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
               <li className="text-sm text-gray-700">
                 <span className="font-medium">{t('label.credits_role')}</span> Marcelo Salvador
               </li>
+              <li className="flex items-center gap-2">
+                <BanduaIcon className="w-8 h-8 flex-shrink-0" aria-hidden="true" />
+                <span className="text-sm text-gray-700">{t('about.studio')}</span>
+              </li>
               <li className="text-sm text-gray-500 italic">
                 {t('msg.thanks_contributors')}
               </li>
@@ -158,15 +185,26 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
             <p className="text-sm text-gray-700 leading-relaxed mb-3">
               {t('msg.support_description')}
             </p>
-            <a
-              href="https://ko-fi.com/A0383T5"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              <KoFiIcon className="w-4 h-4" />
-              {t('btn.buy_coffee')}
-            </a>
+            <div className="flex gap-2">
+              <a
+                href="https://ko-fi.com/A0383T5"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <KoFiIcon className="w-4 h-4 flex-shrink-0" />
+                Ko-fi
+              </a>
+              <a
+                href="https://www.patreon.com/banduastudio"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <PatreonIcon className="w-4 h-4 flex-shrink-0" />
+                Patreon
+              </a>
+            </div>
 
             <div className="mt-4 pt-3 border-t border-amber-200">
               <p className="text-sm font-medium text-gray-800 mb-2">{t('label.cryptocurrency')} <span className="font-normal text-gray-600">{t('msg.crypto_network_hint')}</span></p>
@@ -182,12 +220,8 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
                   <CopyButton text="Hnw5z47sk1hS6FsnCLfgX8pZhDryQVnZpzWJjSSRV5Nf" />
                 </li>
               </ul>
-              <div className="flex gap-2 mt-3">
-                <a href="https://ko-fi.com/A0383T5" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                  <KoFiIcon className="w-4 h-4" />
-                  Ko-fi
-                </a>
-                <a href="https://github.com/ribaudequin/clavis" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+              <div className="flex flex-wrap justify-between gap-2 mt-3">
+                <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
                   <GithubIcon className="w-4 h-4" />
                   GitHub
                 </a>
@@ -201,7 +235,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
                 </a>
               </div>
               {newVersion ? (
-                <a href="https://github.com/ribaudequin/clavis/releases/latest" target="_blank" rel="noopener noreferrer" className="w-full mt-3 inline-flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-green-600/20 transition-all">
+                <a href={`${REPO_URL}/releases/latest`} target="_blank" rel="noopener noreferrer" className="w-full mt-3 inline-flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-green-600/20 transition-all">
                   <GithubIcon className="w-5 h-5" />
                   {t('msg.update_available', { version: newVersion })}
                 </a>
