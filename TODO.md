@@ -198,8 +198,8 @@
   - Chain now fully covered: main `https.get` → IPC → comparison → rendered link. Closes the `v0.4.2-beta` failure (renderer `fetch` CSP-blocked; its "user confirmed" note came from a local build).
   - Harness selector note: `t('label.credits_title')` is `Créditos` under PT-PT, so it matches `button[aria-label*="redit"], button[aria-label*="rédit"]`.
   - Plus `tests/CreditsModal.test.tsx` (13 tests, mutation-checked vs 7 deliberate breaks) closes part of P3.31. **User visually re-confirmed the button in the running AppImage (2026-10-05)** → P2.25 fully closed, automated + human evidence.
-- [ ] P3.22 — ErrorBoundary accessibility (`ErrorBoundary.tsx`) → `role="alert"`, `aria-live="assertive"`, `aria-label` restart
-- [ ] P3.23 — SkeletonLoader accessibility (`SkeletonLoader.tsx`) → `aria-hidden="true"`, `aria-busy="true"`
+- [x] P3.22 — ErrorBoundary `role="alert"`, `aria-live="assertive"`, `aria-label` — **DONE 2026-10-13** (`a1fd5ab`).
+- [x] P3.23 — SkeletonLoader `aria-hidden="true"`, `aria-busy="true"` — **DONE 2026-10-13** (`dde3c16`).
 - [x] P3.24 — CreditsModal i18n (`CreditsModal.tsx`) → **DONE 2026-10-05**: ~19 user-facing strings routed through `t()` (About / description / source / Credits / role / thanks / Support / Ko-fi CTA / Cryptocurrency / EVM hint / footer / Copy button). Data deliberately **not** translated: crypto addresses, `ETH`/`SOL` tickers, `GitHub`/`Ko-fi` brand names, URLs, author name, `console.error`, error dumps. 21 new keys, 2 locales. See `ADR-009`.
 - [x] P3.25 — ErrorBoundary i18n (`ErrorBoundary.tsx`) → **DONE 2026-10-05**: 4 keys (`label.error_title`, `msg.error_restart_hint`, `label.error_details`, `btn.restart`).
 - [x] P3.26 — Toast messages i18n (`CreditsModal.tsx`) → **DONE 2026-10-05**: `msg.address_copied`, `msg.copy_failed`.
