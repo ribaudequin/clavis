@@ -265,16 +265,41 @@ Requested as "make the About screen follow the brand rules". Authority: `~/Herme
       that domain. LinkedIn keeps its platform name because its handle is long enough to unbalance a two-link row.
       Both mutations negative-controlled. **Lands after `v0.4.8-beta`, so it ships in the next release.**
 - [x] **BR-17** `text-pretty` on the identity line — without it "Marcelo / Salvador" split across lines.
-- [ ] **BR-18** GitHub mark — **deferred by the owner out of v0.4.8-beta, measured and ready.** `github-dark.svg`
-      (black) and `github-light.svg` (white) exist in `icons/svg/` but are **uncommitted and unused**. Two live
-      1.4.11 failures, only one of which was ever recorded:
-      - **Chip, on white: 2.76:1** — the current mark is `#2ba1fd`, a blue that is not even the GitHub brand
-        colour. **This one was never in DESIGN.md's Known gaps.** `github-dark.svg` reads **21.00:1**.
-      - **Update button, on `green-600`: 1.20:1** — the gap recorded since 2026-10-06. `github-light.svg`
-        reads **3.30:1**.
-      Two imports fix both. Left alone for a follow-up release by owner decision.
-- [ ] **BR-8g** `icons/svg/ko-fi.svg` (the old badge) is now imported by nothing. **Kept and flagged, not deleted** —
-      removing an asset is the owner's call. Delete it if it is not wanted for a light surface.
+- [x] **BR-18** GitHub mark — **closed 2026-10-13.** The repository chip now uses `github-dark.svg` (black) and the update
+      button `github-light.svg` (white), under distinct identifiers, with sizing, spacing and layout untouched.
+      The chip goes from **2.76:1** to **21.00:1**; the button from **1.20:1** to **3.30:1** (hover `green-700` 5.02).
+      Both were live 1.4.11 failures and only one was ever recorded. `github-dark.svg` also gained a baked
+      `fill:#000`, so neither variant can inherit an ancestor `fill`. `github.svg` is now imported by nothing —
+      **archived** on the owner's decision, to `icons/archive/github-badge-2ba1fd.svg` (BR-8g).
+      **The negative control contradicted the brief, and the correction is the point:** `github-dark.svg` and
+      `github-light.svg` carry **identical path data**, so comparing the rendered `d` against the file on disk
+      pins *which glyph* sits where (it catches the old blue badge) but **cannot** catch a swapped pair. Verified,
+      not assumed: the swap fails the fill test and leaves the geometry test green. Colour placement is pinned by
+      the resolved fill alone, and the test says so rather than implying more than it checks.
+      A third control stripped `fill:#000` and the test failed on `''` — precisely the inheritance trap.
+      The Known-gaps row is **deleted**, not amended. **`173/173`** tests, both typechecks and lint clean.
+      **Both marks measured in a locally built AppImage**, by sampling the pixels the packaged app paints —
+      chip `#000000` on `#fffdf3` at **20.60:1** and button `#ffffff` on `#16a34a` at **3.30:1**. The chip's
+      surface is `bg-amber-50/60` over the white panel, not white, so **2.70:1** is the retired mark's real
+      figure there and **2.76:1** is its figure on white; both are now on record.
+      **Two imports where there was one shifted every line below them, and the brand checker pins line numbers.**
+      `brand/ABOUT.md` §6 listed `CreditsModal.tsx` 232, 233, 237, 238, 246, 250 and the checker reads
+      `content[line_no - 1]` literally, so the checker went red on a change lint, typecheck and CI all passed.
+      Fixed the way **BR-11** fixed the same trap before: the imports were split onto two lines and §6 plus the
+      checker's `INVENTORY` re-synced together to **233, 234, 238, 239, 247, 251**. `ABOUT.md` §10 and §7.1 now
+      record the rule, so the next reader knows an edit above line 233 means re-syncing §6 in the same pass.
+      **A harness fact worth keeping:** `window.electronAPI` is frozen by `contextBridge` and non-configurable,
+      so a renderer-side stub of the update check is impossible — `--host-resolver-rules` does not intercept it
+      either, because `checkUpdate` leaves the **main** process through Node's `https.get`, not Chromium's stack.
+      Seeing that button in a real build means making the main process believe there is a newer release.
+- [x] **BR-8g** `icons/svg/ko-fi.svg` (the old badge) was imported by nothing. **Archived 2026-10-13**, on the owner's
+      decision: moved to `icons/archive/ko-fi-badge.svg`. `icons/archive/` is gitignored, so the file leaves the
+      repository and stays on disk. **Joined by three orphans nobody had noticed** — `kofi-dark.svg` (the mis-named
+      black twin of `kofi-light.svg`), `x-light.svg` and `linkedin-light.svg` (the white marks, with no dark mode in
+      the app to sit on). `icons/svg/github.svg` went the same way, to `icons/archive/github-badge-2ba1fd.svg`,
+      named for the `#2ba1fd` it carried. **Every file now in `icons/svg/` has exactly one importer**, verified by
+      counting them, which turns "is this asset dead?" from a question buried in a design document into something
+      `ls` answers. Restorable with `git checkout HEAD -- icons/svg/<name>` if a dark mode ever needs them.
 - [x] **BR-9** Contrast measured for all six new text/surface pairs; tightest is the MIT link at **4.62:1** on
       `indigo-50`, identical to the GitHub link beside it. Recorded in `DESIGN.md`.
 - [x] **BR-10** `DESIGN.md` updated — the two new brand marks registered, the About card's tinted surface measured,
@@ -296,13 +321,32 @@ Requested as "make the About screen follow the brand rules". Authority: `~/Herme
       `ABOUT.md` §10 stay open — outside this agent's scope.
 
 ## Progress
+- **Current focus (2026-10-13) — BR-18 closed: the GitHub mark ships the variant that matches its surface.** Both 1.4.11
+  failures are gone — chip **2.70:1 → 20.60:1** on its real `#fffdf3` surface, update button **1.20:1 → 3.30:1** —
+  measured by sampling pixels in a locally built AppImage, and the Known-gaps row is deleted rather than amended,
+  because that table is specified as live gaps only. `github.svg` is orphaned and **archived** (BR-8g). `173/173` tests (was 171), green under `CI=true`, both typechecks and lint clean, brand
+  checker exits 0.
+  **The negative control contradicted the plan, and that is the lesson of the session.** The brief required asserting the
+  rendered path `d` against the asset on disk *because* that pins which mark is where. It does not: the two variants carry
+  **identical path data** and differ only in the baked fill, so a swapped pair leaves every `d` assertion green — confirmed
+  by running the swap, which failed the fill test and passed the geometry one. Geometry still earns its place (it catches
+  a return to the old blue badge), but colour placement is pinned by the resolved fill alone. The test now states that
+  limitation in a comment instead of implying more than it checks. **A control that contradicts the brief is worth more
+  than one that confirms it — this is the first time that sentence has applied to a test's own design.**
+  **The brand checker caught its fourth class of trap: it pins line numbers.** `brand/ABOUT.md` §6 fixes the ETH and SOL
+  address lines in `CreditsModal.tsx`, so a second import shifts all six and the gate goes red while lint, typecheck and
+  CI stay green. Re-synced the way BR-11 did — two proper import lines, §6 and the checker's `INVENTORY` both moved to
+  233, 234, 238, 239, 247, 251, and `ABOUT.md` §10 and §7.1 now record the rule.
+  **The untracked-asset trap bit again, and it is why the two new SVGs are committed with the change.** They existed
+  on disk and the local build was green, while a fresh `actions/checkout` would not have had them at all — a release
+  cut would have failed on an unresolved import with nothing locally to warn of it.
 - **Current focus (2026-10-12) — the Credits/About screen aligned with the Bandua Studio brand rules, and the alignment was only real because it was measured in the packaged AppImage.** Four of the eight elements `brand/ABOUT.md` §3.1 requires were missing (app name, version, licence, studio identity), plus Patreon. All closed — see **BR-1…BR-14** above, plus the layout rework in **BR-8b/BR-8e/BR-8f** and the studio profiles in **BR-15…BR-19**. `171/171` tests (was 152), green under `CI=true`, both typechecks and lint clean.
   **The rule that governs all of it: an app's palette is the app's own.** The studio contributes the mark, the line and the links — never a colour. Now `ABOUT.md` §3.7 and an enforced check, because it is also the only defensible reading of `BRAND.md` §5: Moss fails 4.5:1 on Mist and Teal on Deep fails even 3:1, and those numbers only hold on a 4-swatch brandboard.
   **Fourth time the same lesson: a green suite is not evidence — and this time the suite was what hid a regression I introduced.** All 26 `CreditsModal` tests passed while the support row overflowed its panel (455 vs 433). Found by driving the real AppImage with Playwright on `DISPLAY=:0`, fixed with `flex-wrap`.
   **A naive implementation of the version change was wrong and the suite caught it:** a second `useEffect` calls `getAppVersion` twice, and the existing `toHaveBeenCalledTimes(1)` failed immediately. The fix is one effect with `Promise.allSettled`, so neither request can cancel the other. One existing assertion changed on purpose — it asserted `getAppVersion` was *not* called when the update check rejects, which was true only because the two calls were sequential.
   **Two traps:** the simple-icons Patreon SVG carries `role="img"` + `<title>`, which next to the link text makes the accessible name "Patreon Patreon"; and `settle()` in the test file was one microtask deep, which stopped being enough once `allSettled` added a tick — one full-suite run failed right after a bulk file restore, was not reproducible in 13 subsequent full runs, and rather than dismiss it the timing assumption was removed.
   **A mistake of mine:** `git checkout scripts/check-about-references.py`, to undo a temporary mutation, discarded the session's work on that file. **Undo a mutation with a file copy, never with `git checkout` on a file you have been editing.**
-  **Still open:** P2.21 (save spinner) · C6-N16 (Ctrl+S) · P3.27 (`|| 'fallback'`) · P3.32 (`lang="en"` with a pt-PT UI, WCAG 3.1.1) · `DESIGN.md` known gaps: `danger.svg`'s invisible `#131112`, the GitHub mark at 1.20:1 on `green-600`, `::placeholder` at 2.54:1, and `CreditsModal` still never focusing on mount. Housekeeping: the repo's **private vulnerability reporting needs confirming** (`gh api` timed out again this session) — if disabled, SECURITY.md's advisory link dead-ends, though the file documents a fallback.
+  **Still open:** P2.21 (save spinner) · C6-N16 (Ctrl+S) · P3.27 (`|| 'fallback'`) · P3.32 (`lang="en"` with a pt-PT UI, WCAG 3.1.1) · `DESIGN.md` known gaps: `danger.svg`'s invisible `#131112`, `::placeholder` at 2.54:1, and `CreditsModal` still never focusing on mount — **the GitHub mark at 1.20:1 on `green-600` is closed since 2026-10-13 (BR-18)**. Housekeeping: the repo's **private vulnerability reporting needs confirming** (`gh api` timed out again this session) — if disabled, SECURITY.md's advisory link dead-ends, though the file documents a fallback.
 
 - **Done**: All 23 audit-2026-08-30 findings fixed, full drawer flow (+ import UI), security hardening, store extraction. **v0.1.9.1-alpha** (2026-09-08): preload fix + CI artifact fix — preload runtime fix (inlined CHANNELS constants to fix `module not found: ../../shared/channels.js`), CI workflow artifact name fix (include version in artifact name `clavis-${os}-${tag}`). **v0.1.8-alpha** (2026-09-07): Phase 2 P0 a11y + ErrorBoundary fix — 3 P0 a11y blockers (focus indicator, drawer rows as buttons, credits modal focus trap) + 10 P1 quick wins + **Preload runtime fix** (inlined CHANNELS constants to fix `module not found: ../../shared/channels.js`). **ErrorBoundary.restartApp** end-to-end. **v0.1.7-alpha** (2026-09-07): IPC-layer hardening — B2 symlink rejection + strip `details: e`, B3 decrypt size cap 10 MB, B5 `CHANNELS` const (kills drift risk), doc sweep. **v0.1.6-alpha** (2026-09-04): P0 UX (toast system, focus traps, skeleton loaders, password visibility toggle, strength meter in CreateDrawerModal only). **v0.1.4-alpha** (2026-09-03): DeleteConfirmModal + `danger.svg`. **v0.1.3-alpha** (2026-09-03): first CI-built green run `33781273256`. **v0.1.2-alpha** baseline: import drawer button. **v0.1.1-alpha**: fixed `argon2` Win32 `PE32+` via `afterPack` + `scrypt` fallback, save/delete `Result` mismatch, Windows `confirm()` focus steal.
 - [x] **Tested**: Encryption round-trip, wrong-password rejection, drawer CRUD, path-traversal rejection, import drawer flow, HomeScreen rendering, all build targets, ASAR content, AppImage runtime, Windows `PE32+` verified, save/delete `Result` flow, Windows modal focus after delete, CI-built `v0.1.3-alpha` (AppImage Linux + ZIP Windows 11), CI-built `v0.1.4-alpha` (AppImage delete-confirm UI), **v0.1.7-alpha (54/54 tests)** — symlink rejection, decrypt size cap, CHANNELS const, all 8 IPC handlers, **v0.1.8-alpha (58/58 tests)** — a11y fixes, preload fix, ErrorBoundary restartApp, **duplicate-title warning (86/86 tests)** — `CreateDrawerModal.test.tsx` 7/7, mutation-checked (fails 4/7 when detection is stubbed), **visually confirmed by the user in the local AppImage `0.4.2-beta` (250M)**: creating a drawer named "Notas" and submitting that same name again shows the inline confirm step

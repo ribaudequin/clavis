@@ -148,6 +148,30 @@ why the light-background variant of the mark is the one to ship. In the packaged
 measures exactly **32.00 × 32.00 px** at `devicePixelRatio` 1.25, which is the `BRAND.md` §4.4
 minimum; `w-8 h-8` is asserted in the test suite so it cannot silently shrink.
 
+**The GitHub mark, and which variant sits on which surface**
+
+The mark is drawn twice in this modal, on surfaces that are far apart in luminance, so it ships as
+two files: `github-dark.svg` on the repository chip and `github-light.svg` on the update button.
+The `#2ba1fd` badge both replaced measured **2.76:1** on the chip and **1.20:1** on the button —
+both under the 3:1 that 1.4.11 requires of a graphic that carries meaning. The two files are the
+same outline and differ **only** in the baked fill, so the fill is the whole of the distinction:
+
+| Mark | Surface | Measured | Verdict |
+|---|---|---|---|
+| `github-dark.svg` (`#000`) | white `#ffffff` | **21.00** | Pass |
+| `github-dark.svg` (`#000`) | `amber-50/60` over the panel — `#fffdf3` | **20.60** | Pass — the chip's real surface, and the lower of the two ends |
+| `github-light.svg` (`#fff`) | `green-600` `#16a34a` | **3.30** | Pass — 0.30 of headroom over 3:1, and the tightest mark in the app |
+| `github-light.svg` (`#fff`) | `green-700` `#15803d`, the hover fill | 5.02 | Pass |
+| `github.svg` (`#2ba1fd`), retired | white | **2.76** | Fail — the mark these two replaced |
+| `github.svg` (`#2ba1fd`), retired | the chip's real `#fffdf3` surface | **2.70** | Fail |
+| `github.svg` (`#2ba1fd`), retired | `green-600` | **1.20** | Fail |
+
+Nothing else changed: the marks are rendered uncoloured, the classes stay `w-4 h-4` and `w-5 h-5`,
+and the chip and button keep the layout they had. Because the two files carry the same path data
+and differ only in the baked fill, the test suite asserts the geometry against the assets on disk
+**and** the resolved fill of each mark — a swapped pair is invisible to a path assertion alone, and
+jsdom has no layout and no colour of its own to fall back on.
+
 **The marked entries are not options.** They are listed so the reason they are absent from the
 codebase is on the record: `amber-500` and `yellow-600` were both live WCAG AA failures, measured
 at 2.15:1 and 2.94:1 against 14px white labels, and were raised to `-700` in commit `5ad6892`.
@@ -638,7 +662,8 @@ Icons come from three sources, and they do not behave the same way:
    and is therefore controllable. It is the app's single warm accent and stays one colour
    everywhere — see [The heart accent](#the-heart-accent) below for why it is a badge rather than
    a coloured glyph.
-3. **Brand marks** — `github.svg`, `eth.svg`, `sol.svg`, `patreon.svg`, `kofi-light.svg`, `bandua.svg`.
+3. **Brand marks** — `github-dark.svg`, `github-light.svg`, `eth.svg`, `sol.svg`, `patreon.svg`,
+   `kofi-light.svg`, `bandua.svg`.
    These carry baked `fill="#..."` presentation attributes and are rendered **uncoloured**, with no
    class. They must stay that way: recolouring the GitHub, ETH, SOL, Ko-fi or Patreon logos would
    destroy recognition.
@@ -648,7 +673,16 @@ Icons come from three sources, and they do not behave the same way:
    is the light-coloured mark for a dark background. It does **not** name the background. Two files
    were originally added the other way round, `kofi-dark.svg` holding white and `kofi-light.svg`
    holding black, which would have put an invisible white mark on any light surface the moment
-   someone reached for the name that sounded right.
+   someone reached for the name that sounded right. After the swap `kofi-dark.svg` was the black
+   mark and nothing imported it, so it now lives in `icons/archive/` — **a `-dark` file that no
+   surface needs is an archive entry, not an asset.**
+
+   The GitHub pair is the second application of that rule: `github-dark.svg` is the black mark on
+   the light repository chip, `github-light.svg` the white mark on the `green-600` update button —
+   measured under **The GitHub mark, and which variant sits on which surface**, above.
+   **Both bake their fill** — `#000` and `#fff` — rather than leaning on the SVG default, which is
+   what `github-dark.svg` did until this pass: an unbaked mark inherits from any ancestor `fill`
+   and is silently recoloured by a stylesheet nobody was looking at.
 
    `bandua.svg` is the **Pixel Arc**, the Bandua Studio mark. It is a byte-identical copy of
    `~/Hermes/Bandua Studio/brand/bandua-icon-dark.svg` and is covered by the same rule as the
@@ -660,18 +694,40 @@ Icons come from three sources, and they do not behave the same way:
    Deep or Moss. The mark carries those colours as an image; the app keeps its own blue and amber
    everywhere else.
 
-   **`patreon.svg` and `kofi-light.svg` deliberately have no `role` and no `<title>`.** The links
-   already spell *Patreon* and *Ko-fi* as text; an accessible name inside the icon as well makes
-   the link's name "Ko-fi Ko-fi", which breaks every `getByRole('link', { name: 'Ko-fi' })`
-   assertion. The upstream `simple-icons` sources ship both attributes, so this has to be stripped
-   on every import — verified by negative control.
+   **`patreon.svg`, `kofi-light.svg`, `github-dark.svg` and `github-light.svg` deliberately have no
+   `role` and no `<title>`.** The links already spell *Patreon*, *Ko-fi* and *GitHub* as text; an
+   accessible name inside the icon as well makes the link's name "Ko-fi Ko-fi", which breaks every
+   `getByRole('link', { name: 'Ko-fi' })` assertion. The upstream `simple-icons` sources ship both
+   attributes, so this has to be stripped on every import — verified by negative control.
 
-   > **Dead file, flagged not deleted.** `ko-fi.svg` — the old circular badge with the red-and-blue
+   > **Archived, not deleted.** `ko-fi.svg` — the old circular badge with the red-and-blue
    > cup — is no longer imported by anything. It is the reason the Ko-fi CTA was reworked: its blue
    > cup measured **2.66:1** against its own white disc and its red **3.03:1**, both at or under the
    > 3:1 that 1.4.11 requires of a graphic carrying meaning. The white glyph replaced it and the
-   > problem went with it. The file is kept only because deleting an asset is the owner's call, not
-   > because anything uses it.
+   > problem went with it. Moved to `icons/archive/ko-fi-badge.svg` on 2026-10-13 (the archive is
+   > gitignored, so the file leaves the repository but stays on disk).
+
+   > **Archived, not deleted.** `github.svg` — the `#2ba1fd` Octocat on a white disc — is no longer
+   > imported by anything. The repository chip and the update button take `github-dark.svg` and
+   > `github-light.svg` instead, because that blue measured **2.76:1** on the chip and **1.20:1** on
+   > the button, under the 3:1 that 1.4.11 requires. Moved to
+   > `icons/archive/github-badge-2ba1fd.svg`, named for the colour it carried.
+
+   > **`icons/svg/` now holds nothing that is not imported.** `kofi-dark.svg` (the mis-named twin of
+   > `kofi-light.svg`, black once the pair was swapped), `x-light.svg` and `linkedin-light.svg` were
+   > archived in the same pass — the two `-light` marks are the white variants, and with no dark mode
+   > in the app they had no surface. **A directory that only holds live assets is checkable**: every
+   > file in `icons/svg/` has exactly one importer, and an orphan is now a fact you can see in
+   > `ls` rather than a fact buried in a design document. `git checkout HEAD -- icons/svg/<name>`
+   > brings any of them back from history if a dark mode ever needs them.
+
+   > **Adding a line above the wallet addresses breaks the brand checker.** `brand/ABOUT.md` §6 pins
+   > the line numbers of the ETH and SOL addresses further down `CreditsModal.tsx`, and
+   > `scripts/check-about-references.py` reads `content[line_no - 1]` literally. Adding the second
+   > GitHub import moved all six, so §6 and the checker's `INVENTORY` were re-synced together to
+   > **233, 234, 238, 239, 247, 251**. Neither `lint` nor CI catches this, and neither does
+   > `prettier`. The checker's "no address on this line" is the alarm, and it is the *only* one —
+   > so re-sync §6 in the same pass as any edit above line 233 of the component.
 
 ### The heart accent
 
@@ -729,7 +785,6 @@ is fully conformant.
 | Gap | Measured | Status |
 |---|---|---|
 | `danger.svg` contains **two** `style="fill"` declarations — `#f32929` and `#131112` — and the near-black one is painted last | `#131112` on the `red-50` panel is **17.19:1**; the icon is effectively invisible | Undiagnosed. Whether `#131112` was meant to be a stroke or is an export artefact is unknown. Needs an asset decision. |
-| The GitHub mark on the `green-600` update button | **1.20:1** | Pre-existing. Fixing it needs a brand-asset or surface decision — the mark cannot be recoloured without ceasing to be the GitHub logo. |
 | `CreditsModal` never focuses anything on mount | ESC does not close it until the user clicks or tabs into the panel | Live. Add the mount `focus()` + `window.focus()` the other four have. |
 | No `prefers-reduced-motion` support | 0 occurrences in `src/` | The `animate-in`/`animate-pulse` transitions do not degrade for users who have asked for reduced motion. |
 | Residual i18n leaks in the strength meter | `CreateDrawerModal.tsx:52` and `:59` hardcode `'Too short (min 8 chars)'`, `'Weak'`, `'Fair'`, `'Good'`, `'Strong'`, `'Excellent'` in English, while every other string goes through `t()`. The colours on those same lines are tokenised; the labels are not. | Part of the "not everything is tokenised yet" set. |

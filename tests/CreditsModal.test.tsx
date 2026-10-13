@@ -2,6 +2,8 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor, act } from '@testing-library/react';
+import * as fs from 'fs';
+import * as path from 'path';
 
 vi.mock('../src/renderer/hooks/useFocusTrap', () => ({ useFocusTrap: () => {} }));
 vi.mock('../src/renderer/hooks/useModalKeyboard', () => ({ useModalKeyboard: () => {} }));
@@ -19,6 +21,9 @@ const APP_NAME = 'clavis';
 const ETH = '0x466f0c3ee495a3dc851fafa5c4720ab2fdcd4af4';
 const SOL = 'Hnw5z47sk1hS6FsnCLfgX8pZhDryQVnZpzWJjSSRV5Nf';
 const ORIGINAL_LANGUAGE = window.navigator.language;
+/** Every notation of the two fills the brand assets bake, `hex` and `rgb()` alike. */
+const WHITE_FILLS = ['#fff', '#ffffff', 'white', 'rgb(255, 255, 255)', 'rgb(255,255,255)'];
+const BLACK_FILLS = ['#000', '#000000', 'black', 'rgb(0, 0, 0)', 'rgb(0,0,0)'];
 
 function setLanguage(lang: string): void {
   Object.defineProperty(window.navigator, 'language', { value: lang, configurable: true });
@@ -26,6 +31,30 @@ function setLanguage(lang: string): void {
 
 function queryUpdateLink(): HTMLAnchorElement | null {
   return document.querySelector<HTMLAnchorElement>(UPDATE_LINK_SELECTOR);
+}
+
+/** `REPO_URL` is linked twice — as prose in the About card and as a chip — so the chip is reached
+ *  through the row the ETH and SOL chips share. A plain href query would hit the prose link,
+ *  which carries no mark at all. */
+function queryRepoChip(): HTMLAnchorElement | null {
+  const row = document.querySelector('a[href*="etherscan"]')?.parentElement;
+  return row?.querySelector<HTMLAnchorElement>(`a[href="${REPO_URL}"]`) ?? null;
+}
+
+/** Reads the `d` of the one path in a brand asset on disk. Both GitHub variants ship as a bare
+ *  `<svg><path/></svg>`, and the string is taken from the file rather than pasted here so the
+ *  assertion compares the rendered glyph against the asset that ships. */
+function readIconPathData(file: string): string {
+  const match = fs.readFileSync(path.resolve(__dirname, '..', 'icons', 'svg', file), 'utf8').match(/<path[^>]*\sd="([^"]*)"/);
+  if (!match) throw new Error(`no <path d> in icons/svg/${file}`);
+  return match[1];
+}
+
+/** jsdom normalises the baked `#fff`/`#000` to `rgb(…)`, so a fill is compared by value and never
+ *  by the notation the asset happens to use. */
+function resolveFill(mark: Element | null): string {
+  const declared = (mark as SVGElement | null)?.style?.fill ?? '';
+  return (declared || mark?.getAttribute('fill') || '').trim().toLowerCase();
 }
 
 /** The app name sits in its own <span>, so it matches exactly and never twice. */
@@ -613,5 +642,45 @@ describe('CreditsModal — required About content', () => {
     // BRAND.md §4.4 — below 32px the 8px grid stops resolving. w-8 is 32px.
     expect(mark?.getAttribute('class')).toContain('w-8');
     expect(mark?.getAttribute('class')).toContain('h-8');
+  });
+});
+
+describe('CreditsModal — GitHub mark per surface', () => {
+  it('draws both surfaces with the single-path brand marks, not with the old blue badge', async () => {
+    installStub('v0.4.4-beta', '0.4.3-beta');
+    render(<CreditsModal isOpen onClose={() => {}} />);
+    const chipMark = queryRepoChip()?.querySelector('path') ?? null;
+    const updateMark = (await findUpdateLink()).querySelector('path');
+
+    expect(chipMark).toBeTruthy();
+    expect(chipMark?.getAttribute('d')).toBe(readIconPathData('github-dark.svg'));
+    expect(updateMark?.getAttribute('d')).toBe(readIconPathData('github-light.svg'));
+
+    // What this can and cannot catch, stated so nobody reads more into it: the two assets are the
+    // same outline and differ only in the baked fill, so `d` pins *which glyph* sits on each
+    // surface — it catches a return to the blue `github.svg` badge, 2.76:1 on the chip — and pins
+    // nothing about colour. Swapping dark for light is caught by the fill assertion below.
+  });
+
+  it('paints the chip mark black and the update-button mark white, the pairing that clears 3:1', async () => {
+    installStub('v0.4.4-beta', '0.4.3-beta');
+    render(<CreditsModal isOpen onClose={() => {}} />);
+    const chipMark = queryRepoChip()?.querySelector('path') ?? null;
+    const updateMark = (await findUpdateLink()).querySelector('path');
+    const chipFill = resolveFill(chipMark);
+    const updateFill = resolveFill(updateMark);
+
+    // Black on the chip's light surface is 21.00:1 and white on the button's `green-600` is
+    // 3.30:1. The two assets share one outline, so the fill is the only thing that says which
+    // surface got which — a swapped pair is invisible to a path assertion.
+    expect(BLACK_FILLS).toContain(chipFill);
+    expect(WHITE_FILLS).toContain(updateFill);
+    expect(chipFill).not.toBe(updateFill);
+
+    // Membership in a set, not merely "not the other colour": an asset that dropped its baked fill
+    // would pass a negative check while inheriting whatever an ancestor paints, which is exactly
+    // the trap the baked `#000` in github-dark.svg closes.
+    expect(chipFill).not.toBe('');
+    expect(updateFill).not.toBe('');
   });
 });

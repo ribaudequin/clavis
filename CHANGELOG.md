@@ -6,6 +6,40 @@
   folded into `v0.4.8-beta`: that one was already published, with six assets, while this was still being
   decided, and moving its tag would make the provenance of a downloaded artefact ambiguous.
 
+### The GitHub mark, chosen per surface — two 1.4.11 failures closed
+
+The mark shipped as one `#2ba1fd` file used in two places, and it failed WCAG 1.4.11 in both: **2.70:1**
+on the repository chip's `#fffdf3` surface, and **1.20:1** on the `green-600` update button. The blue
+is not even the GitHub brand colour, and neither failure was visible to the eye — which is why the
+second one survived from 2026-10-06 and the first was never recorded at all.
+
+The mark cannot be recoloured without ceasing to be the GitHub mark, so the fix is two files and one
+import each: `github-dark.svg` on the light chip and `github-light.svg` on the dark button. Both bake
+their fill — `#000` and `#fff` — rather than relying on the SVG default, which an ancestor `fill`
+would silently override. `github.svg` is now imported by nothing and has been **archived** to
+`icons/archive/github-badge-2ba1fd.svg` — `icons/archive/` is gitignored, so the file leaves the
+repository and stays on disk. `icons/svg/` now contains nothing without an importer.
+
+**Measured in a locally built AppImage**, by sampling the pixels the packaged app actually paints:
+
+| Mark | Surface | Before | After |
+|---|---|---|---|
+| Repository chip | `#fffdf3` (`bg-amber-50/60` over the white panel) | 2.70:1 | **20.60:1** |
+| Update button | `#16a34a` (`green-600`) | 1.20:1 | **3.30:1** |
+
+Two tests pin which mark sits on which surface. Because the two assets share one outline and differ
+only in the baked fill, a path-data assertion catches a return to the old blue badge but is blind to
+a swapped pair — the resolved fill is what asserts the pairing, and both are negative-controlled.
+`173/173` tests, green under `CI=true`, typecheck and lint clean.
+
+**Two things a future reader needs to know.** `brand/ABOUT.md` §6 pins the line numbers of the ETH
+and SOL addresses inside `CreditsModal.tsx`, and the brand checker reads them literally, so the second
+import moved all six and §6 was re-synced to 233, 234, 238, 239, 247, 251 — lint, typecheck and CI
+would all have passed while the checker went red. And `window.electronAPI` is frozen by `contextBridge`
+and non-configurable, so a test harness cannot stub the update check from the renderer at all: the
+only way to see that button in a real build is to make the main process believe there is a newer
+release.
+
 ## v0.4.8-beta (2026-10-12)
 
 ### About / Credits screen — brought into line with the Bandua Studio brand rules
@@ -64,10 +98,10 @@ spread so both rows share the same edges. No unit test could have caught this; j
 
 ### Known, deliberately not fixed here
 
-The GitHub mark ships in `#2ba1fd`, a blue that is not the GitHub brand colour, and fails 1.4.11 in
-two places: **2.76:1** on the white chip row — a failure that was not recorded anywhere before — and
-**1.20:1** on the update button's `green-600` fill. Correct variants measure 21.00:1 and 3.30:1
-respectively, are already in `icons/svg/`, and are staged for a follow-up release.
+The GitHub mark shipped in `#2ba1fd`, a blue that is not the GitHub brand colour, and failed 1.4.11
+in two places: **2.76:1** on the white chip row — a failure that was not recorded anywhere before —
+and **1.20:1** on the update button's `green-600` fill. Correct variants were already in
+`icons/svg/` and were staged for a follow-up release. **Fixed under `Unreleased`.**
 
 ### Verification
 

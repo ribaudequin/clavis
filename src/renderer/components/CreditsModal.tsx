@@ -6,7 +6,8 @@ import { toast } from 'react-hot-toast';
 import HeartIcon from '../../../icons/svg/heart.svg?react';
 import KoFiIcon from '../../../icons/svg/kofi-light.svg?react';
 import PatreonIcon from '../../../icons/svg/patreon.svg?react';
-import GithubIcon from '../../../icons/svg/github.svg?react';
+import GithubDarkIcon from '../../../icons/svg/github-dark.svg?react';
+import GithubLightIcon from '../../../icons/svg/github-light.svg?react';
 import EthIcon from '../../../icons/svg/eth.svg?react';
 import SolIcon from '../../../icons/svg/sol.svg?react';
 import ClavisIcon from '../../../icons/svg/clavis.svg?react';
@@ -240,7 +241,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
               </ul>
               <div className="flex flex-wrap justify-between gap-2 mt-3">
                 <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                  <GithubIcon className="w-4 h-4" />
+                  <GithubDarkIcon className="w-4 h-4" />
                   GitHub
                 </a>
                 <a href="https://etherscan.io/address/0x466f0c3ee495a3dc851fafa5c4720ab2fdcd4af4" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
@@ -254,7 +255,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
               </div>
               {newVersion ? (
                 <a href={`${REPO_URL}/releases/latest`} target="_blank" rel="noopener noreferrer" className="w-full mt-3 inline-flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-green-600/20 transition-all">
-                  <GithubIcon className="w-5 h-5" />
+                  <GithubLightIcon className="w-5 h-5" />
                   {t('msg.update_available', { version: newVersion })}
                 </a>
               ) : null}
