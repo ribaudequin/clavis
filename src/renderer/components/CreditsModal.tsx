@@ -63,6 +63,7 @@ function CopyButton({ text }: { text: string }): React.JSX.Element {
 
 function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element | null {
   const modalRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   const [newVersion, setNewVersion] = useState<string | null>(null);
   const [appVersion, setAppVersion] = useState<string | null>(null);
 
@@ -87,6 +88,12 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
 
   useFocusTrap(modalRef, { isActive: isOpen });
   useModalKeyboard(modalRef, { onEscape: onClose });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    closeRef.current?.focus();
+    window.focus();
+  }, [isOpen]);
 
   function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>): void {
     if (e.target === e.currentTarget) {
@@ -118,6 +125,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
             </h2>
           </div>
           <button
+            ref={closeRef}
             onClick={onClose}
             className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             aria-label={t('btn.close')}
