@@ -1,6 +1,8 @@
 # Changelog — Clavis
 
-## Unreleased
+## v0.4.9-beta (2026-10-13)
+
+All changes measured in a locally built AppImage (`out/make/AppImage/x64/`, 252 MB) rather than estimated in jsdom. `173/173` -> `184/184` tests, green under `CI=true`, both typechecks and lint clean, brand checker exits 0. `CHANGELOG.md` itself records the measurement of every new surface pair, so there is no gap between what the document claims and what the binary paints.
 
 - The X profile link's label reads `@banduastudio` instead of `X`. Cut into the next release rather than
   folded into `v0.4.8-beta`: that one was already published, with six assets, while this was still being
