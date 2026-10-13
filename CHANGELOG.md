@@ -5,6 +5,13 @@
 - The X profile link's label reads `@banduastudio` instead of `X`. Cut into the next release rather than
   folded into `v0.4.8-beta`: that one was already published, with six assets, while this was still being
   decided, and moving its tag would make the provenance of a downloaded artefact ambiguous.
+- The page language is measured in a locally built AppImage under three system locales:
+  `pt-PT` → `lang="pt-PT"`, `pt-BR` → `lang="pt-PT"` (the single-lusophone-locale rule, ADR-009),
+  `en-GB` → `lang="en"` — each with the UI rendering in the matching language. Note for the next
+  reader: `LANG=`/`LC_ALL=` and Electron's `--lang` do **not** move `navigator.language` in this
+  build, so the non-pt cases need the value stubbed before the app boots.
+- `<html lang>` is set from the locale the app actually renders instead of the hardcoded `en` that
+  shipped since the beginning — WCAG 3.1.1 Language of Page (AA). `DESIGN.md` records the rule.
 
 ### The GitHub mark, chosen per surface — two 1.4.11 failures closed
 
@@ -39,6 +46,30 @@ would all have passed while the checker went red. And `window.electronAPI` is fr
 and non-configurable, so a test harness cannot stub the update check from the renderer at all: the
 only way to see that button in a real build is to make the main process believe there is a newer
 release.
+
+### The page language now follows the locale the app renders (WCAG 3.1.1)
+
+`index.html` shipped `<html lang="en">` as a literal while every string rendered in Portuguese for
+any `pt*` system locale, so a screen reader pronounced the whole application with an English voice
+on every screen. It was measured on the **published** `v0.4.5-beta` AppImage
+(`document.documentElement.lang === "en"` under a `pt-PT` locale) and survived because nothing
+asserted the attribute.
+
+`detectLocale()` was already the single locale decision; it is now also the single writer of the
+attribute. The mapping moved into a pure exported `resolveLocale(navigatorLanguage)` — same
+behaviour, `pt-BR` still cannot return — and a new `applyDocumentLanguage()` writes its result to
+`document.documentElement.lang`. The `process.env.CI` short-circuit stays in the runtime resolver so
+the pure function answers the same question in a test as in the app. It is called **once**, from
+`src/renderer/index.tsx` immediately before `createRoot(...).render(...)`.
+
+`lang="en"` stays in the markup as the **pre-JavaScript default**, which is the correct value for
+the English locale; a rule in `DESIGN.md` says so, so the next reader
+does not "fix" it back into a constant.
+
+`tests/i18n.test.ts` grows from 14 to 24 tests. The assertion that closes the bug is on the
+attribute, not on the mapping function — a test of the mapping alone passes while the page stays
+wrong. One test imports the renderer entry, so **removing the startup call fails the suite** rather
+than passing quietly. `183/183` tests, green under `CI=true`.
 
 ## v0.4.8-beta (2026-10-12)
 

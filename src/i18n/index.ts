@@ -173,12 +173,21 @@ export const translations: Record<string, TranslationDict> = {
   },
 };
 
-function detectLocale(): string {
-  if (process.env.CI) return 'en';
-  const lang = navigator.language || 'en';
-  const primarySubtag = lang.trim().replace(/_/g, '-').split('-')[0].toLowerCase();
+export type Locale = keyof typeof translations;
+
+export function resolveLocale(navigatorLanguage: string): Locale {
+  const primarySubtag = navigatorLanguage.trim().replace(/_/g, '-').split('-')[0].toLowerCase();
   if (primarySubtag === 'pt') return 'pt-PT';
   return 'en';
+}
+
+function detectLocale(): Locale {
+  if (process.env.CI) return 'en';
+  return resolveLocale(navigator.language || 'en');
+}
+
+export function applyDocumentLanguage(): void {
+  document.documentElement.lang = detectLocale();
 }
 
 export function t(key: string, params?: Record<string, string>): string {

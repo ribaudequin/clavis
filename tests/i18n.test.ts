@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { translations, t } from '../src/i18n';
+import { translations, t, resolveLocale, applyDocumentLanguage } from '../src/i18n';
 
 const LOCALES = ['pt-PT', 'en'] as const;
 const PARAMS = { version: 'v9.9.9-beta' };
@@ -25,7 +25,13 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.doUnmock('../src/i18n');
+  vi.doUnmock('react-dom/client');
+  vi.doUnmock('../src/renderer/pages/HomeScreen');
+  vi.doUnmock('../src/renderer/components/ErrorBoundary');
+  vi.doUnmock('../src/renderer/components/ToastProvider');
   setLanguage(ORIGINAL_LANGUAGE);
+  document.documentElement.removeAttribute('lang');
 });
 
 describe('i18n dictionaries', () => {
@@ -128,5 +134,130 @@ describe('locale routing', () => {
       setLanguage(lang);
       expect({ lang, value: t(PROBE_KEY) }).toEqual({ lang, value: translations['en'][PROBE_KEY] });
     }
+  });
+});
+
+// WCAG 3.1.1 Language of Page. Measured on a published binary, not theorised:
+// the v0.4.5-beta AppImage read `document.documentElement.lang === 'en'` with
+// the whole UI in European Portuguese, so a screen reader pronounced every
+// string on every screen with an English voice.
+//
+// Everything below asserts against the *attribute on the document*, not only
+// against the mapping function. A test of the mapping alone passes while the
+// page stays wrong, which is exactly what happened for eight days.
+describe('document language (WCAG 3.1.1)', () => {
+  it('maps a system language tag onto the locale the app renders', () => {
+    expect(resolveLocale('pt-PT')).toBe('pt-PT');
+    expect(resolveLocale('pt-BR')).toBe('pt-PT');
+    expect(resolveLocale('pt')).toBe('pt-PT');
+    expect(resolveLocale('en-US')).toBe('en');
+    expect(resolveLocale('en')).toBe('en');
+  });
+
+  it('maps an empty or malformed tag to English rather than to nothing', () => {
+    for (const lang of ['', '   ', '-', '!!!', 'not-a-locale', 'p', 'ptt-PT']) {
+      expect({ lang, locale: resolveLocale(lang) }).toEqual({ lang, locale: 'en' });
+    }
+  });
+
+  it('can only return a locale the dictionary actually has', () => {
+    for (const lang of ['pt-PT', 'pt-BR', 'pt', 'pt_AO', 'en-US', 'en', 'fr-FR', '', '!!!']) {
+      expect(Object.keys(translations)).toContain(resolveLocale(lang));
+    }
+  });
+
+  it('carries no CI short-circuit of its own, so it cannot answer differently under test', () => {
+    vi.stubEnv('CI', 'true');
+    expect(resolveLocale('pt-PT')).toBe('pt-PT');
+    expect(resolveLocale('en-US')).toBe('en');
+  });
+
+  it('writes the locale onto <html lang> for a Portuguese system language', () => {
+    setLanguage('pt-PT');
+    applyDocumentLanguage();
+    expect(document.documentElement.getAttribute('lang')).toBe('pt-PT');
+    expect(document.documentElement.lang).toBe('pt-PT');
+  });
+
+  it('writes <html lang="en"> for an English system language', () => {
+    setLanguage('en-US');
+    applyDocumentLanguage();
+    expect(document.documentElement.getAttribute('lang')).toBe('en');
+    expect(document.documentElement.lang).toBe('en');
+  });
+
+  it('leaves the attribute agreeing with what t() actually renders, for every tag it routes', () => {
+    const PROBE = 'label.credits_title';
+    for (const lang of ['pt-PT', 'pt-BR', 'pt', 'pt_AO', 'en-US', 'fr-FR', '!!!']) {
+      setLanguage(lang);
+      applyDocumentLanguage();
+      // Derived from what t() produced, not from the tag — so this fails if the
+      // attribute and the rendered copy ever come from different decisions.
+      const expected = t(PROBE) === translations['pt-PT'][PROBE] ? 'pt-PT' : 'en';
+      expect({ lang, attribute: document.documentElement.lang, expected }).toEqual({
+        lang,
+        attribute: expected,
+        expected,
+      });
+    }
+  });
+
+  // Requirement: the call must be wired into startup, not merely exported.
+  // Importing the renderer entry is the only honest way to prove that, so React
+  // is mocked out — what runs here is the module body, not a rendered tree.
+  // The render hook is a parameter because a second `vi.doMock` on the same path
+  // does not replace the first one, and that silently produced an `order` with no
+  // 'render' in it on the first attempt.
+  function mockRendererDependencies(onRender?: () => void): void {
+    vi.doMock('../src/renderer/pages/HomeScreen', () => ({ default: () => null }));
+    vi.doMock('../src/renderer/components/ErrorBoundary', () => ({ default: () => null }));
+    vi.doMock('../src/renderer/components/ToastProvider', () => ({ default: () => null }));
+    vi.doMock('react-dom/client', () => ({
+      createRoot: () => ({
+        render: () => {
+          onRender?.();
+        },
+      }),
+    }));
+  }
+
+  it('is applied by the renderer entry when the app boots under a Portuguese locale', async () => {
+    mockRendererDependencies();
+    setLanguage('pt-PT');
+    vi.resetModules();
+    await import('../src/renderer/index');
+    expect(document.documentElement.getAttribute('lang')).toBe('pt-PT');
+  });
+
+  it('is applied by the renderer entry when the app boots under an English locale', async () => {
+    mockRendererDependencies();
+    setLanguage('en-US');
+    vi.resetModules();
+    await import('../src/renderer/index');
+    expect(document.documentElement.getAttribute('lang')).toBe('en');
+  });
+
+  it('runs before the first render, so nothing is ever mounted under the wrong language', async () => {
+    const order: string[] = [];
+    mockRendererDependencies(() => {
+      order.push('render');
+    });
+    vi.doMock('../src/i18n', async (importActual) => {
+      const actual = await importActual<typeof import('../src/i18n')>();
+      return {
+        ...actual,
+        applyDocumentLanguage: () => {
+          order.push('applyDocumentLanguage');
+          actual.applyDocumentLanguage();
+        },
+      };
+    });
+    setLanguage('pt-PT');
+    vi.resetModules();
+    await import('../src/renderer/index');
+    expect({ order, attribute: document.documentElement.lang }).toEqual({
+      order: ['applyDocumentLanguage', 'render'],
+      attribute: 'pt-PT',
+    });
   });
 });

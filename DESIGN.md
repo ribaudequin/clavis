@@ -35,6 +35,9 @@ The short version. These are the constraints that the existing code satisfies; f
 8. **ESC always goes to the cancel/close path.** Never to the destructive or committing action.
 9. **Modal focus goes where a stray Enter lands safely** — the cancel button, or the action the
    dialog is recommending. Never the one that destroys something.
+10. **The page language is the locale the app actually renders, never a constant.**
+    `document.documentElement.lang` is set by `applyDocumentLanguage()`, from the same
+    `detectLocale()` that `t()` uses. Never hardcode `lang`, in the markup or in code.
 
 ---
 
@@ -774,6 +777,47 @@ So there are exactly two valid states:
 
 If you add an icon and the colour class appears to do nothing, open the SVG and look for `fill`
 before assuming the class is wrong.
+
+---
+
+## The page language
+
+**The page language is the locale the app actually renders, not a constant.**
+
+The app has **two** locales and no in-app selector (P3.28 was cancelled; `ADR-009`): the system
+language decides. `src/i18n/index.ts` resolves it once, in `detectLocale()`, from the BCP-47
+primary subtag — any lusophone tag renders `pt-PT`, everything else `en`. `t()` calls that
+resolver; `applyDocumentLanguage()` calls the same resolver and writes the result to
+`document.documentElement.lang`. One decision, two consumers.
+
+This is WCAG **3.1.1 Language of Page (AA)**, and it was a live failure: `index.html` shipped
+`<html lang="en">` as a literal while every string rendered in Portuguese, so a screen reader
+pronounced the entire application with an English voice. It was found by measuring a **published**
+AppImage — `document.documentElement.lang === "en"` under a `pt-PT` locale — and not by any test,
+because there was no assertion on the attribute. `tests/i18n.test.ts` now asserts the attribute
+itself, and one of its tests imports the renderer entry so that **removing the startup call fails
+the suite**: a test of the mapping function alone passes while the page stays wrong.
+
+**`lang="en"` in `index.html` is the pre-JavaScript default, and it is correct there.** It is what
+the document declares before any script runs; English is the right value for the English locale,
+and the attribute is corrected the moment the app boots. Do not "fix" it into another constant,
+and do not delete it — a document with no `lang` fails 3.1.1 for a different reason. This section
+is where that rule lives, because the source carries no comments by convention: `index.html` is
+exactly the file a reader is most likely to touch, and it says nothing to warn them.
+
+**Where the attribute is set, and why there.** `applyDocumentLanguage()` is called from
+`src/renderer/index.tsx`, the entry that calls `createRoot`, immediately before the render — not in
+a component (it is not a component's business, and it would not survive the first route change to
+somewhere that forgot) and not in `index.html` (which cannot know the locale). That script is
+`type="module"`, so it runs after the document is parsed and before React mounts; by then the body
+holds only an empty `<div id="root">`, so no text is ever painted under the wrong language. A test
+pins the order: `['applyDocumentLanguage', 'render']`.
+
+**Two things that look like exceptions and are not.** The CI short-circuit
+(`if (process.env.CI) return 'en'`) lives in `detectLocale()` and not in the pure
+`resolveLocale(tag)`, so the mapping can be tested without an environment stub changing its answer.
+And `src/main/ipc-handlers.ts` keeps its own `getLocale()` reading `LANG`/`LC_ALL` for main-process
+**log text** — it is a second locale decision that can drift, and it is not what `lang` describes.
 
 ---
 
