@@ -129,4 +129,14 @@ describe('ViewDrawer', () => {
     expect(props.onBack).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
   });
+
+  it('calls handleSave when Ctrl+S is pressed on the main area', () => {
+    const onSave = vi.fn(okSave);
+    renderDrawer({ initialTitle: 'T', initialContent: 'C', onSave });
+    fireEvent.change(screen.getByDisplayValue('T'), { target: { value: 'Updated' } });
+    // Ctrl+S (metaKey covers Command on macOS)
+    fireEvent.keyDown(screen.getByRole('main'), { ctrlKey: true, metaKey: true, key: 's' });
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave).toHaveBeenCalledWith('1', 'pw', 'Updated', 'C');
+  });
 });

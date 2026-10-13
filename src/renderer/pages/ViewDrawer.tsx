@@ -90,11 +90,18 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
     void handleSave();
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      void handleSave();
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col" onKeyDown={handleKeyDown} tabIndex={0}>
       <header className="bg-white border-b px-6 py-4 flex items-center cursor-default">
         <button onClick={handleBack} className="text-blue-600 hover:text-blue-800 mr-4 text-sm">
-          ← {t('btn.back') || 'Back'}
+          ← {t('btn.back')}
         </button>
         <h1 className="text-xl font-semibold text-gray-800">Clavis</h1>
       </header>
@@ -110,13 +117,13 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
           placeholder={t('label.title')}
           className="w-full border border-input rounded px-3 py-2 text-sm mb-4 bg-white disabled:opacity-50"
         />
-        <label htmlFor="drawer-content-textarea" className="sr-only">{t('label.content') || 'Content'}</label>
+        <label htmlFor="drawer-content-textarea" className="sr-only">{t('label.content')}</label>
         <textarea
           id="drawer-content-textarea"
           value={content}
           onChange={(e) => setContent(e.target.value)}
           disabled={saving || deleting}
-          placeholder={t('label.content') || 'Content'}
+          placeholder={t('label.content')}
           className="flex-1 w-full border border-input rounded px-3 py-2 text-sm bg-white resize-none min-h-[300px] disabled:opacity-50"
         />
       </main>
@@ -132,9 +139,18 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
         <button
           onClick={handleSave}
           disabled={saving || deleting}
-          className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+          className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 inline-flex items-center gap-2 transition-colors"
         >
-          {saving ? t('msg.saving') : t('btn.save_and_back')}
+          {saving ? (
+            <>
+              <span className="inline-block animate-spin">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+              </span>
+              {t('msg.saving')}
+            </>
+          ) : (
+            t('btn.save_and_back')
+          )}
         </button>
       </footer>
 
