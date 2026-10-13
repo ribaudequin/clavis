@@ -22,6 +22,8 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [showSpinner, setShowSpinner] = useState(false);
+  const spinnerTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const isDirty = title !== initialTitle || content !== initialContent;
 
@@ -49,6 +51,7 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
       return;
     }
     setSaving(true);
+    spinnerTimeoutRef.current = setTimeout(() => setShowSpinner(true), 250);
     try {
       const result = await onSave(drawerId, password, title, content);
       if (!result.ok) {
@@ -59,7 +62,12 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
     } catch {
       toast.error(t('msg.error_save'));
     } finally {
+      if (spinnerTimeoutRef.current) {
+        clearTimeout(spinnerTimeoutRef.current);
+        spinnerTimeoutRef.current = null;
+      }
       setSaving(false);
+      setShowSpinner(false);
     }
   }
 
@@ -141,16 +149,14 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
           disabled={saving || deleting}
           className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 inline-flex items-center gap-2 transition-colors"
         >
-          {saving ? (
+          {saving && showSpinner ? (
             <>
               <span className="inline-block animate-spin">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
               </span>
               {t('msg.saving')}
             </>
-          ) : (
-            t('btn.save_and_back')
-          )}
+          ) : (saving ? t('msg.saving') : t('btn.save_and_back'))}
         </button>
       </footer>
 
