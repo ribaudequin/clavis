@@ -10,6 +10,7 @@
   `en-GB` → `lang="en"` — each with the UI rendering in the matching language. Note for the next
   reader: `LANG=`/`LC_ALL=` and Electron's `--lang` do **not** move `navigator.language` in this
   build, so the non-pt cases need the value stubbed before the app boots.
+- `::placeholder` fixed: `gray-400` (#9ca3af, 2.54:1) replaced by `text-gray-500` (#6b7280, 4.83:1) with `opacity: 1` in `src/renderer/index.css`. `DESIGN.md` records `gray-400` as banned for body text.
 - `<html lang>` is set from the locale the app actually renders instead of the hardcoded `en` that
   shipped since the beginning — WCAG 3.1.1 Language of Page (AA). `DESIGN.md` records the rule.
 

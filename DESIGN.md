@@ -192,7 +192,7 @@ actually drawn on:
 | `--border-input` (`#8a8a8a`) | `gray-50` `#f9fafb` | **3.30** | Pass |
 | `--border-input` (`#8a8a8a`) | `gray-100` `#f3f4f6` | **3.14** | Pass |
 | `border` / `--border-default` (`#e5e7eb`) | white | 1.24 | Fail — the old input edge |
-| `gray-400` (`#9ca3af`) | white | 2.54 | Fail |
+| `::placeholder` (`#9ca3af`, Tailwind preflight `gray-400`) | white | **2.54** | **Fixed 2026-10-13** — `text-gray-500` (`#6b7280`, **4.83:1**) replaces the preflight default, with `opacity: 1` so the browser does not dilute it further. `gray-400` (`#9ca3af`) is **banned** for any body text, including placeholder text; it only reaches 2.54:1. The only lighter permitted grey is `gray-500`. |
 | `gray-500` (`#6b7280`) | white | 4.83 | Pass, but visually heavy |
 | `yellow-700` (`#a16207`) | `yellow-50` `#fefce8` | **4.76** | Pass — the duplicate-title alert |
 | `yellow-600` (`#ca8a04`) | `yellow-50` | 2.84 | Fail — so the alert could not step up one |
@@ -828,7 +828,7 @@ is fully conformant.
 
 | Gap | Measured | Status |
 |---|---|---|
-| `danger.svg` contains **two** `style="fill"` declarations — `#f32929` and `#131112` — and the near-black one is painted last | `#131112` on the `red-50` panel is **17.19:1**; the icon is effectively invisible | Undiagnosed. Whether `#131112` was meant to be a stroke or is an export artefact is unknown. Needs an asset decision. |
+| `danger.svg` (now `#f32929` only) | `red-50` (`#fff1f2`) | **4.62:1** | **Fixed 2026-10-13.** The second `fill:#131112` — an invisible near-black path painted over the red shape — has been removed from the asset. It was an export artefact, not a designed stroke: `#131112` measures 17.19:1 on `red-50`, which is why the icon was invisible. The file now carries a single path with `fill:#f32929`, the same colour as the discard-and-leave button it accompanies (`red-700` / `red-300`). |
 | `CreditsModal` never focuses anything on mount | ESC does not close it until the user clicks or tabs into the panel | Live. Add the mount `focus()` + `window.focus()` the other four have. |
 | No `prefers-reduced-motion` support | 0 occurrences in `src/` | The `animate-in`/`animate-pulse` transitions do not degrade for users who have asked for reduced motion. |
 | Residual i18n leaks in the strength meter | `CreateDrawerModal.tsx:52` and `:59` hardcode `'Too short (min 8 chars)'`, `'Weak'`, `'Fair'`, `'Good'`, `'Strong'`, `'Excellent'` in English, while every other string goes through `t()`. The colours on those same lines are tokenised; the labels are not. | Part of the "not everything is tokenised yet" set. |

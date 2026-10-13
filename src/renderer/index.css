@@ -43,3 +43,11 @@ header {
   -webkit-app-region: no-drag;
   cursor: default;
 }
+
+/* Placeholder contrast: Tailwind preflight sets `::placeholder` to `gray-400`
+   (#9ca3af, 2.54:1 on white, failing 1.4.3). `gray-500` (#6b7280, 4.83:1)
+   is the lightest permitted grey. See DESIGN.md, "::placeholder" gap. */
+::placeholder {
+  color: #6b7280;
+  opacity: 1;
+}
