@@ -3,7 +3,7 @@ import { t } from '../../i18n';
 
 export function SkeletonCard(): React.JSX.Element {
   return (
-    <div className="animate-pulse flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm">
+    <div className="animate-pulse flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm" aria-hidden="true">
       <div className="w-8 h-8 bg-gray-200 rounded grid grid-cols-3 grid-rows-3 gap-0.5">
         {Array.from({ length: 9 }).map((_, i) => (
           <div key={i} className="w-2 h-2 bg-gray-300 rounded-sm" />
@@ -23,7 +23,7 @@ export function SkeletonCard(): React.JSX.Element {
 
 export function SkeletonLoaders({ count = 3 }: { count?: number }): React.JSX.Element {
   return (
-    <div className="space-y-2" role="status" aria-label={t('label.loading_drawers')}>
+    <div className="space-y-2" role="status" aria-label={t('label.loading_drawers')} aria-busy="true">
       {Array.from({ length: count }).map((_, i) => (
         <SkeletonCard key={i} />
       ))}
