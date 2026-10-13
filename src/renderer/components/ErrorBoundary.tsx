@@ -35,7 +35,12 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   render(): React.ReactNode {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div
+          className="min-h-screen bg-gray-50 flex items-center justify-center"
+          role="alert"
+          aria-live="assertive"
+          aria-label={t('label.error_title')}
+        >
           <div className="bg-white rounded-lg p-6 w-96 shadow-lg">
             <h1 className="text-xl font-semibold text-gray-800 mb-2">{t('label.error_title')}</h1>
             <p className="text-gray-600 text-sm mb-4">
