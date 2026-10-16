@@ -3,11 +3,7 @@
 A short, factual reference for Clavis's storage limits. Every number here is traceable to a
 constant in the source; the file-size figures were measured, not estimated.
 
-> ⚠️ **This document describes a known, unfixed defect.** The save path and the unlock path measure
-> the same content in **different units** (code points vs UTF-8 bytes), so content above ~10 MB of
-> UTF-8 can be saved and then never opened again. Every limit below is accurate *for ASCII*; for
-> anything else, read [What 10 MB means in practice](#what-10-mb-means-in-practice) before trusting
-> a number. Tracked as SAV-01…SAV-06 in `TODO.md`.
+> ⚠️ **Partially fixed (2026-10-16, commit `ff4efb7`).** The save path (`encrypt()` guard + `SaveDrawerSchema`) and the unlock path (`store.ts:271`) still measure different things — **code points** vs **UTF-8 bytes** — so non-ASCII text above ~10 MB of UTF-8 is refused at save (`SAV-03`) and reported correctly (`SAV-02`: `{ok:false,reason:'content_too_large'}` or `'too_large'`). Import (`SAV-01`) and all reads (`Block B`) now check `stat.size` / ciphertext length. The Zod `.max()` limit remains 10 M code points; the practical ceiling for accented Portuguese stays at ~9.1 M characters. See `TODO.md` SAV-01…SAV-06.
 
 ---
 
@@ -30,16 +26,13 @@ They are separate checks in separate places, and they do not all measure the sam
 
 | Limit | Value | Where | Measures |
 |---|---|---|---|
-| Content on save | `10_000_000` | `src/main/validation.ts:17` — `SaveDrawerSchema.content.max(10_000_000)` | **code points** of the string (Zod 4.5.4) |
-| Ciphertext on unlock | `10_000_000` | `src/main/store.ts:271`, in `unlockDrawer()` | **bytes** of decoded ciphertext |
-| Decrypted content | `10_000_000` | `src/main/encryption.ts:8` (`MAX_DECRYPTED_SIZE`), checked in `decrypt()` after the `Buffer.concat` | **bytes** of plaintext |
-| Imported `.clavis` file | `20_004_096` | `src/main/store.ts:402` (`MAX_IMPORT_FILE_SIZE`), checked in `importDrawerRaw()` | **characters of the JSON file** |
+| Content on save | `10_000_000` code points (`validation.ts`) | **code points** (Zod 4.5.4) — `encrypt()` now throws `ContentTooLargeError` (`SAV-03`) |
+| Ciphertext on unlock | `10_000_000` bytes (`store.ts`) | **bytes** — checked before `decrypt()` (`SAV-01`) |
+| Decrypted content | `10_000_000` bytes (`encryption.ts`) | **bytes** — `decrypt()` enforces it; unreachable through the app (`SAV-01`) |
+| Imported `.clavis` file | `20_004_096` chars (`store.ts`) | **characters of JSON** — derived (`MAX_DECRYPTED_SIZE * 2 + 4_096`) + `ABSOLUTE_IMPORT_CEILING` (`A4`) |
+| Import ciphertext | floor(`len/2`) > `MAX_DECRYPTED_SIZE` (`store.ts:593`) | **bytes** of decoded ciphertext (`SAV-01`) |
 
-**The save schema and the unlock guard count different things, and the gap between them is a bug.**
-The schema counts code points; the unlock guard counts UTF-8 bytes. A code point can be up to 4
-bytes, so content accepted on save can exceed the unlock ceiling by as much as 4×. Such a drawer is
-written to disk successfully and then **can never be opened**. This is tracked as SAV-01…SAV-06 in
-`TODO.md`; it is not fixed.
+**Fixed in code, not in the unit.** `unlockDrawer()` returns a typed `{ok:false,reason}` (`SAV-02`), `encrypt()` rejects oversized content (`SAV-03`), `importDrawerRaw()` rejects oversized ciphertext (`SAV-01`), and all read paths (`Block B`) use `stat.size` before allocating. The gap between code-point and byte counting remains by design — the fix is that an oversized drawer is refused clearly, not silently.
 
 > ⚠️ **Until that is fixed, "10 MB" below means two different numbers depending on which check you
 > are asking about.** For ASCII they coincide at 10 000 000. For anything else they do not.

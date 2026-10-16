@@ -327,7 +327,9 @@ Surfaced by researching what keeping the 20 MB import cap exposed. **Nothing her
 The owner decision on record: **keep 20 MB**. Two hostile reviews have run; the second killed every
 load-bearing claim in the first draft, and the corrections are recorded in the plan.
 
-- [ ] **SAV-01 — a drawer can be saved and then never opened again. THREE doors, two need no attacker.**
+- [x] **SAV-01 — a drawer can be saved and then never opened again. THREE doors, two need no attacker.**
+      Implementado em `ff4efb7` (0a): `isCiphertextOverCap()` + rejeição no import (`store.ts:593`).
+      Door 1 (save) fechado por `SAV-03` (`encrypt()` guard); Door 2 (import) fechado; Door 3 (migração) fechado (`migrateDrawersFrom` com `stat.size`).
       `unlockDrawer` refuses any drawer whose `encryptedData` decodes above `MAX_DECRYPTED_SIZE`
       (`store.ts:271-278`) and returns `null`, which `ipc-handlers.ts:167-180` reports as
       `DECRYPT_FAILED` → **"Incorrect password or drawer not found"**, *and increments the rate
@@ -353,13 +355,13 @@ load-bearing claim in the first draft, and the corrections are recorded in the p
         through the application and survives only via a direct unit test; (b) "cannot be backed up"
         is **false** for most of the range — at 10 000 004 bytes the file is 20 000 611 chars, under
         the cap, so export→delete→import **succeeds** and still yields an unopenable drawer.
-- [ ] **SAV-02 — root cause is `unlockDrawer`'s `null` contract, not a missing guard.** Six distinct
+- [x] **SAV-02 — `unlockDrawer` retorna `{ok,reason}` (`SAV-02`, `store.ts`).** Feito (`ff4efb7`).
       causes return `null` — invalid id (`:231`), read failure (`:238`), parse failure (`:239`), KDF
       out of bounds (`:255`), ciphertext over cap (`:278`), wrong password (`:281`) — and
       `ipc-handlers.ts:167-180` collapses all six into one message *and* one rate-limiter increment.
       A `{ ok: false, reason }` return fixes all six, is smaller than special-casing, and **rescues
       drawers already bricked in the wild** — which no guard can, because the bytes are on disk.
-- [ ] **SAV-03 — `encrypt()` byte guard + a legible error.** Mirror `decrypt()`'s guard into
+- [x] **SAV-03 — `encrypt()` byte guard + a legible error.** Mirror `decrypt()`'s guard into
       `encrypt()`. **Two traps:** (a) a throw there is swallowed by `saveDrawer`'s `boolean` contract
       (`store.ts:360`) and surfaces as *"Failed to save drawer (invalid ID or password)"* — the
       password again, and not loud; (b) **no existing `ErrorCode` can carry a legible message** —
@@ -370,11 +372,11 @@ load-bearing claim in the first draft, and the corrections are recorded in the p
       goes red until **both** dictionary entries exist.
       **`tests/encryption.test.ts:61-70` must be rewritten in the same commit** — it calls
       `encrypt()` with an oversized payload at `:65` and will throw once the guard exists.
-- [ ] **SAV-04 — reject oversized ciphertext at import (`store.ts:419`).** One line, closes door 2.
+- [x] **SAV-04 — reject oversized ciphertext at import (`store.ts:419`).** One line, closes door 2.
       `Math.floor(drawer.encryptedData.length / 2) > MAX_DECRYPTED_SIZE`. Sound because
       `Buffer.from(s,'hex').length <= Math.floor(s.length/2)` always holds (Node stops at the first
       invalid pair) and the floor is exact, not rounded. Verified against odd-length, non-hex and astral input.
-- [ ] **SAV-05 — read guards run after the allocation they exist to prevent.** `unlockDrawer` (`:238`),
+- [x] **SAV-05 — read guards run after the allocation they exist to prevent.** `unlockDrawer` (`:238`),
       `saveDrawer` (`:323`), `readDrawerRaw` (`:383`, and it crosses IPC into a renderer `Blob`),
       `importDrawerRaw` (read at `ipc-handlers.ts:396`, capped at `store.ts:407` — downstream),
       and **`listDrawers` (`:149-150`), which needs no user gesture**: it reads and parses every
@@ -389,7 +391,7 @@ load-bearing claim in the first draft, and the corrections are recorded in the p
       store module (`:14-23`), so nothing today observes read size. A call-shape assertion cannot fail
       on the real defect — make `fs.stat` resolve an over-cap size, make `readFile` **throw if called**,
       and assert the operation refused.
-- [ ] **SAV-06 — the import-cap coupling. Owner decision: keep 20 MB.** A4, recommended:
+- [x] **SAV-06 — the import-cap coupling. Owner decision: keep 20 MB.** A4, recommended:
       `MAX_IMPORT_FILE_SIZE = Math.min(MAX_DECRYPTED_SIZE * 2 + IMPORT_ENVELOPE_OVERHEAD, ABSOLUTE_IMPORT_CEILING)`
       with `ABSOLUTE_IMPORT_CEILING = 20_004_096`. Keeps the relationship correct **by construction**
       and pins the DoS bound so raising the text limit cannot move it. **No new test needed** — the

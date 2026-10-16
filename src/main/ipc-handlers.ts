@@ -264,12 +264,13 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     } catch (e) {
       if (e instanceof z.ZodError) {
         logger.warn('save-drawer validation failed', { issues: e.issues.length });
+        // Se o erro é devido ao limite de tamanho (.max), reporta como CONTENT_TOO_LARGE
+        const isTooBig = e.issues.some((iss: any) => iss.code === 'too_big' || (iss.message && iss.message.toLowerCase().includes('maximum')));
         return {
           ok: false,
           error: {
-            code: ErrorCode.VALIDATION_ERROR,
-            message: e.issues[0]?.message || 'Validation failed',
-            // details: undefined (ERR-01 fixed).issues,
+            code: isTooBig ? ErrorCode.CONTENT_TOO_LARGE : ErrorCode.VALIDATION_ERROR,
+            message: isTooBig ? 'Content exceeds the maximum size' : (e.issues[0]?.message || 'Validation failed'),
           },
         };
       }
