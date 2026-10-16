@@ -105,7 +105,7 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
     }
   }
 
-  const codePoints = new Intl.Segmenter('pt', { granularity: 'grapheme' }).segment(content || '').length;
+  const codePoints = Array.from(new Intl.Segmenter('pt', { granularity: 'grapheme' }).segment(content || '')).length;
   const bytes = new TextEncoder().encode(content || '').length;
   const MAX_CODE = 10_000_000;
   const MAX_BYTES = 10_000_000;
@@ -143,9 +143,9 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
           className="flex-1 w-full border border-input rounded px-3 py-2 text-sm bg-white resize-none min-h-[300px] disabled:opacity-50"
         />
         <div className="mt-2 flex items-center gap-3 text-xs text-gray-500">
-          <span className={atRisk ? 'text-amber-600 font-medium' : ''}>{t('label.tokens', { cp: codePoints, max: MAX_CODE })}</span>
+          <span className={atRisk ? 'text-amber-600 font-medium' : ''}>{t('label.tokens', { cp: String(codePoints), max: String(MAX_CODE) })}</span>
           <span>·</span>
-          <span className={atRisk ? 'text-amber-600 font-medium' : ''}>{t('label.bytes', { b: bytes, max: MAX_BYTES })}</span>
+          <span className={atRisk ? 'text-amber-600 font-medium' : ''}>{t('label.bytes', { b: String(bytes), max: String(MAX_BYTES) })}</span>
           <span>·</span>
           <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
             <div className={bytePct >= 1 ? 'bg-red-600' : bytePct >= 0.9 ? 'bg-amber-500' : 'bg-green-500'} style={{ width: `${Math.min(bytePct * 100, 100)}%`, height: '100%', borderRadius: 9999 }} />
