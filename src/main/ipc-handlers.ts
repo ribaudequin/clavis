@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { app } from 'electron';
 import type { Dialog } from 'electron';
+import type { ClientRequest } from 'http';
 import https from 'https';
 import { z } from 'zod';
 import {
@@ -34,6 +35,15 @@ export type IpcListener = (event: unknown, ...args: string[]) => unknown;
 
 const allowedImportPaths = new Map<string, string>();
 const importTimers: NodeJS.Timeout[] = [];
+
+// Without a deadline a stalled GitHub request leaves the check-update promise
+// unsettled forever: CreditsModal awaits it inside Promise.allSettled, so the
+// About card silently loses its version line for the rest of the session.
+const CHECK_UPDATE_TIMEOUT_MS = 5_000;
+
+// The release payload is third-party input, so tag_name is either a string or
+// absent — never coerced from whatever shape the wire delivers.
+const GitHubReleaseSchema = z.object({ tag_name: z.string().optional() });
 
 function getLocale(): string {
   const lang = process.env.LANG || process.env.LC_ALL || process.env.LC_MESSAGES || 'en';
@@ -458,18 +468,50 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 
   ipcMain.handle(CHANNELS.CHECK_UPDATE, async (): Promise<{ tag_name?: string } | null> => {
     return new Promise((resolve) => {
-      https.get('https://api.github.com/repos/ribaudequin/clavis/releases/latest', { headers: { 'User-Agent': 'Clavis' } }, (res) => {
-        let data = '';
-        res.on('data', (chunk) => (data += chunk));
-        res.on('end', () => {
-          try {
-            const json = JSON.parse(data);
-            resolve({ tag_name: json.tag_name || null });
-          } catch {
-            resolve(null);
+      let req: ClientRequest | null = null;
+      const settle = (value: { tag_name?: string } | null): void => {
+        clearTimeout(timer);
+        resolve(value);
+      };
+      const timer = setTimeout(() => {
+        req?.destroy();
+        logger.warn('check-update: request timed out', { timeoutMs: CHECK_UPDATE_TIMEOUT_MS });
+        settle(null);
+      }, CHECK_UPDATE_TIMEOUT_MS);
+
+      req = https.get(
+        'https://api.github.com/repos/ribaudequin/clavis/releases/latest',
+        { headers: { 'User-Agent': 'Clavis' } },
+        (res) => {
+          const status = res.statusCode ?? 0;
+          // A 403/5xx body parses into a payload with no tag, which the About card
+          // cannot tell apart from "up to date".
+          if (status < 200 || status >= 300) {
+            logger.warn('check-update: unexpected response status', { status });
+            settle(null);
+            return;
           }
-        });
-      }).on('error', () => resolve(null));
+          let data = '';
+          res.on('data', (chunk) => (data += chunk));
+          res.on('end', () => {
+            try {
+              const json: unknown = JSON.parse(data);
+              const parsed = GitHubReleaseSchema.safeParse(json);
+              if (!parsed.success) {
+                logger.warn('check-update: unexpected payload shape', { issues: parsed.error.issues.length });
+                settle(null);
+                return;
+              }
+              settle({ tag_name: parsed.data.tag_name });
+            } catch {
+              settle(null);
+            }
+          });
+          // A response stream can die or stall after the headers arrive, and the
+          // request-level handler below never sees it.
+          res.on('error', () => settle(null));
+        }
+      ).on('error', () => settle(null));
     });
   });
 

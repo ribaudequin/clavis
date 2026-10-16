@@ -2,8 +2,9 @@
 // Why these tests do not simply "press Enter and expect one submit": jsdom does not
 // implement implicit form submission, so Enter on the password input produces 0 submits
 // (keydown, keypress and keyup were all probed). Such a test would pass while the
-// duplicate-submit bug is still present, because it can only reach the hook's onEnter.
-// The invariant is therefore proved in four parts: (G1) no onEnter is registered,
+// duplicate-submit bug is still present. The hook has no onEnter branch, so the only way
+// that bug returns is PasswordModal passing an onEnter again — (G1) pins that it does not.
+// The invariant is therefore proved in five parts: (G1) no onEnter is registered,
 // (G2) Enter on a button does not submit, (G3) the native path submits exactly once
 // and Enter on the input submits nothing through the hook, (G4) the isLoading guard
 // blocks a concurrent second submit, (G5) an empty password never submits.

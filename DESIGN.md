@@ -38,6 +38,10 @@ The short version. These are the constraints that the existing code satisfies; f
 10. **The page language is the locale the app actually renders, never a constant.**
     `document.documentElement.lang` is set by `applyDocumentLanguage()`, from the same
     `detectLocale()` that `t()` uses. Never hardcode `lang`, in the markup or in code.
+11. **A crash screen takes focus too, and never on Restart.** `ErrorBoundary` moves focus to the
+    Error-details `<summary>`. A crash is exactly when someone reflexively hits Enter, and Enter on
+    Restart relaunches the app — rule 9, applied to a page that is not a modal. Restart is one Tab
+    away.
 
 ---
 
@@ -502,28 +506,50 @@ when there is an error — a dangling reference in the common case.
 
 **ESC goes to cancel.** In all five modals `onEscape` is the cancel or close handler.
 
-**Mount focus.** Both hooks bind on the container, so something must hold focus inside the modal
-for ESC to fire at all. Each modal therefore focuses something on mount:
+**Focus on open.** Both hooks bind on the container, so something must hold focus inside the modal
+for ESC to fire at all. Each modal therefore focuses something when it opens:
 
-| Modal | Focused on mount | `window.focus()`? |
+| Modal | Focused on open | `window.focus()`? |
 |---|---|---|
 | `DeleteConfirmModal` | **Cancel** — the safe action | yes |
 | `DiscardChangesModal` | **"Save and leave"** — the recommended action | yes |
 | `CreateDrawerModal` | The title input | yes |
 | `PasswordModal` | The password input | no |
-| `CreditsModal` | *nothing* | no |
+| `CreditsModal` | The close button | yes |
 
 The reasoning behind the two that are not simply "the first field": focus goes where a stray Enter
 should land **safely**, or where the dialog is **recommending**. `DeleteConfirmModal` focuses
 cancel, so a reflexive Enter dismisses rather than destroys. `DiscardChangesModal` focuses the
 save action, because that is what the dialog is telling you to do. **Never focus the destructive
-action on mount.**
+action on open.**
 
 `window.focus()` is called alongside the element focus so the Electron window takes keyboard
 focus; without it the first keypress can be swallowed by the OS.
 
-**`CreditsModal` has no mount focus at all.** Until the user clicks or tabs into the panel, ESC
-does nothing. This is a live gap — see below.
+**`CreditsModal` is where "on open" stops meaning the same thing as "on mount".** It is the one
+modal that takes `isOpen` as a prop, so its focus effect is keyed on that prop —
+`useEffect(() => { if (!isOpen) return; … }, [isOpen])` (`CreditsModal.tsx:92-96`) — and fires when
+`isOpen` goes from `false` to `true`. The other four are unmounted while closed, so their
+`useEffect(…, [])` runs at exactly the moment they open and the two ideas coincide. For
+`CreditsModal` they coincide only because `HomeScreen.tsx:346` renders it inside a conditional; the
+prop flip is the wider contract, and it is the one to copy for any modal that is mounted once and
+opened and closed by a prop. A mount effect would focus it on first render and never again.
+
+The `if (!isOpen) return` guard is load-bearing rather than defensive. Without it the effect runs on
+every render of a closed modal: a `window.focus()` that pulls the OS keyboard focus back to the app
+for nothing, which is the one case where focusing on open would be worse than not focusing at all.
+
+**The close button is the right target.** It is the same action ESC already performs, it destroys
+nothing, and the panel has no primary submit — so a reflexive Enter closes the dialog instead of
+committing anything. Rule 9 with nothing to recommend.
+
+**What guards it.** `tests/CreditsModal.test.tsx`, `describe('CreditsModal — focus on open')` — 4
+tests, with `useFocusTrap` and `useModalKeyboard` mocked, because the guarantee is the explicit
+`focus()` call and a focus call that only happens to be a hook side effect is not the rule stated
+here. The open case is driven through a real `rerender` from `isOpen={false}` to `isOpen` rather
+than a fresh mount, because that is the production path and the case a mount effect would miss; the
+third test asserts the negative, that a modal mounted closed calls neither focus and leaves focus
+exactly where the user left it.
 
 **The support CTA row holds two buttons, and the chip row below it holds three links.** Ko-fi is the
 left button, Patreon the right one, both `flex-1` at **172 px** with identical styling — the two
@@ -576,7 +602,7 @@ agree with the action the dialog recommends, not with the presence of a destruct
 
 **Escape is modal-keyboard behaviour, not focus-containment behaviour.** `useFocusTrap` keeps Tab
 inside the panel and restores focus when the modal unmounts. It should never have handled a key.
-`useModalKeyboard` is the sole owner of Escape and Enter, and it is the hook every modal passes
+`useModalKeyboard` is the sole owner of Escape, and it is the hook every modal passes
 `onEscape` to. `onEscape` is not in `useFocusTrap`'s options interface at all — the option, the
 latest-value ref that held it, and the effect that synced that ref are all gone.
 
@@ -616,10 +642,10 @@ trap is now avoided by not having the key in this hook at all, rather than by a 
 stable — but the consequence is identical, and the reason has not changed.
 
 The symptom is a **focus escape, not a crash**: the modal stays open and the listener re-attaches,
-so this never appears in an error report. Note that `useModalKeyboard` lists `onEscape` and
-`onEnter` as ordinary dependencies, which is correct there because it has no focus-restoring
-cleanup. The asymmetry is no longer a difference in technique; it is a difference in
-responsibility, and it is the intended one.
+so this never appears in an error report. Note that `useModalKeyboard` lists `onEscape` as an
+ordinary dependency, which is correct there because it has no focus-restoring cleanup. The
+asymmetry is no longer a difference in technique; it is a difference in responsibility,
+and it is the intended one.
 
 **What guards it.** `tests/escapeSingleInvocation.test.tsx` — 5 tests, **no hook mocked**, because
 the point is the real wiring — asserts the single-owner contract using **non-idempotent handlers**:
@@ -630,6 +656,44 @@ guards sit alongside it: `tests/DiscardChangesModal.test.tsx` asserts statically
 absent from the `useFocusTrap` options, and `tests/useFocusTrap.test.tsx` asserts that focus stays
 inside the dialog across a caller re-render while Escape still closes it. The suite went from 143
 to 148 tests with this fix; all five new ones fail if the double handling returns.
+
+### Error boundaries
+
+`ErrorBoundary` is **not a modal**, and nothing in the two sections above applies to it: no
+`useFocusTrap`, no `useModalKeyboard`, no `role="dialog"`, no `aria-modal`, no Escape. It is a
+full-page fallback — `role="alert"` with `aria-live="assertive"` — that replaces the tree the user
+was looking at. Unlike a modal it hands nothing back when it goes: `useFocusTrap` restores focus on
+unmount, and there is no equivalent here, which makes taking focus a requirement rather than a
+courtesy.
+
+**It has to take focus, because the swap takes it away.** Measured, not assumed: when the boundary
+replaces the tree, `document.activeElement` is `<body>`. The fallback's only button — Restart — is
+not where focus is, so a keyboard user is left tabbing blind into an unknown page.
+
+**Focus goes to the Error-details `<summary>`, not to Restart.** A crash screen is exactly when
+someone reflexively hits Enter, and Enter on Restart relaunches the app, discarding whatever was
+unsaved when it crashed. The `<summary>` is inert: it expands the stack trace and nothing else.
+Restart stays one Tab away, which turns a reflex into a decision. This is rule 9 again, on a page
+that is not a modal.
+
+**From `componentDidCatch`, not `componentDidUpdate`.** Measured against React 19.2.8 with a class
+boundary:
+
+| Throw site | Lifecycle observed |
+|---|---|
+| Initial mount | `componentDidMount` → `componentDidCatch` — **`componentDidUpdate` never fires** |
+| Later update | `componentDidUpdate` → `componentDidCatch` |
+
+`componentDidCatch` is the only one of the three that fires on both paths, and by the time it runs
+the ref is populated and the fallback is already in the DOM. `autoFocus` is not the alternative: it
+appears **zero** times in `src/` and `tests/`, and the house convention for taking focus is the
+explicit call.
+
+**What guards it.** `tests/ErrorBoundary.test.tsx`, `describe('ErrorBoundary — focus after the tree
+is replaced')` — one test, compared as a single object because separate assertions could each pass
+on an unrelated throw: `focusedTag` is `SUMMARY` and `focusOnRestart` is `false`. That last field is
+what keeps the target a decision rather than an accident — it fails the moment anyone moves focus
+onto the button. Remove the focus call and `focusedTag` reads `BODY`.
 
 ### Toasts
 
@@ -829,7 +893,7 @@ is fully conformant.
 | Gap | Measured | Status |
 |---|---|---|
 | `danger.svg` (now `#f32929` only) | `red-50` (`#fff1f2`) | **4.62:1** | **Fixed 2026-10-13.** The second `fill:#131112` — an invisible near-black path painted over the red shape — has been removed from the asset. It was an export artefact, not a designed stroke: `#131112` measures 17.19:1 on `red-50`, which is why the icon was invisible. The file now carries a single path with `fill:#f32929`, the same colour as the discard-and-leave button it accompanies (`red-700` / `red-300`). |
-| `CreditsModal` never focuses anything on mount | ESC does not close it until the user clicks or tabs into the panel | Live. Add the mount `focus()` + `window.focus()` the other four have. |
+| `CreditsModal` focused nothing | ESC did not close it until the user clicked or tabbed into the panel | **Fixed 2026-10-16.** The modal now focuses its close button and calls `window.focus()` when `isOpen` goes true (`CreditsModal.tsx:92-96`) — the same rule the other four get. See [Modals](#modals). |
 | No `prefers-reduced-motion` support | 0 occurrences in `src/` | The `animate-in`/`animate-pulse` transitions do not degrade for users who have asked for reduced motion. |
 | Residual i18n leaks in the strength meter | `CreateDrawerModal.tsx:52` and `:59` hardcode `'Too short (min 8 chars)'`, `'Weak'`, `'Fair'`, `'Good'`, `'Strong'`, `'Excellent'` in English, while every other string goes through `t()`. The colours on those same lines are tokenised; the labels are not. | Part of the "not everything is tokenised yet" set. |
 | **No dark mode** | — | `tailwind.config.cjs` sets `darkMode: 'class'` and the CSS is structured to allow it, but no `dark:` variant exists anywhere and no theme is defined. Deliberately deferred. Do not infer that adding `dark:` classes will work. |

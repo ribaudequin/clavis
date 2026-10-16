@@ -11,6 +11,8 @@ interface ErrorBoundaryState {
 }
 
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  private summaryRef: React.RefObject<HTMLElement | null> = React.createRef<HTMLElement>();
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -22,6 +24,10 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
   componentDidCatch(error: Error): void {
     console.error('ErrorBoundary caught error:', error);
+    // Focus the details toggle rather than Restart: a crash screen is exactly when someone
+    // reflexively hits Enter, and Enter on Restart relaunches the app. Restart stays one Tab
+    // away. DESIGN.md rule 9 — focus goes where a stray Enter lands safely.
+    this.summaryRef.current?.focus();
   }
 
   handleRestart = (): void => {
@@ -48,7 +54,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
             </p>
             {this.state.error && (
               <details className="mb-4 text-xs text-gray-500 bg-gray-50 p-2 rounded max-h-32 overflow-auto">
-                <summary>{t('label.error_details')}</summary>
+                <summary ref={this.summaryRef}>{t('label.error_details')}</summary>
                 <pre className="mt-1 whitespace-pre-wrap break-words">{this.state.error.toString()}</pre>
               </details>
             )}

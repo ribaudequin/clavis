@@ -73,8 +73,13 @@ The counter resets after 2 minutes of inactivity and is cleared on a successful 
 
 ### Filesystem permissions
 
-- Data directory created with mode **`0o700`**.
-- Drawer files written with mode **`0o600`**.
+Drawers are stored in a `drawers` subdirectory of Electron's `userData` path. The directory is created with mode **`0o700`** (`store.ts`, `ensureDataDir`); each drawer file is written with mode **`0o600`** on create (`store.ts:205`), save (`:351`) and import (`:436`).
+
+- **Linux and macOS:** the mode is applied when the file is created, and the process umask can only clear bits, never add them. `0o600` is therefore an upper bound on what a newly created drawer file can be, not a lower bound.
+- **An existing file is never tightened.** The Node.js documentation states that the `mode` option of `fs.writeFile()` "only affects the newly created file", and `fs.mkdir()`'s likewise applies at creation only. A drawer file that is already in place with looser permissions — restored from a backup, copied in by hand, or unpacked from an archive — keeps them, and saving it again does not change them. **This holds on Linux and macOS too; it is not a Windows-only gap.**
+- **The old-data migration is the exception.** It copies each file with `fs.copyFile()` and then calls `fs.chmod(dst, 0o600)` on the copy (`store.ts:116-117`), because a copy carries the source's permissions across. Migrated drawers are tightened whatever the original had.
+- **Windows:** `mode` is ignored. Node.js documents `fs.mkdir()`'s `mode` as "not supported on Windows", and file modes do not apply there either. Protection comes instead from the ACL inherited from the per-user `%APPDATA%` directory that `userData` resolves to, which Windows restricts to that user by default. The practical outcome is comparable, but **the control is the operating system's, not Clavis's**.
+- **Exports get none of this** — see [3. Exported `.clavis` files do not inherit the app's file permissions](#3-exported-clavis-files-do-not-inherit-the-apps-file-permissions).
 
 ### Content-Security-Policy
 
@@ -100,6 +105,8 @@ https://api.github.com/repos/ribaudequin/clavis/releases/latest
 
 It is made **only when the Credits modal is opened**, and only to compare the latest `tag_name` against the running version. No telemetry, no analytics, no crash reporting, no update feed, and no `electron-updater`. Logs are written locally to the data directory.
 
+**The check is bounded and fails closed.** It carries a **5-second** deadline after which the request is destroyed, listens for an error on the response as well as on the request, treats any non-2xx status as *no information* rather than parsing the body, and validates the payload with Zod. Every one of those paths resolves "no update known" instead of propagating: a stalled or hostile response can cost the About card its version line, and cannot hang the renderer, crash the main process, or leave the app believing it is up to date when it is not.
+
 ### No code signing
 
 Deliberately unsigned — there are no EV certificates and no Apple notarization credentials.
@@ -109,7 +116,7 @@ Deliberately unsigned — there are no EV certificates and no Apple notarization
 
 ## Known Limitations
 
-Two items are documented honestly rather than presented as working controls.
+Three items are documented honestly rather than presented as working controls.
 
 ### 1. The KDF is not unconditionally Argon2id
 
@@ -122,6 +129,12 @@ Two items are documented honestly rather than presented as working controls.
 ### 2. `frame-ancestors 'none'` provides no protection
 
 Described in full under [Content-Security-Policy](#content-security-policy) above. The directive is present but inert in a meta-delivered policy, so there is no active clickjacking defence.
+
+### 3. Exported `.clavis` files do not inherit the app's file permissions
+
+Export never writes the destination file from the main process. The raw drawer JSON is returned over IPC (`ipc-handlers.ts`, `EXPORT_DRAWER`) and handed to Chromium as a `Blob`, which triggers an `<a download>` (`HomeScreen.tsx`); Chromium creates the file in the OS downloads folder with its own default permissions, and the `0o600` mode described under [Filesystem permissions](#filesystem-permissions) never reaches it. On Linux and macOS no restrictive mode is applied to it, so it lands with the creating process's default — commonly `0o644`, readable by other local accounts.
+
+**What this exposes is metadata, not content.** The drawer body is AES-256-GCM ciphertext, so a readable export still discloses nothing without the password. What it does disclose is the plaintext metadata listed under [Notes](#notes): the drawer title, the creation and update timestamps, and the icon colour data.
 
 ### Password length check mismatch
 

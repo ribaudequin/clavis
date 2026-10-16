@@ -1,15 +1,14 @@
-import React, { useEffect, useRef, RefObject } from 'react';
+import { useEffect, RefObject } from 'react';
 
 interface UseModalKeyboardOptions {
   onEscape?: () => void;
-  onEnter?: () => void;
 }
 
 export function useModalKeyboard(
   containerRef: RefObject<HTMLElement | null>,
   options: UseModalKeyboardOptions = {}
 ): void {
-  const { onEscape, onEnter } = options;
+  const { onEscape } = options;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -20,21 +19,9 @@ export function useModalKeyboard(
         e.preventDefault();
         onEscape();
       }
-      if (e.key === 'Enter' && onEnter) {
-        const target = e.target as HTMLElement;
-        const tag = target.tagName.toLowerCase();
-        const isTextArea = tag === 'textarea';
-        const isButton = tag === 'button';
-        const isSelect = tag === 'select';
-        const isContentEditable = target.getAttribute('contenteditable') === 'true';
-        if (!isTextArea && !isButton && !isSelect && !isContentEditable) {
-          e.preventDefault();
-          onEnter();
-        }
-      }
     }
 
     container.addEventListener('keydown', handleKeyDown);
     return () => container.removeEventListener('keydown', handleKeyDown);
-  }, [containerRef, onEscape, onEnter]);
+  }, [containerRef, onEscape]);
 }

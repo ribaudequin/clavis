@@ -3,10 +3,11 @@ import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import DangerIcon from '../../../icons/svg/danger.svg?react';
 import { t } from '../../i18n';
+import { toast } from 'react-hot-toast';
 
 interface DeleteConfirmModalProps {
   drawerTitle?: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -23,11 +24,16 @@ function DeleteConfirmModal({ drawerTitle, onConfirm, onCancel }: DeleteConfirmM
     window.focus();
   }, []);
 
-  async function handleConfirm() {
+  async function handleConfirm(): Promise<void> {
     if (isConfirming) return;
     setIsConfirming(true);
     try {
       await onConfirm();
+    } catch {
+      // Defence in depth: both production call sites handle their own failures,
+      // so nothing reaches here today. A future onConfirm that rejects should
+      // not escape the component as an unhandled rejection.
+      toast.error(t('msg.error_delete_failed'));
     } finally {
       setIsConfirming(false);
     }
@@ -44,7 +50,7 @@ function DeleteConfirmModal({ drawerTitle, onConfirm, onCancel }: DeleteConfirmM
     >
       <div className="bg-red-50 border-2 border-red-600 rounded-lg p-6 w-96 shadow-xl">
         <div className="w-12 h-12 mx-auto mb-4 flex items-center justify-center">
-          <DangerIcon className="w-12 h-12" />
+          <DangerIcon className="w-12 h-12" aria-hidden="true" />
         </div>
         <h2 id="delete-confirm-title" className="text-lg font-bold text-red-800 text-center mb-2">
           {t('btn.delete')}
@@ -53,7 +59,7 @@ function DeleteConfirmModal({ drawerTitle, onConfirm, onCancel }: DeleteConfirmM
           <p className="text-sm text-red-700 text-center mb-2 font-medium">&quot;{drawerTitle}&quot;</p>
         )}
         <p id="delete-confirm-desc" className="text-sm text-red-800 text-center mb-6">
-          {t('msg.irreversible') || 'This action is irreversible.'}
+          {t('msg.irreversible')}
         </p>
         <div className="flex justify-center gap-3">
           <button

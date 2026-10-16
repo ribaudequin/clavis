@@ -1,10 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { MockedFunction } from 'vitest';
+import type { Mock, MockedFunction } from 'vitest';
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn() },
   dialog: { showOpenDialog: vi.fn() },
-  app: { quit: vi.fn() },
+  app: { quit: vi.fn(), getVersion: vi.fn(), relaunch: vi.fn() },
+}));
+
+vi.mock('https', () => ({
+  default: { get: vi.fn() },
 }));
 
 vi.mock('../src/main/store.js', () => ({
@@ -42,6 +46,8 @@ import { registerIpcHandlers, __resetAllowedImportPaths } from '../src/main/ipc-
 import type { IpcListener } from '../src/main/ipc-handlers';
 import * as store from '../src/main/store';
 import * as fsPromises from 'fs/promises';
+import { app } from 'electron';
+import https from 'https';
 import { CHANNELS } from '../src/shared/channels';
 import type { Channel } from '../src/shared/channels';
 import { ErrorCode } from '../src/shared/types';
@@ -83,6 +89,89 @@ const lstatMock = fsPromises.lstat as unknown as MockedFunction<
 const readFileMock = fsPromises.readFile as unknown as MockedFunction<
   (path: string, encoding: 'utf8') => Promise<string>
 >;
+
+// `https.get` is overloaded too; the alias below pins the single overload the
+// check-update handler uses, and the fake request/response objects implement
+// exactly the members it touches — `.on()`, `.destroy()` and `statusCode`.
+type Listener = (payload?: unknown) => void;
+type MockResponse = { statusCode: number; on: (event: string, listener: Listener) => MockResponse };
+type MockRequest = { on: (event: string, listener: Listener) => MockRequest; destroy: () => void };
+
+const httpsGetMock = https.get as unknown as MockedFunction<
+  (
+    url: string,
+    options: { headers: Record<string, string> },
+    callback: (res: MockResponse) => void
+  ) => MockRequest
+>;
+
+type HttpsScript = {
+  statusCode?: number;
+  body?: string;
+  /** Emits `error` on the response instead of the body, after the headers. */
+  streamError?: Error;
+  /** Never emits anything — the connection stalls after the request is sent. */
+  stall?: boolean;
+};
+
+interface HttpsStub {
+  destroy: Mock;
+  failRequest: (error: Error) => void;
+}
+
+/** Records whether a handler promise settled at all, and with what. */
+type PendingSettlement =
+  | { done: false }
+  | { done: true; value: { tag_name?: string } | null };
+
+// `EventEmitter` semantics without the class: listeners register inside the
+// production callback, so delivery happens on a later tick like the real stream.
+function stubHttps(script: HttpsScript): HttpsStub {
+  const resListeners = new Map<string, Listener[]>();
+  const reqListeners = new Map<string, Listener[]>();
+  const add = (map: Map<string, Listener[]>, event: string, listener: Listener): void => {
+    map.set(event, [...(map.get(event) ?? []), listener]);
+  };
+  const emit = (map: Map<string, Listener[]>, event: string, payload?: unknown): void => {
+    for (const listener of map.get(event) ?? []) listener(payload);
+  };
+
+  const destroy = vi.fn();
+  const request: MockRequest = {
+    on: (event, listener) => {
+      add(reqListeners, event, listener);
+      return request;
+    },
+    destroy,
+  };
+  const response: MockResponse = {
+    statusCode: script.statusCode ?? 200,
+    on: (event, listener) => {
+      add(resListeners, event, listener);
+      return response;
+    },
+  };
+
+  httpsGetMock.mockImplementation((_url, _options, callback) => {
+    callback(response);
+    if (!script.stall) {
+      setImmediate(() => {
+        if (script.streamError) {
+          emit(resListeners, 'error', script.streamError);
+          return;
+        }
+        const body = script.body ?? '';
+        const mid = Math.ceil(body.length / 2);
+        emit(resListeners, 'data', body.slice(0, mid));
+        emit(resListeners, 'data', body.slice(mid));
+        emit(resListeners, 'end');
+      });
+    }
+    return request;
+  });
+
+  return { destroy, failRequest: (error) => emit(reqListeners, 'error', error) };
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -610,6 +699,164 @@ describe('IPC handlers', () => {
       }
       expect(readFileMock).not.toHaveBeenCalled();
       expect(store.importDrawerRaw).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('get-app-version', () => {
+    it('returns the version reported by electron', async () => {
+      vi.mocked(app.getVersion).mockReturnValue('0.4.9-beta');
+
+      const handler = getHandler(CHANNELS.GET_APP_VERSION);
+      const result = await handler({});
+
+      expect(result).toBe('0.4.9-beta');
+      expect(app.getVersion).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('restart-app', () => {
+    it('relaunches, quits on the next tick and returns ok', async () => {
+      const handler = getHandler(CHANNELS.RESTART_APP);
+      const result = await handler({});
+
+      expect(result).toEqual({ ok: true, data: undefined });
+      expect(app.relaunch).toHaveBeenCalledOnce();
+
+      // `setImmediate(() => app.quit())` is scheduled, not awaited, by the handler;
+      // letting it drain here keeps the assertion honest and leaves no pending
+      // immediate that could land inside a later test.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(app.quit).toHaveBeenCalledOnce();
+    });
+
+    it('returns a WRITE_FAILED envelope when relaunch throws, and never quits', async () => {
+      vi.mocked(app.relaunch).mockImplementationOnce(() => {
+        throw new Error('spawn ENOENT');
+      });
+
+      const handler = getHandler(CHANNELS.RESTART_APP);
+      const result = await handler({});
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.WRITE_FAILED);
+        expect(result.error.message).toBe('Failed to restart app');
+        expect(result.error.details).toBeUndefined();
+      }
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(app.quit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('check-update', () => {
+    it('returns the tag from a well-formed 2xx body', async () => {
+      stubHttps({ body: '{"tag_name":"v9.9.9","name":"Clavis 9.9.9"}' });
+
+      const handler = getHandler(CHANNELS.CHECK_UPDATE);
+      const result = await handler({});
+
+      expect(result).toEqual({ tag_name: 'v9.9.9' });
+      expect(httpsGetMock).toHaveBeenCalledWith(
+        'https://api.github.com/repos/ribaudequin/clavis/releases/latest',
+        { headers: { 'User-Agent': 'Clavis' } },
+        expect.any(Function)
+      );
+    });
+
+    it('returns no tag for a 2xx body without one', async () => {
+      stubHttps({ body: '{}' });
+
+      const handler = getHandler(CHANNELS.CHECK_UPDATE);
+      const result = await handler({});
+
+      expect(result).toEqual({ tag_name: undefined });
+      expect(result?.tag_name).toBeUndefined();
+    });
+
+    it('returns null when the response stream errors after the headers', async () => {
+      stubHttps({ body: '{"tag_name":"v9.9.9"}', streamError: new Error('ECONNRESET') });
+
+      const handler = getHandler(CHANNELS.CHECK_UPDATE);
+      const result = await handler({});
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null when the request errors', async () => {
+      const stub = stubHttps({ stall: true });
+
+      const handler = getHandler(CHANNELS.CHECK_UPDATE);
+      const settled = handler({});
+      stub.failRequest(new Error('ENOTFOUND'));
+
+      expect(await settled).toBeNull();
+    });
+
+    it('returns null on a non-2xx status without parsing the body', async () => {
+      stubHttps({ statusCode: 403, body: '{"message":"API rate limit exceeded"}' });
+
+      const handler = getHandler(CHANNELS.CHECK_UPDATE);
+      const result = await handler({});
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null on a 5xx status', async () => {
+      stubHttps({ statusCode: 503, body: '{"tag_name":"v9.9.9"}' });
+
+      const handler = getHandler(CHANNELS.CHECK_UPDATE);
+      const result = await handler({});
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null on malformed JSON', async () => {
+      stubHttps({ body: 'not-json{' });
+
+      const handler = getHandler(CHANNELS.CHECK_UPDATE);
+      const result = await handler({});
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null, not "42", when tag_name is not a string', async () => {
+      stubHttps({ body: '{"tag_name":42}' });
+
+      const handler = getHandler(CHANNELS.CHECK_UPDATE);
+      const result = await handler({});
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null when a payload without an object root arrives', async () => {
+      stubHttps({ body: '"v9.9.9"' });
+
+      const handler = getHandler(CHANNELS.CHECK_UPDATE);
+      const result = await handler({});
+
+      expect(result).toBeNull();
+    });
+
+    it('resolves null and destroys the request when the response never arrives', async () => {
+      const stub = stubHttps({ stall: true });
+      vi.useFakeTimers();
+      try {
+        let settled: PendingSettlement = { done: false };
+        // `Handler<C>` is typed by the resolved value, so wrap the real promise
+        // back up to observe *whether* it settles, not only what it resolves to.
+        void Promise.resolve(getHandler(CHANNELS.CHECK_UPDATE)({})).then((value) => {
+          settled = { done: true, value };
+        });
+
+        // Ten virtual minutes: no timeout value a reviewer would accept survives
+        // this, so the test pins "it settles", not "it settles in 5s".
+        await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+
+        expect(settled).toEqual({ done: true, value: null });
+        expect(stub.destroy).toHaveBeenCalledOnce();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

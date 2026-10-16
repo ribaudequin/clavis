@@ -191,6 +191,8 @@ These addresses are also available in the app's **Credits** modal (click the ❤
 - Drawer titles, timestamps, and the icon colour data are stored in plaintext inside the `.clavis` file
 - Passwords are irreversible: there is no recovery. If you lose a drawer's password, its content is gone
 - Drawer passwords are never written to disk — not to the `.clavis` file, and not to any OS keychain
+- Drawer files are created with owner-only permissions (mode 0o600) on Linux and macOS. The mode applies at creation only, so a file copied in or restored from a backup keeps the permissions it arrived with. On Windows the mode is ignored and the per-user data directory provides that protection instead
+- Exported `.clavis` files are written by the browser download rather than by Clavis, so they do not carry those permissions. The content stays encrypted, but the plaintext title, timestamps and icon colours inside are readable by anyone who can read the file
 - Use strong, unique passwords per drawer, and keep your exported `.clavis` files backed up somewhere safe
 
 Full details, including known limitations, are in [SECURITY.md](SECURITY.md).

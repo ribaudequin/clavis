@@ -1,5 +1,67 @@
 # Changelog — Clavis
 
+## Unreleased
+
+Landed on `main` without a release, on the owner's decision. `184 -> 277` tests, 20 files, all four
+gates green. Every change below is negative-controlled — the defect was reintroduced and the
+specific test watched failing before the fix was called done.
+
+### Fixed
+
+- **`check-update` could hang forever.** The `.on('error')` handler sat on the *request*, never on the
+  *response*, and there was no timeout. A response stream that stalled after the headers left the
+  promise unsettled forever, so `CreditsModal`'s `Promise.allSettled` never resolved and the About
+  card silently dropped its version line for the rest of the session. It also parsed non-2xx bodies,
+  which made a GitHub 403/5xx indistinguishable from "up to date". Now: `res.on('error')`, a **5 s**
+  deadline that destroys the request, and non-2xx treated as *no information*.
+- **`check-update` returned a value its own type forbids.** `resolve({ tag_name: json.tag_name || null })`
+  against a declared `Promise<{ tag_name?: string } | null>`, compiling only because `JSON.parse`
+  returns `any`. The payload is now Zod-parsed, so `tag_name` is a validated string.
+- **The crash screen was unreachable by keyboard.** When `ErrorBoundary` replaces the tree,
+  `document.activeElement` is left on `<body>`. It now focuses the Error-details `<summary>` — not
+  Restart, because a crash screen is exactly when someone reflexively hits Enter and Enter on
+  Restart relaunches the app. Done in `componentDidCatch`, which is the only lifecycle method that
+  fires on both the mount and the update path.
+- **`danger.svg` was not hidden from assistive tech** in `DeleteConfirmModal`, unlike every other
+  decorative icon in the app.
+- **`DeleteConfirmModal`'s `onConfirm: () => void` was a type lie.** It admitted any async function
+  while blocking `onConfirm().catch(...)` — which is why `try/finally` was written instead of
+  `try/catch/finally`. Widened to `() => void | Promise<void>` and a `catch` added. The rejection
+  is unreachable in production today, so this is defence in depth, not a bug fix.
+- **Three IPC channels had no test at all** — `CHECK_UPDATE`, `RESTART_APP` and `GET_APP_VERSION`
+  were the only ones without a `describe` block. 13 tests, and the electron mock had to grow
+  `app.getVersion` / `app.relaunch` before any of them could run.
+- `DeleteConfirmModal.tsx`'s `|| 'This action is irreversible.'` removed — the P3.27 pattern, which
+  had been closed for `ViewDrawer.tsx` only.
+
+### Removed
+
+- **The dead `onEnter` branch in `useModalKeyboard`** — 11 of the hook's 40 lines, with zero callers
+  across all five modals. Deleting it also removed an unguarded `e.target as HTMLElement` cast that
+  would throw on a keydown originating from an SVG child.
+
+### Added
+
+- Four test files closing the P3.31 gaps: `useModalKeyboard` (the sole owner of Escape since
+  2026-10-07, untested until now), `DeleteConfirmModal`, `ErrorBoundary`, and `preload` — the last
+  pinning `ElectronAPI` parity in both directions and the argument order per method. Transposing
+  `saveDrawer`'s `title` and `content` fails exactly one test; `typecheck` is satisfied by both
+  orderings because both are `string`, and it would otherwise surface only as silent corruption.
+- `msg.error_delete_failed` in both locales, so the new toast reads a complete sentence instead of
+  inheriting the trailing colon from the `msg.error_delete` prefix.
+
+### Documented
+
+- **P3.30** — the file-permission documentation was overstating its control. `fs.writeFile`'s `mode`
+  applies only at creation, so an existing `0644` drawer keeps those permissions across every save
+  (**on Linux and macOS too, not only Windows**), and **exported `.clavis` files get no `0o600` at
+  all** because a Chromium `<a download>` writes them. Filed as a Known Limitation; the exposure is
+  metadata — title, timestamps, icon colours — not content, since the body is ciphertext.
+- `SECURITY.md`'s network posture now states the check's 5-second bound and its fail-closed paths.
+- `DESIGN.md` reported a closed gap as open in three places, the worst being a remediation
+  instruction for work already done. Corrected, and the rule is now **focus on open** rather than
+  mount focus.
+
 ## v0.4.9-beta (2026-10-13)
 
 All changes measured in a locally built AppImage (`out/make/AppImage/x64/`, 252 MB) rather than estimated in jsdom. `173/173` -> `184/184` tests, green under `CI=true`, both typechecks and lint clean, brand checker exits 0. `CHANGELOG.md` itself records the measurement of every new surface pair, so there is no gap between what the document claims and what the binary paints.

@@ -206,10 +206,91 @@
 - [x] **i18n model change (owner decision, 2026-10-05)** → **`pt-BR` removed.** Rule: *any* lusophone system language renders **PT-PT**; everything else renders English. Two locales only (`pt-PT`, `en`), 69 keys each. `detectLocale()` now compares the **BCP-47 primary subtag** instead of a prefix: `lang.trim().replace(/_/g,'-').split('-')[0].toLowerCase() === 'pt'`, because `startsWith('pt')` was case-sensitive (`PT-br` → English) and over-matched (`ptx`, `ptt`). `t()` gained an optional `params` arg for `{token}` substitution (`msg.update_available`). New `docs/adr/ADR-009-i18n-single-lusophone-locale.md` supersedes ADR-003's fallback chain (ADR-003 kept as history with a pointer). Guards in `tests/i18n.test.ts`: `pt-PT`↔`en` key parity, `pt-BR` cannot return, routing of 8 lusophone + 8 non-lusophone + 7 malformed tags, and a quarantine scan for Brazilian-only markers in `pt-PT` values (`senhas`, `aplicativo`, `Excluir`, `Salvar`, `Arquivo`, "Me pague um café"). `SkeletonLoader`'s `aria-label` also i18n'd (it's screen-reader text). `114/114` tests, also green under `CI=true`. ⚠️ `src/main/ipc-handlers.ts` keeps an **independent** `getLocale()` reading `LANG` env vars for main-process error messages — consistent today, but a second locale decision that can drift. → **RESOLVIDO 2026-10-07 (`5269aa6`, `v0.4.7-beta`)**, e o diagnóstico estava incompleto: `getLocale()` é usado por **2** das 25 mensagens; as outras **23 nem sequer tinham locale**. O renderer expunha `result.error.message` (o texto inglês de diagnóstico do main) em **8 sítios**, cinco deles concatenando um prefixo traduzido ("Falha ao guardar Incorrect password or drawer not found"), e o `CreateDrawerModal` tinha um prefixo inglês `Error:` hardcoded num ecrã pt-PT. **Confirmado visualmente no AppImage:** senha errada mostrava "Incorrect password or drawer not found" numa UI portuguesa. **Corrigido traduzindo por `AppError.code`, que já existia** — nova `tError()` em `src/i18n/index.ts` mapeia os 7 `ErrorCode` para chaves `error.*` novas nos dois locales; `src/main/**` intocado e as **17** asserções de `tests/ipc-handlers.test.ts` sobre a string inglesa continuam a passar, porque essa mensagem passou a ser só de log. **Invariante com guarda de compilação:** `ERROR_MESSAGE_KEYS` é `Record<ErrorCode, string>`, logo um `ErrorCode` novo sem tradução é erro de build, não texto inglês em runtime; e `tError()` **rejeita um miss do dicionário** (`translated !== key`), senão mostraria a chave literal `error.decrypt_failed` ao utilizador. `HomeScreen.tsx:165` e `:180` discordavam — o `catch` buscava `t('label.incorrect_password')`, que só dispara em excepção e **nunca** em `result.ok === false`, ou seja nunca corria no caso de senha errada; ambos passam por `tError()` e a chave morta foi removida dos dois dicionários.
 - [x] **P3.27 — Fallback patterns (`ViewDrawer.tsx`)** — `|| 'Back'` e `|| 'Content'` removidos; `t()` devolve a chave se ausente, portanto o fallback nunca dispara e apenas polui o código.
 - [x] P3.28 — In-app language selector → **CANCELLED 2026-10-05 (owner decision)**: o app segue a **lingua do sistema**, sem override. Registado em `ADR-009`. Não implementar.
-- [ ] P3.29 — HomeScreen `useCallback` (`HomeScreen.tsx`) → memoize handlers
-- [ ] P3.30 — POSIX permissions (`ipc-handlers.ts`) → document Windows limitation in README
-- [ ] P3.31 — Testing gaps → remaining files without tests (`main/index.ts`, `logger.ts`, `preload/index.ts`, `CreateDrawerModal` ✅ 2026-10-03, `ErrorBoundary`, `CreditsModal` ✅ 2026-10-05, `DeleteConfirmModal`, `ToastProvider`, `SkeletonLoader`, `useFocusTrap`, `useModalKeyboard`, `types.ts`, `channels.ts`). **`i18n/index.ts` ✅ 2026-10-05** via `tests/i18n.test.ts` (24 tests: `pt-PT`↔`en` key parity, non-trivial key count, no empty values, `pt-BR` cannot return, lusophone/non-lusophone/malformed routing, Brazilian-phrasing quarantine, plus 10 added 2026-10-13 with **P3.32**: the pure `resolveLocale()` mapping, the `<html lang>` attribute actually being written, its agreement with what `t()` renders, and the renderer entry calling it before the first render).
+- [ ] P3.29 — HomeScreen `useCallback` (`HomeScreen.tsx`) → memoize handlers. **Still an open question of whether the item survives at all:** the 2026-10-06 entry records `useCallback` tried on `ViewDrawer` and **rejected**, because `onBack` is also new on every render so it fixed nothing. Decide keep-or-drop before spending time on it.
+- [x] **P3.30 — POSIX permissions → documentation made honest — DONE 2026-10-16.** The TODO named the wrong file: the calls are in `src/main/store.ts`, not `ipc-handlers.ts`. The real defect was that the docs **overstated** the control. Three facts, all verified empirically (`umask-created: 600`, `after rewrite of a 644 file: 644`, `copyFile carries perms: 644`):
+  - **`fs.writeFile`'s `mode` only applies at creation** — an existing `0644` drawer stays `0644` across every save. **True on Linux and macOS too, not a Windows-only gap.**
+  - `fs.copyFile` carries the source's permissions, which is exactly why the old-data migration's `fs.chmod(dst, 0o600)` at `store.ts:116-117` is load-bearing. Migrated drawers are tightened; nothing else is.
+  - **Exported `.clavis` files get none of it.** `HomeScreen.handleExport` builds a `Blob` and fires a Chromium `<a download>`, so the `0o600` never reaches the destination — on POSIX it lands at the process default, commonly `0o644`. Filed as `SECURITY.md` **Known Limitations item 3**, because the README's closing line promises the limitations live there. Content is ciphertext, so what a readable export discloses is **metadata, not content**: the plaintext title, timestamps and icon colour data.
+- [ ] P3.31 — Testing gaps → **remaining untested files**: `main/index.ts`, `logger.ts`, `ToastProvider`, `SkeletonLoader`, `types.ts`, `channels.ts`. **Closed this session**: `preload/index.ts` ✅ (41 tests — `ElectronAPI` parity in both directions, per-method channel, argument order, promise identity), `DeleteConfirmModal` ✅ (15), `ErrorBoundary` ✅ (11), `useModalKeyboard` ✅ (9 after C1), plus `useFocusTrap` ✅ and `CreditsModal` ✅ (earlier). Also closed: `CHECK_UPDATE` / `RESTART_APP` / `GET_APP_VERSION` — the only three IPC channels that had **no `describe` block at all** (13 tests, and the electron mock had to grow `app.getVersion`/`app.relaunch` first). `i18n/index.ts` ✅ 2026-10-05 via `tests/i18n.test.ts`. `CreateDrawerModal` ✅ 2026-10-03.
 - [x] Duplicate drawer title → advisory warning (not a blocker) — **DONE 2026-10-03**: `CreateDrawerModal` takes `existingTitles?: string[]`; on trimmed + case-insensitive match it shows an inline `role="alert"` confirm step (`btn.create_anyway` / `btn.change_title`) instead of calling `createDrawer`. Renderer-only — no `src/main/**` change, no uniqueness validation, rename/import untouched, existing duplicates untouched. New `tests/CreateDrawerModal.test.tsx` (7 tests) closes the `CreateDrawerModal` gap listed in P3.31.
+
+## Defect sweep 2026-10-16 — `PLANO-DEFECTOS-2026-10-15.md`
+
+Found while closing the P3.31 testing gaps, then fixed. Owner decisions taken up front: **delete the
+dead `onEnter` branch**, **land in `main` with no release**, **impact-first order**. All seven steps
+negative-controlled. `184 → 277` tests.
+
+- [x] **A1 — `ErrorBoundary` moved no focus.** After the tree is replaced `document.activeElement` is
+      `<body>`, so the crash screen was unreachable by keyboard. Now focuses the Error-details
+      `<summary>` from **`componentDidCatch`** — not `componentDidUpdate`, which **never fires when
+      the error occurs on the initial mount** (measured against React 19.2.8: mount →
+      `componentDidMount → componentDidCatch`; update → `componentDidUpdate → componentDidCatch`),
+      and the project's own test renders a fresh mount. Not Restart, per owner decision: a crash
+      screen is exactly when someone reflexively hits Enter, and Enter on Restart relaunches the app.
+      The `it.fails` became a real test; `DESIGN.md` gained rule 11 and an `### Error boundaries` section.
+- [x] **A2 — `DeleteConfirmModal`'s `onConfirm: () => void` type lie.** It admitted any async function
+      while **blocking** `onConfirm().catch(…)` (`Property 'catch' does not exist on type 'void'`),
+      which is almost certainly why `try/finally` was written instead. Widened to
+      `() => void | Promise<void>` (bare `Promise<void>` breaks the test harness with TS2322) and a
+      `catch` added. **The rejection is unreachable in production today and the `catch` changes no
+      observable behaviour** — approved as defence-in-depth plus a testable statement, and the source
+      comment says so.
+- [x] **A3 — `danger.svg` had no `aria-hidden`** in `DeleteConfirmModal`. The guard had to become
+      `toHaveAttribute('aria-hidden','true')`: with the attribute present, `computeAccessibleName`
+      returns `""` and `queryByRole('img')` excludes the subtree, so **both** existing assertions stay
+      green under the planned mutation. Verified — without the new assertion the whole file is blind to it.
+- [x] **A4 — `check-update` could hang forever.** Found while reviewing the plan. `.on('error')` was on
+      the **request**, not the response, with no timeout: a stalled response stream meant the promise
+      never settled → `CreditsModal`'s `Promise.allSettled` never resolved → the About card silently
+      omitted its version line, permanently. No HTTP status check either, so a GitHub 403/5xx read as
+      "no update available" — indistinguishable from "up to date". Now: `res.on('error')`, a **5 s**
+      timeout that destroys the request, non-2xx → `null`.
+- [x] **B1 — `check-update` returned a value its own type forbids.** `resolve({ tag_name: json.tag_name || null })`
+      against `Promise<{ tag_name?: string } | null>`, compiling only because `JSON.parse` returns
+      `any`. Now Zod-parsed. Confirmed causally: with a typed `json` under `tsc --strict` the same
+      line is `TS2322: Type 'string | null' is not assignable to type 'string | undefined'`.
+- [x] **B2 — three IPC channels had no `describe` block at all**: `CHECK_UPDATE`, `RESTART_APP`,
+      `GET_APP_VERSION`. 13 tests. The electron mock had to grow `app.getVersion`/`app.relaunch` first,
+      and `RESTART_APP`'s `setImmediate(() => app.quit())` is flushed inside its own test.
+- [x] **C1 — deleted the dead `onEnter` branch.** 11 of `useModalKeyboard`'s 40 lines, zero callers,
+      plus the unguarded `e.target as HTMLElement` cast that would throw on a keydown from an SVG
+      child. 40 → 27 lines, 279 → 273 tests. **Four files**, not two: the hook, `useModalKeyboard.test.tsx`
+      (the option is threaded through three tests *outside* the Enter describe), `PasswordModal.integration.test.tsx`
+      (its "can only reach the hook's onEnter" rationale became false), and two `DESIGN.md` lines.
+- [x] **C2 — `DeleteConfirmModal.tsx:56`'s `|| 'This action is irreversible.'`** — the P3.27 pattern,
+      which had been closed for `ViewDrawer.tsx` only.
+- [x] **D1 — `DESIGN.md` reported a closed gap as open in three places**, the worst being a Known-gaps
+      row reading *"Live. **Add the mount `focus()` + `window.focus()` the other four have.**"* — a
+      remediation instruction for work already done. Corrected, and the rule is now **focus on open**,
+      not mount focus: `HomeScreen.tsx:346` renders `{showCreditsModal && …}`, so mount and open
+      coincide only by accident of structure and the prop flip is the wider contract. A
+      `CreditsModal` focus test was written first (4 tests), because the "already closed" behaviour
+      had **no automated guard at all** and the doc edit would otherwise have been unfalsifiable.
+- [ ] **A2-deferred — 5 sibling `try/finally`-without-`catch` handlers**: `PasswordModal.tsx:29-38`,
+      `HomeScreen.tsx:44-56`, `:79-98`, `:104-127`, `:129-152`. Plus **5 un-awaited call sites** in
+      `HomeScreen` (`:59`, `:215`, `:316`, `:284`, `:234`) whose rejections reach the **global** handler —
+      a strictly larger exposure than `DeleteConfirmModal`'s own discarded return value. (`:292
+      handleDelete` is `async` with no `await`, so it cannot reject.) A separate change with its own review.
+- [ ] **13 `CreditsModal` icons have no `aria-hidden`** (`:120`, `:143`, `:189`, `:194`, `:207-208`, `:217`,
+      `:226`, `:237`, `:252`, `:256`, `:259`, `:265`, `:274`). **Owner deferred 2026-10-16** — `CreditsModal`
+      is the screen most likely to churn under the pending brand work. `grep aria-hidden src/` returns
+      5 hits, so "fixed twice already" was true of the sweeps, not of the code.
+- [ ] **`ErrorBoundary.tsx:29` discards the `restartApp` promise** — `window.electronAPI.restartApp?.()`
+      is neither awaited nor handled. Same shape as A2 and absent from its scope note.
+- [ ] **`msg.error_delete` ends in a colon** in both catalogues (`i18n/index.ts:31`, `:114`), so A2's new
+      toast renders "Error deleting:". The key is shaped as a prefix for a detail the callers own, and
+      they already surface it via `toast.error(tError(result.error))`. Options: a second key (recommended —
+      additive), an interpolation with nothing to pass, or change the key and lose the colon at its
+      existing prefix-style call sites. **Copy decision, left to the owner.**
+- [ ] **`check-update` follows no redirects** (a 3xx from a renamed repo reads as "no information") and
+      has **no response size cap** (`data` accumulates without bound; not reachable today, GitHub's
+      `/releases/latest` is ~5 KB).
+- [ ] **`DESIGN.md:474`** — the "contract to follow when adding a sixth" snippet reads
+      `useFocusTrap(modalRef, { isActive: true })`. A sixth modal mounted once and opened by prop needs
+      `{ isActive: isOpen }`; the literal `true` teaches the wrong thing, the same mount-vs-open trap D1 fixed.
+- [ ] **`DESIGN.md:826`** — "These are live." above the Known-gaps table is now wrong twice: it already
+      carried one `**Fixed 2026-10-13**` row and D1 added a second. `DESIGN.md:829` also has a malformed
+      `danger.svg` row (4 cells in a 3-column table).
 
 ## Deferred (Post-MVP)
 
@@ -330,7 +411,23 @@ Requested as "make the About screen follow the brand rules". Authority: `~/Herme
       `ABOUT.md` §10 stay open — outside this agent's scope.
 
 ## Progress
-- **Current focus (2026-10-13) — BR-18 closed: the GitHub mark ships the variant that matches its surface.** Both 1.4.11
+- **Current focus (2026-10-16) — the P3.31 testing sweep and a 7-step defect sweep, both landed on `main` with no release.**
+  `184 -> 277` tests across 20 files, every new test negative-controlled; `lint`, `typecheck` and `typecheck:test` all 0.
+  New test files: `useModalKeyboard` (9), `DeleteConfirmModal` (15), `ErrorBoundary` (11), `preload` (41).
+  `P3.30` closed by making `README.md` + `SECURITY.md` honest about file permissions, including the fact that
+  **exported `.clavis` files get none of the `0o600`** because a Chromium `<a download>` writes them.
+  `PLANO-DEFECTOS-2026-10-15.md` then landed A1 (ErrorBoundary focus), A2 (the `onConfirm: () => void` type lie),
+  A3 (`danger.svg` `aria-hidden`), A4 (`check-update` could hang forever), B1 (Zod-parse the payload), B2
+  (3 untested IPC channels), C1 (delete the dead `onEnter` branch), C2 (the P3.27 leftover), D1 (`DESIGN.md` drift).
+  **The lesson, and it is new: a hostile review of the PLAN caught more than the tests did.** Three claims were
+  wrong, each killed by a measurement. `componentDidUpdate` never fires on an initial-mount throw, so A1's
+  test would have stayed red *with* the fix and its negative control was impossible to perform. Adding
+  `aria-hidden` would have blinded the very test named as A3's guard. And a gate was quoted as "exits 0" for a
+  **brand checker that does not exist** -- no `brand/`, no `ABOUT.md`, no `.py` file in the repo at all.
+  **A gate that has never been run is worse than no gate, because it looks like evidence.**
+  **A new toolchain fact worth carrying:** `npm run typecheck` inspects **zero** files under `src/renderer`
+  (`tsconfig.json` excludes it), so `typecheck:test` is the gate that actually covers renderer work.
+- **Previous (2026-10-13) — BR-18 closed: the GitHub mark ships the variant that matches its surface.** Both 1.4.11
   failures are gone — chip **2.70:1 → 20.60:1** on its real `#fffdf3` surface, update button **1.20:1 → 3.30:1** —
   measured by sampling pixels in a locally built AppImage, and the Known-gaps row is deleted rather than amended,
   because that table is specified as live gaps only. `github.svg` is orphaned and **archived** (BR-8g). `173/173` tests (was 171), green under `CI=true`, both typechecks and lint clean, brand

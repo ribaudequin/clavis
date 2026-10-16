@@ -67,6 +67,20 @@ function querySpan(pattern: RegExp): HTMLElement | null {
   return screen.queryByText(pattern, { selector: 'span' });
 }
 
+/** The panel carries two controls with the same Close label — the header `X` and the footer
+ *  button — and they are told apart the way the code tells them apart: `closeRef` is on the
+ *  header one, which is the only one of the two with an `aria-label`. The copy buttons carry
+ *  one too, but not this label. */
+function queryHeaderClose(): HTMLButtonElement {
+  const labelled = screen
+    .getAllByRole<HTMLButtonElement>('button', { name: CLOSE_BUTTON })
+    .filter((button) => button.hasAttribute('aria-label'));
+  if (labelled.length !== 1) {
+    throw new Error(`expected 1 aria-labelled Close button, found ${labelled.length}`);
+  }
+  return labelled[0];
+}
+
 async function findUpdateLink(): Promise<HTMLAnchorElement> {
   return await waitFor(() => {
     const link = queryUpdateLink();
@@ -682,5 +696,72 @@ describe('CreditsModal — GitHub mark per surface', () => {
     // the trap the baked `#000` in github-dark.svg closes.
     expect(chipFill).not.toBe('');
     expect(updateFill).not.toBe('');
+  });
+});
+
+describe('CreditsModal — focus on open', () => {
+  // `useFocusTrap` and `useModalKeyboard` are mocked at the top of this file, so nothing in this
+  // block moves focus except the effect that is under test. That is deliberate: the guarantee is
+  // the explicit `focus()` call, and a focus call that only happens to be a side effect of a hook
+  // is not the rule DESIGN.md states.
+
+  it('focuses the close button when the dialog is mounted open', () => {
+    render(<CreditsModal isOpen onClose={() => {}} />);
+
+    expect(document.activeElement).toBe(queryHeaderClose());
+  });
+
+  it('focuses the close button again when a modal that mounted closed is opened', async () => {
+    const { rerender } = render(<CreditsModal isOpen={false} onClose={() => {}} />);
+    await settle();
+
+    expect(document.activeElement).toBe(document.body);
+
+    // The prop flip, not a fresh mount: `isOpen` is the trigger and the effect is keyed on it, so
+    // an open that arrives as a re-render of a component that never unmounted still focuses. That
+    // is the case a mount effect would miss. `HomeScreen` mounts the modal inside a conditional
+    // today, so mount and open coincide there; the contract the component exposes is wider than
+    // that, and this is the path that pins it.
+    rerender(<CreditsModal isOpen onClose={() => {}} />);
+
+    expect(document.activeElement).toBe(queryHeaderClose());
+  });
+
+  it('calls no focus at all while the dialog is closed', async () => {
+    const windowFocus = vi.spyOn(window, 'focus');
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    outside.focus();
+
+    try {
+      render(<CreditsModal isOpen={false} onClose={() => {}} />);
+      await settle();
+
+      // The `if (!isOpen) return` guard, observed rather than assumed: a modal mounted closed
+      // leaves focus exactly where the user left it, and reaches neither focus call. Dropping the
+      // guard fires the effect on every render of a closed modal — a focus call for nothing, and
+      // a `window.focus()` that yanks the OS keyboard focus back to the app for no reason.
+      expect(windowFocus).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(outside);
+      expect(screen.queryByRole('dialog')).toBeNull();
+    } finally {
+      outside.remove();
+      windowFocus.mockRestore();
+    }
+  });
+
+  it('releases focus when the dialog closes', async () => {
+    const { rerender } = render(<CreditsModal isOpen onClose={() => {}} />);
+    const close = queryHeaderClose();
+    expect(document.activeElement).toBe(close);
+
+    rerender(<CreditsModal isOpen={false} onClose={() => {}} />);
+
+    // Nothing inside a closed modal can hold focus: the panel is not in the DOM, so the control
+    // that held it goes with it and focus falls back to the document. Tab then starts again from
+    // the top of the app rather than from a node that no longer exists.
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.contains(close)).toBe(false);
+    expect(document.activeElement).toBe(document.body);
   });
 });
