@@ -6,6 +6,10 @@ export enum ErrorCode {
   FILE_NOT_FOUND = 'FILE_NOT_FOUND',
   INVALID_JSON = 'INVALID_JSON',
   VALIDATION_ERROR = 'VALIDATION_ERROR',
+  // SAV-02/SAV-03 — A size refusal is not a generic write failure: reusing
+  // WRITE_FAILED renders "The operation could not be completed." and throws away
+  // the only message that tells the user why their drawer will not open.
+  CONTENT_TOO_LARGE = 'CONTENT_TOO_LARGE',
 }
 
 export interface AppError {

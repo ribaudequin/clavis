@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { encrypt, decrypt, deriveKey, generateSalt, MAX_DECRYPTED_SIZE } from '../src/main/encryption';
+import crypto from 'crypto';
+import {
+  encrypt,
+  decrypt,
+  deriveKey,
+  generateSalt,
+  ContentTooLargeError,
+  MAX_DECRYPTED_SIZE,
+} from '../src/main/encryption';
 
 describe('encryption module', () => {
   it('should generate a 16-byte salt', () => {
@@ -59,14 +67,52 @@ describe('encryption module', () => {
   });
 
   it('should throw "Decrypted content exceeds maximum size" when content larger than MAX_DECRYPTED_SIZE', async () => {
+    // Built without encrypt(): that guard refuses an over-cap plaintext outright, and
+    // this test covers decrypt()'s own cap — the one the application never reaches,
+    // because the store refuses the same ciphertext one line earlier. The ciphertext
+    // is real GCM over a real key, so decrypt() gets past the auth tag and fails on
+    // the size check, which is the branch under test; garbage bytes would have failed
+    // the tag first and proved nothing.
     const password = 'oversized-password-123';
-    const plainText = 'x'.repeat(MAX_DECRYPTED_SIZE + 1);
+    const params = { timeCost: 3, memoryCost: 2 ** 16, parallelism: 1 };
+    const salt = generateSalt();
+    const iv = crypto.randomBytes(16);
+    const key = await deriveKey(password, salt, params);
 
-    const { encryptedData, salt, iv, authTag } = await encrypt(plainText, password);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const encryptedData = Buffer.concat([
+      cipher.update('x'.repeat(MAX_DECRYPTED_SIZE + 1), 'utf8'),
+      cipher.final(),
+    ]).toString('hex');
+    key.fill(0);
+    expect(Buffer.from(encryptedData, 'hex')).toHaveLength(MAX_DECRYPTED_SIZE + 1);
 
     await expect(
-      decrypt(encryptedData, salt, iv, authTag, password)
+      decrypt(encryptedData, salt.toString('hex'), iv.toString('hex'), cipher.getAuthTag().toString('hex'), password, params)
     ).rejects.toThrow('Decrypted content exceeds maximum size');
+  });
+
+  it('refuses to encrypt plaintext above MAX_DECRYPTED_SIZE bytes', async () => {
+    const warn = 'oversized-password-123';
+    // Accented text is the realistic trigger: Zod counts code points, so this passes
+    // a 10_000_000-code-point schema while carrying twice the limit in UTF-8. A
+    // character-counting guard would accept it and store a drawer that can never be
+    // unlocked again.
+    await expect(encrypt('ã'.repeat(MAX_DECRYPTED_SIZE / 2 + 1), warn)).rejects.toBeInstanceOf(
+      ContentTooLargeError
+    );
+  });
+
+  it('encrypts content of exactly MAX_DECRYPTED_SIZE bytes', async () => {
+    // The accepting side of the same boundary, in the same unit: half as many code
+    // points, the same byte count, and it must still round-trip.
+    const content = 'ã'.repeat(MAX_DECRYPTED_SIZE / 2);
+    expect(content.length).toBeLessThan(MAX_DECRYPTED_SIZE);
+    expect(Buffer.byteLength(content, 'utf8')).toBe(MAX_DECRYPTED_SIZE);
+
+    const { encryptedData, salt, iv, authTag } = await encrypt(content, 'oversized-password-123');
+    expect(Buffer.from(encryptedData, 'hex')).toHaveLength(MAX_DECRYPTED_SIZE);
+    expect(await decrypt(encryptedData, salt, iv, authTag, 'oversized-password-123')).toBe(content);
   });
 
   it('deriveKey uses the same cost factors whether params are omitted or passed explicitly', async () => {

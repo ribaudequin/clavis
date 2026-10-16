@@ -63,8 +63,12 @@ The counter resets after 2 minutes of inactivity and is cleared on a successful 
 ### Content and file limits
 
 - Decrypted content is capped at **10,000,000 bytes** (`encryption.ts`).
-- Save is capped at the same 10,000,000 bytes via Zod (`validation.ts`).
-- Import files are capped at **11,000,000 bytes**, with a **pre-decrypt size check on unlock** so an oversized payload is rejected before any decryption work is done.
+- Save is capped at the same 10,000,000 by Zod (`validation.ts`) — but Zod 4.5.4's `.max()` counts **code points**, not UTF-16 code units and not bytes. A code point may be up to 4 UTF-8 bytes, so the save ceiling is worth up to 40 MB of UTF-8.
+- A **pre-decrypt size check on unlock** (`store.ts:271`) rejects a payload longer than **10,000,000 decoded bytes** before any decryption work is done. That bound is the decrypted-content limit, because AES-GCM ciphertext is exactly as long as its plaintext; a separate, larger file-size constant would have left the guard unable to fire.
+- ⚠️ **These two caps are in different units and do not agree — unfixed, SAV-01…SAV-06.** The guard that actually fires is the one at `store.ts:271`, **not** the byte cap inside `decrypt()`, which it makes unreachable. Content above 10 MB of UTF-8 therefore **saves successfully and then can never be unlocked**. Realistic trigger: `'ã'.repeat(10_000_000)` — 10 M code points, accepted by Zod, 20 MB of UTF-8, refused on open. Accented Portuguese starts failing above ~9.1 M characters.
+- ⚠️ **The refusal is reported as an authentication failure.** `unlockDrawer` returns a bare `null` from six distinct causes (SAV-02); an oversized drawer is reported as "Incorrect password or drawer not found" and increments the rate limiter, so a user retrying with the correct password is locked out.
+- Import files are capped at **20,004,096 characters of JSON**, derived from the decrypted-content limit rather than set independently: the payload is hex, so a file costs two characters per byte of text, and the cap is `MAX_DECRYPTED_SIZE * 2 + 4_096` (`store.ts`).
+- ⚠️ **Import is not a recovery path, and it does not validate the payload it admits.** `importDrawerRaw` checks that `encryptedData` is present and a string (`store.ts:419`) but never checks its length (SAV-04), so an oversized drawer imports cleanly and appears in the drawer list under its plaintext title. Because the derived cap is loose enough to admit a 10 MB-UTF-8 payload, export → delete → import **succeeds** for a drawer that still cannot be opened — a round trip that completes while preserving nothing.
 
 ### Process and window hardening
 
@@ -73,7 +77,7 @@ The counter resets after 2 minutes of inactivity and is cleared on a successful 
 
 ### Filesystem permissions
 
-Drawers are stored in a `drawers` subdirectory of Electron's `userData` path. The directory is created with mode **`0o700`** (`store.ts`, `ensureDataDir`); each drawer file is written with mode **`0o600`** on create (`store.ts:205`), save (`:351`) and import (`:436`).
+Drawers are stored in a `drawers` subdirectory of Electron's `userData` path. The directory is created with mode **`0o700`** (`store.ts`, `ensureDataDir`); each drawer file is written with mode **`0o600`** on create (`store.ts:205`), save (`:356`) and import (`:453`).
 
 - **Linux and macOS:** the mode is applied when the file is created, and the process umask can only clear bits, never add them. `0o600` is therefore an upper bound on what a newly created drawer file can be, not a lower bound.
 - **An existing file is never tightened.** The Node.js documentation states that the `mode` option of `fs.writeFile()` "only affects the newly created file", and `fs.mkdir()`'s likewise applies at creation only. A drawer file that is already in place with looser permissions — restored from a backup, copied in by hand, or unpacked from an archive — keeps them, and saving it again does not change them. **This holds on Linux and macOS too; it is not a Windows-only gap.**

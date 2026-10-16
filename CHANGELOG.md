@@ -8,6 +8,14 @@ specific test watched failing before the fix was called done.
 
 ### Fixed
 
+- **Export → import round trip broken above ~5.5 MB.** `importDrawerRaw()` capped the `.clavis` *file* at
+  11 000 000 characters while the save path capped *text* at 10 000 000, and the constant's own comment
+  claimed it sat "slightly above MAX_DECRYPTED_SIZE to allow JSON overhead" — arithmetic that holds for
+  base64 and not for the hex payload `encrypt()` returns, which costs two characters per byte. Anything
+  over ~5.5 MB exported cleanly and then failed to import, with no warning at any point. The cap is now
+  derived from `MAX_DECRYPTED_SIZE` so the two constants cannot drift apart again. The same constant had
+  also bounded the *unlock* path, where the quantity is decoded bytes rather than file characters — raising
+  it would have left the P0.12 pre-decrypt guard unreachable, so that bound moved to `MAX_DECRYPTED_SIZE`.
 - **`check-update` could hang forever.** The `.on('error')` handler sat on the *request*, never on the
   *response*, and there was no timeout. A response stream that stalled after the headers left the
   promise unsettled forever, so `CreditsModal`'s `Promise.allSettled` never resolved and the About
@@ -41,6 +49,8 @@ specific test watched failing before the fix was called done.
   would throw on a keydown originating from an SVG child.
 
 ### Added
+
+- `docs/DRAWER-CAPACITY.md` — how much text a drawer holds, in bytes, characters and pages, for five scripts.
 
 - Four test files closing the P3.31 gaps: `useModalKeyboard` (the sole owner of Escape since
   2026-10-07, untested until now), `DeleteConfirmModal`, `ErrorBoundary`, and `preload` — the last

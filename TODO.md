@@ -292,6 +292,113 @@ negative-controlled. `184 → 277` tests.
       carried one `**Fixed 2026-10-13**` row and D1 added a second. `DESIGN.md:829` also has a malformed
       `danger.svg` row (4 cells in a 3-column table).
 
+- [x] **DOS-02 — export → import round trip broken above ~5.5 MB — DONE 2026-10-16.** Found while writing
+      `docs/DRAWER-CAPACITY.md`, not by reading the code. `importDrawerRaw()` capped the `.clavis` **file** at
+      11 000 000 characters while the save path caps **text** at 10 000 000, and `MAX_IMPORT_FILE_SIZE`'s own
+      comment claimed it sat "slightly above MAX_DECRYPTED_SIZE to allow JSON overhead" — arithmetic that holds for
+      base64 and not for the hex payload `encrypt()` returns (`encryption.ts:122`, 2 chars per byte). Anything over
+      **~5.5 MB** exported cleanly and then failed to import, silently. **Owner decision: raise the limit, do not
+      change the storage format** — hex→base64 would halve the files but changes the on-disk format of every
+      existing drawer, and the content is irreversibly encrypted, so a bad migration means permanent data loss.
+      The cap is now **derived** (`MAX_DECRYPTED_SIZE * 2 + 4_096`) so the two constants cannot drift apart again,
+      and the misleading comment records the cause. **A second bug hid inside the fix:** the same constant was the
+      bound on the *unlock* path, where the quantity is decoded bytes rather than file characters — raising it would
+      have left the P0.12 pre-decrypt guard permanently unreachable, a security regression introduced while fixing a
+      functional one. That bound moved to `MAX_DECRYPTED_SIZE`, which is **exactly tight** because GCM ciphertext
+      equals plaintext length (the tag is returned separately, never concatenated). 4 tests, incl. a real 10 MB
+      `createDrawer → saveDrawer → readDrawerRaw → deleteDrawer → importDrawerRaw → unlockDrawer` round trip (1.4 s;
+      Argon2id at 2^18 KiB costs ~310 ms here, so nothing had to be faked). The guard test spies on `logger.warn`
+      because `unlockDrawer` returns `null` for an oversized payload **and** for garbage alike — asserting `null`
+      passed under the mutation and proved nothing. `281/281`.
+- [ ] **The unlock guard allocates before it checks.** `Buffer.from(drawer.encryptedData, 'hex')` runs one line
+      *before* the size comparison, so a 500 MB `encryptedData` string is fully decoded into a 250 MB buffer before
+      anything is refused. `unlockDrawer` also has no cap on the file it reads — `fs.readFile(filePath, 'utf8')`
+      parses a JSON file of any size from the data directory first. The guard bounds the key derivation and the
+      decrypted output (what P0.12 asked for) but is not a memory guard on the path to it. Allocation-free form:
+      check `drawer.encryptedData.length / 2` before decoding. Separate hardening edit with its own edge cases
+      (odd-length hex, non-hex input).
+- [ ] **Raising the import cap doubles the worst case `importDrawerRaw` will parse**, from ~22 MB to ~40 MB of
+      JSON. Still local-only and user-initiated on a file they picked, so practical risk is small — recorded in
+      the constant's comment and in `docs/DRAWER-CAPACITY.md` rather than left implicit.
+
+## Storage limits hardening — `PLANO-STORAGE-LIMITS-2026-10-16.md`
+
+Surfaced by researching what keeping the 20 MB import cap exposed. **Nothing here is fixed yet.**
+The owner decision on record: **keep 20 MB**. Two hostile reviews have run; the second killed every
+load-bearing claim in the first draft, and the corrections are recorded in the plan.
+
+- [ ] **SAV-01 — a drawer can be saved and then never opened again. THREE doors, two need no attacker.**
+      `unlockDrawer` refuses any drawer whose `encryptedData` decodes above `MAX_DECRYPTED_SIZE`
+      (`store.ts:271-278`) and returns `null`, which `ipc-handlers.ts:167-180` reports as
+      `DECRYPT_FAILED` → **"Incorrect password or drawer not found"**, *and increments the rate
+      limiter* — so retrying walks into the 1s/5s/30s lockout with the correct password.
+      - **Door 1 (save):** `SaveDrawerSchema.content.max(10_000_000)` counts **code points** (Zod 4.5.4,
+        `util.codePointLength`); the cap counts **UTF-8 bytes**. Worst case 4 bytes per counted unit.
+        `store.ts:344` calls `encrypt()` with no byte check and `store.ts:356` writes the result.
+      - **Door 2 (import), and the cheapest — NOT in the first draft of the plan:** `importDrawerRaw`
+        checks that `encryptedData` *exists* and is a string (`store.ts:419-422`) but **never its
+        length**. Verified: 20 002 000 hex chars → file ~20 002 900 (under the 20 004 096 cap) →
+        imports → listed under its plaintext title → can never be opened.
+      - **Door 3 (legacy migration):** `store.ts:116` `fs.copyFile`s any `*.clavis` from
+        `~/.local/share/Clavis/drawers` with no size check, no parse, every startup.
+      - **The trigger is any note over 10 000 000 UTF-8 bytes:** `'x'.repeat(9_999_998) + '😀'` =
+        9 999 999 code points, **10 000 002 bytes** → schema accepts, unlock refuses. Verified.
+        Minimum astral form is 2 500 001 code points. **[corrected]** this line previously read
+        "four emoji in a 9.9 MB note" — that is 9 900 016 bytes and is **not** triggered; the
+        4-bytes-per-code-point fact had been mis-transcribed into an example. The realistic case
+        is not emoji: `'ã'.repeat(10_000_000)` = 10 M code points, 20 MB of UTF-8, also accepted
+        then refused — ordinary accented Portuguese bricks.
+      - **Corrections to the first draft of the plan, each measured:** (a) `decrypt()` **never runs** —
+        `store.ts:278` returns before `:281`, so the byte cap at `encryption.ts:149` is unreachable
+        through the application and survives only via a direct unit test; (b) "cannot be backed up"
+        is **false** for most of the range — at 10 000 004 bytes the file is 20 000 611 chars, under
+        the cap, so export→delete→import **succeeds** and still yields an unopenable drawer.
+- [ ] **SAV-02 — root cause is `unlockDrawer`'s `null` contract, not a missing guard.** Six distinct
+      causes return `null` — invalid id (`:231`), read failure (`:238`), parse failure (`:239`), KDF
+      out of bounds (`:255`), ciphertext over cap (`:278`), wrong password (`:281`) — and
+      `ipc-handlers.ts:167-180` collapses all six into one message *and* one rate-limiter increment.
+      A `{ ok: false, reason }` return fixes all six, is smaller than special-casing, and **rescues
+      drawers already bricked in the wild** — which no guard can, because the bytes are on disk.
+- [ ] **SAV-03 — `encrypt()` byte guard + a legible error.** Mirror `decrypt()`'s guard into
+      `encrypt()`. **Two traps:** (a) a throw there is swallowed by `saveDrawer`'s `boolean` contract
+      (`store.ts:360`) and surfaces as *"Failed to save drawer (invalid ID or password)"* — the
+      password again, and not loud; (b) **no existing `ErrorCode` can carry a legible message** —
+      `tError` falls back to `error.message` only when the dictionary key is missing, and every
+      `error.*` key exists, so `WRITE_FAILED` renders the generic copy and discards the message.
+      There is already a dead instance: `ipc-handlers.ts:417` builds a `"File too large."` the user
+      never sees. A new `ErrorCode` member is the only route; `tests/errorTranslation.test.tsx:130-141`
+      goes red until **both** dictionary entries exist.
+      **`tests/encryption.test.ts:61-70` must be rewritten in the same commit** — it calls
+      `encrypt()` with an oversized payload at `:65` and will throw once the guard exists.
+- [ ] **SAV-04 — reject oversized ciphertext at import (`store.ts:419`).** One line, closes door 2.
+      `Math.floor(drawer.encryptedData.length / 2) > MAX_DECRYPTED_SIZE`. Sound because
+      `Buffer.from(s,'hex').length <= Math.floor(s.length/2)` always holds (Node stops at the first
+      invalid pair) and the floor is exact, not rounded. Verified against odd-length, non-hex and astral input.
+- [ ] **SAV-05 — read guards run after the allocation they exist to prevent.** `unlockDrawer` (`:238`),
+      `saveDrawer` (`:323`), `readDrawerRaw` (`:383`, and it crosses IPC into a renderer `Blob`),
+      `importDrawerRaw` (read at `ipc-handlers.ts:396`, capped at `store.ts:407` — downstream),
+      and **`listDrawers` (`:149-150`), which needs no user gesture**: it reads and parses every
+      `*.clavis` on every app open, and `HomeScreen` re-runs it after every save, delete, import and
+      back-navigation. `ipc-handlers.ts:385` already holds the `Stats` from `fs.lstat` and **discards
+      `stat.size`**. Also: `store.ts:270` allocates the full decoded buffer one line before `:271`
+      compares its length, and `encryption.ts:140` decodes the same string a second time — handing
+      the buffer over makes the check free and halves the per-unlock allocation.
+      **The migration row needs its own fix:** `fs.copyFile` has no read to bound, so it needs a
+      `stat.size` check *before the copy*, not a read guard.
+      **The test shape matters:** `tests/ipc-handlers.test.ts` mocks `readFile` (`:35-43`) and the whole
+      store module (`:14-23`), so nothing today observes read size. A call-shape assertion cannot fail
+      on the real defect — make `fs.stat` resolve an over-cap size, make `readFile` **throw if called**,
+      and assert the operation refused.
+- [ ] **SAV-06 — the import-cap coupling. Owner decision: keep 20 MB.** A4, recommended:
+      `MAX_IMPORT_FILE_SIZE = Math.min(MAX_DECRYPTED_SIZE * 2 + IMPORT_ENVELOPE_OVERHEAD, ABSOLUTE_IMPORT_CEILING)`
+      with `ABSOLUTE_IMPORT_CEILING = 20_004_096`. Keeps the relationship correct **by construction**
+      and pins the DoS bound so raising the text limit cannot move it. **No new test needed** — the
+      existing round-trip test (`tests/store.test.ts:255-286`) goes red with a real exported file.
+      Rejected: **A2** (decouple + invariant test) asserts a *lower bound* while the derivation makes
+      the violating case inexpressible, and needs a new export since the constant is module-private;
+      **A3** (two values, no test). **Do not "fix" `tests/store.test.ts:270, 303, 305`** — the
+      hardcoded `4096` there encodes the coupling as behaviour and is not drift risk.
+
 ## Deferred (Post-MVP)
 
 - [x] Auto-updater (electron-updater + GitHub Releases endpoint) — `electron-updater` instalado; `autoUpdater.setFeedURL({ provider: 'github', owner: 'ribaudequin', repo: 'clavis' })` + `checkForUpdatesAndNotify()` no `main/index.ts`; `if (app.isPackaged)` guardado — v0.1+
@@ -411,7 +518,24 @@ Requested as "make the About screen follow the brand rules". Authority: `~/Herme
       `ABOUT.md` §10 stay open — outside this agent's scope.
 
 ## Progress
-- **Current focus (2026-10-16) — the P3.31 testing sweep and a 7-step defect sweep, both landed on `main` with no release.**
+- **Current focus (2026-10-16) — documentation corrected, no code changed. The storage-limits docs were wrong about the unit, the guilty line, and their own arithmetic.**
+  `docs/DRAWER-CAPACITY.md` + `SECURITY.md` claimed Zod's `.max()` counts UTF-16 code units; it counts **code points**
+  (verified against Zod 4.5.4: `'😀'.repeat(4)` = 4 code points / 8 units / 16 bytes, and passes `.max(4)`). Both
+  attributed the refusal to `decrypt()`; the guard that fires is **`store.ts:271` (`unlockDrawer`)**, returning a bare
+  `null` from six causes, so an oversized drawer reads as "Incorrect password or drawer not found" and still
+  increments the rate limiter. `decrypt()`'s byte cap at `encryption.ts:149` is **unreachable through the app**.
+  **Envelope arithmetic measured, not reasoned:** claimed ~560/~815/~1 100; actual **393** / **647** / **1 922**
+  (255 × `U+0001` escapes to 6 chars each). The 4 096 allowance leaves **1.1×** headroom, not "roughly 3×". The file is
+  `JSON.stringify(drawer, null, 2)` — the indentation is part of the cost — and `iconData` is derived from the id, not
+  user input. **A wrong number had spread across four files, each citing the others:** "four emoji in a 9.9 MB note" is
+  9 900 016 bytes, under the cap, never triggered; the plan's own table was right while the prose under it was wrong.
+  Realistic trigger is `'ã'.repeat(10_000_000)` — 10 M code points accepted, 20 MB of UTF-8 refused — so accented
+  Portuguese bricks and the safe figure is ~9.1 M characters. Both docs now describe the **bug**, not a fix, since
+  SAV-01…SAV-06 is untouched. `PLANO-STORAGE-LIMITS` Block C marked partly resolved, post-fix reshape deferred.
+  All four gates green, no code touched: `lint` 0, `typecheck` 0, `typecheck:test` 0, **`281/281`**, build OK.
+  **Lesson added: an error copied between documents acquires the appearance of independent confirmation**, because each
+  file cites the others rather than the measurement.
+- **Previous (2026-10-16) — the P3.31 testing sweep and a 7-step defect sweep, both landed on `main` with no release.**
   `184 -> 277` tests across 20 files, every new test negative-controlled; `lint`, `typecheck` and `typecheck:test` all 0.
   New test files: `useModalKeyboard` (9), `DeleteConfirmModal` (15), `ErrorBoundary` (11), `preload` (41).
   `P3.30` closed by making `README.md` + `SECURITY.md` honest about file permissions, including the fact that

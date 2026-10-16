@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { Mock, MockedFunction } from 'vitest';
 
 vi.mock('electron', () => ({
@@ -20,6 +20,7 @@ vi.mock('../src/main/store.js', () => ({
   readDrawerRaw: vi.fn(),
   importDrawerRaw: vi.fn(),
   ensureDataDir: vi.fn(),
+  MAX_DRAWER_FILE_SIZE: 20_004_096,
 }));
 
 vi.mock('../src/main/logger.js', () => ({
@@ -82,7 +83,7 @@ let handlers: Map<Channel, IpcListener>;
 
 // `fs/promises` exposes overloaded signatures; these narrow aliases describe the
 // exact overloads the import handler uses, so mock expectations stay typed.
-type MockStats = { isSymbolicLink: () => boolean };
+type MockStats = { isSymbolicLink: () => boolean; size?: number };
 const lstatMock = fsPromises.lstat as unknown as MockedFunction<
   (path: string) => Promise<MockStats>
 >;
@@ -298,7 +299,7 @@ describe('IPC handlers', () => {
   describe('unlock-drawer', () => {
     it('returns ok with content on success', async () => {
       const payload = { title: 'A', content: 'hello', iconData: 'rgb(0,0,0)' };
-      vi.mocked(store.unlockDrawer).mockResolvedValue(payload);
+      vi.mocked(store.unlockDrawer).mockResolvedValue({ ok: true, data: payload });
 
       const handler = getHandler(CHANNELS.UNLOCK_DRAWER);
       const result = await handler({}, VALID_UUID, 'password12345');
@@ -308,7 +309,7 @@ describe('IPC handlers', () => {
     });
 
     it('returns DECRYPT_FAILED with data:null mapped to error envelope when password wrong', async () => {
-      vi.mocked(store.unlockDrawer).mockResolvedValue(null);
+      vi.mocked(store.unlockDrawer).mockResolvedValue({ ok: false, reason: 'wrong_password' });
 
       const handler = getHandler(CHANNELS.UNLOCK_DRAWER);
       const result = await handler({}, VALID_UUID, 'wrong-password');
@@ -319,6 +320,46 @@ describe('IPC handlers', () => {
         expect(result.error.message).toBe('Incorrect password or drawer not found');
         expect(result.error.details).toBeUndefined();
       }
+    });
+
+    it('reports an oversized drawer as CONTENT_TOO_LARGE rather than as a password failure', async () => {
+      // The rescue path: a drawer already bricked on disk can never be unlocked, and
+      // the honest answer is the only thing the user can act on. Reusing
+      // DECRYPT_FAILED here would put them back in the lockout loop.
+      vi.mocked(store.unlockDrawer).mockResolvedValue({ ok: false, reason: 'too_large' });
+
+      const handler = getHandler(CHANNELS.UNLOCK_DRAWER);
+      const result = await handler({}, VALID_UUID, 'correct-password123');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.CONTENT_TOO_LARGE);
+        expect(result.error.message).toBe('Drawer content exceeds the maximum size');
+      }
+    });
+
+    it('maps every unlock failure reason to its own code and message', async () => {
+      const handler = getHandler(CHANNELS.UNLOCK_DRAWER);
+      const reasons = [
+        'invalid_id',
+        'read_failed',
+        'parse_failed',
+        'kdf_out_of_bounds',
+        'too_large',
+        'wrong_password',
+      ] as const;
+
+      const envelopes = [];
+      for (const reason of reasons) {
+        vi.mocked(store.unlockDrawer).mockResolvedValue({ ok: false, reason });
+        const result = await handler({}, VALID_UUID, 'password12345');
+        if (result.ok) throw new Error(`expected failure for ${reason}`);
+        envelopes.push(`${result.error.code}:${result.error.message}`);
+      }
+
+      // Six causes, six distinguishable answers: a collapsed mapping is what made an
+      // oversized drawer indistinguishable from a wrong password.
+      expect(new Set(envelopes).size).toBe(reasons.length);
     });
 
     it('returns VALIDATION_ERROR on invalid id', async () => {
@@ -346,9 +387,79 @@ describe('IPC handlers', () => {
     });
   });
 
+  // P0.6/SAV-02 — The limiter counts guesses. It used to count every failure,
+  // which locked a user out of a drawer whose password had never been wrong.
+  describe('unlock rate limiting', () => {
+    // Each scenario uses its own id: the limiter state is module-private and there
+    // is no reset hook, so ids are what keep these tests independent.
+    const PASSWORD_ID = '123e4567-e89b-12d3-a456-426614174050';
+    const SIZE_ID = '123e4567-e89b-12d3-a456-426614174051';
+
+    /**
+     * Observes whether a handler call has settled, without awaiting it — a call
+     * parked on a rate-limit timer must be observable as *not* settled.
+     * `Handler<C>` is typed by the resolved value, so the promise is re-wrapped here
+     * exactly as the check-update timeout test does it.
+     */
+    function watch<T>(result: T): { settled: () => boolean } {
+      const state = { done: false };
+      void Promise.resolve(result).then(() => {
+        state.done = true;
+      });
+      return { settled: () => state.done };
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('still locks out after repeated wrong passwords', async () => {
+      vi.mocked(store.unlockDrawer).mockResolvedValue({ ok: false, reason: 'wrong_password' });
+      const handler = getHandler(CHANNELS.UNLOCK_DRAWER);
+
+      // Three failures are free; the fourth is parked on the 1s delay.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const early = watch(handler({}, PASSWORD_ID, 'wrong-password'));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(early.settled()).toBe(true);
+      }
+
+      const locked = watch(handler({}, PASSWORD_ID, 'wrong-password'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(locked.settled()).toBe(false);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(locked.settled()).toBe(true);
+    });
+
+    it('never counts a non-password failure against the limiter', async () => {
+      vi.mocked(store.unlockDrawer).mockResolvedValue({ ok: false, reason: 'too_large' });
+      const handler = getHandler(CHANNELS.UNLOCK_DRAWER);
+
+      // Well past the threshold: with the old condition these attempts would be
+      // parked on 1s/5s/30s timers, and the user would wait out a lockout for a
+      // drawer that cannot be opened at all.
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const settled = watch(handler({}, SIZE_ID, 'correct-password123'));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(settled.settled()).toBe(true);
+      }
+
+      // And the count was genuinely never accumulated: a wrong password on the same
+      // id starts from zero rather than inheriting the failures above.
+      vi.mocked(store.unlockDrawer).mockResolvedValue({ ok: false, reason: 'wrong_password' });
+      const firstGuess = watch(handler({}, SIZE_ID, 'wrong-password'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(firstGuess.settled()).toBe(true);
+    });
+  });
+
   describe('save-drawer', () => {
     it('returns ok on success', async () => {
-      vi.mocked(store.saveDrawer).mockResolvedValue(true);
+      vi.mocked(store.saveDrawer).mockResolvedValue({ ok: true });
 
       const handler = getHandler(CHANNELS.SAVE_DRAWER);
       const result = await handler({}, VALID_UUID, 'password12345', 'Title', 'content');
@@ -357,17 +468,55 @@ describe('IPC handlers', () => {
       expect(store.saveDrawer).toHaveBeenCalledWith(VALID_UUID, 'password12345', 'Title', 'content');
     });
 
-    it('returns WRITE_FAILED with "invalid ID or password" when store returns false', async () => {
-      vi.mocked(store.saveDrawer).mockResolvedValue(false);
+    it('reports an invalid id as VALIDATION_ERROR, not as a password problem', async () => {
+      vi.mocked(store.saveDrawer).mockResolvedValue({ ok: false, reason: 'invalid_id' });
 
       const handler = getHandler(CHANNELS.SAVE_DRAWER);
       const result = await handler({}, VALID_UUID, 'wrong-password', 'Title', 'content');
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error.code).toBe(ErrorCode.WRITE_FAILED);
-        expect(result.error.message).toBe('Failed to save drawer (invalid ID or password)');
+        expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+        expect(result.error.message).toBe('Invalid drawer ID');
       }
+    });
+
+    it('reports an oversized note as CONTENT_TOO_LARGE', async () => {
+      // The guard working: a refusal to store is not a generic write failure, and the
+      // old code reported it as "invalid ID or password".
+      vi.mocked(store.saveDrawer).mockResolvedValue({ ok: false, reason: 'content_too_large' });
+
+      const handler = getHandler(CHANNELS.SAVE_DRAWER);
+      const result = await handler({}, VALID_UUID, 'password12345', 'Title', 'content');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.CONTENT_TOO_LARGE);
+        expect(result.error.message).toBe('Content exceeds the maximum size');
+      }
+    });
+
+    it('maps every save failure reason to its own code and message', async () => {
+      vi.mocked(store.saveDrawer).mockResolvedValue({ ok: true });
+      const handler = getHandler(CHANNELS.SAVE_DRAWER);
+      const reasons = [
+        'invalid_id',
+        'password_too_short',
+        'kdf_out_of_bounds',
+        'content_too_large',
+        'too_large',
+        'write_failed',
+      ] as const;
+
+      const envelopes = [];
+      for (const reason of reasons) {
+        vi.mocked(store.saveDrawer).mockResolvedValue({ ok: false, reason });
+        const result = await handler({}, VALID_UUID, 'password12345', 'Title', 'content');
+        if (result.ok) throw new Error(`expected failure for ${reason}`);
+        envelopes.push(`${result.error.code}:${result.error.message}`);
+      }
+
+      expect(new Set(envelopes).size).toBe(reasons.length);
     });
 
     it('returns VALIDATION_ERROR on invalid id', async () => {
@@ -696,6 +845,43 @@ describe('IPC handlers', () => {
       if (!result.ok) {
         expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
         expect(result.error.message).toBe('Refusing to import a symbolic link');
+      }
+      expect(readFileMock).not.toHaveBeenCalled();
+      expect(store.importDrawerRaw).not.toHaveBeenCalled();
+    });
+
+    // Block B — The import handler already held the lstat result and discarded
+    // stat.size, so the read itself stayed unbounded: the cap in importDrawerRaw
+    // runs on a string already in memory. The shape that can fail on the real
+    // defect: stat resolves over the cap, readFile would throw if called, and
+    // the handler must refuse — a call-shape assertion ("stat was consulted")
+    // stays green if the comparison uses the wrong constant or the wrong branch.
+    it('refuses an over-cap file before reading it, using the lstat size', async () => {
+      const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/huge.clavis'] });
+      handlers.clear();
+      registerIpcHandlers({
+        ipcMain: { handle: (channel, listener) => { handlers.set(channel, listener); } },
+        dialog: { showOpenDialog },
+      });
+      const dialogResult = await getHandler(CHANNELS.OPEN_FILE_DIALOG)({});
+      if (!dialogResult.ok) throw new Error('expected ok');
+      const token = dialogResult.data!.token;
+
+      // The handler holds this lstat result and reads stat.size off it — the
+      // size the real code discarded.
+      lstatMock.mockResolvedValue({ isSymbolicLink: () => false, size: store.MAX_DRAWER_FILE_SIZE + 1 });
+      readFileMock.mockRejectedValue(new Error('must not read an over-cap file'));
+      vi.mocked(store.importDrawerRaw).mockResolvedValue(true);
+
+      const handler = getHandler(CHANNELS.IMPORT_DRAWER);
+      const result = await handler({}, token);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.WRITE_FAILED);
+        // Locale-independent: the handler's message is built in getLocale(),
+        // so the assertion pins *which* message, not which language.
+        expect(result.error.message).toMatch(/too large|demasiado grande/i);
       }
       expect(readFileMock).not.toHaveBeenCalled();
       expect(store.importDrawerRaw).not.toHaveBeenCalled();

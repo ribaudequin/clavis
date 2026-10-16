@@ -17,7 +17,9 @@ import {
   importDrawerRaw,
   DrawerAlreadyExistsError,
   FileTooLargeError,
+  MAX_DRAWER_FILE_SIZE,
 } from './store.js';
+import type { UnlockFailureReason, SaveFailureReason } from './store.js';
 import {
   CreateDrawerSchema,
   UnlockDrawerSchema,
@@ -86,6 +88,33 @@ export interface IpcDeps {
   };
   dialog: Pick<Dialog, 'showOpenDialog'>;
 }
+
+// SAV-02 — The six ways an unlock can fail used to share one message and one
+// rate-limiter increment, so a correct password against an oversized or corrupt
+// drawer told the user it was wrong and then locked them out for retrying it.
+// tError resolves user-visible text from the code alone (every error.* key exists,
+// so the message below is for the logs), which is why 'too_large' needs a code of
+// its own rather than a re-worded DECRYPT_FAILED.
+const UNLOCK_ERRORS: Record<UnlockFailureReason, { code: ErrorCode; message: string }> = {
+  invalid_id: { code: ErrorCode.VALIDATION_ERROR, message: 'Invalid drawer ID' },
+  read_failed: { code: ErrorCode.FILE_NOT_FOUND, message: 'Failed to read the drawer file' },
+  parse_failed: { code: ErrorCode.INVALID_JSON, message: 'The drawer file is corrupt' },
+  kdf_out_of_bounds: { code: ErrorCode.VALIDATION_ERROR, message: 'Drawer key derivation parameters are out of bounds' },
+  too_large: { code: ErrorCode.CONTENT_TOO_LARGE, message: 'Drawer content exceeds the maximum size' },
+  wrong_password: { code: ErrorCode.DECRYPT_FAILED, message: 'Incorrect password or drawer not found' },
+};
+
+// SAV-03 — Same reasoning for the write side: a store that refuses a note for
+// being too large must not be reported as a bad password, which is what the bare
+// boolean used to do.
+const SAVE_ERRORS: Record<SaveFailureReason, { code: ErrorCode; message: string }> = {
+  invalid_id: { code: ErrorCode.VALIDATION_ERROR, message: 'Invalid drawer ID' },
+  password_too_short: { code: ErrorCode.PASSWORD_TOO_SHORT, message: 'Password must be at least 8 characters' },
+  kdf_out_of_bounds: { code: ErrorCode.VALIDATION_ERROR, message: 'Drawer key derivation parameters are out of bounds' },
+  content_too_large: { code: ErrorCode.CONTENT_TOO_LARGE, message: 'Content exceeds the maximum size' },
+  too_large: { code: ErrorCode.CONTENT_TOO_LARGE, message: 'Drawer file exceeds the maximum size' },
+  write_failed: { code: ErrorCode.WRITE_FAILED, message: 'Failed to save drawer' },
+};
 
 export function registerIpcHandlers(deps: IpcDeps): void {
   const { ipcMain, dialog } = deps;
@@ -163,25 +192,33 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
 
-      const data = await unlockDrawer(validated.id, validated.password);
-      if (data === null) {
-        const state = unlockRateLimits.get(validated.id) || { count: 0, lastAttempt: 0 };
-        state.count += 1;
-        state.lastAttempt = Date.now();
-        unlockRateLimits.set(validated.id, state);
-        logger.warn('Unlock failed: incorrect password or drawer not found', { id, attemptCount: state.count });
+      const result = await unlockDrawer(validated.id, validated.password);
+      if (!result.ok) {
+        // P0.6 — Only a wrong password is a guess. An oversized, corrupt or
+        // unreadable drawer is not evidence of anything, and counting those walked
+        // users into the lockout for a password that was never incorrect.
+        if (result.reason === 'wrong_password') {
+          const state = unlockRateLimits.get(validated.id) || { count: 0, lastAttempt: 0 };
+          state.count += 1;
+          state.lastAttempt = Date.now();
+          unlockRateLimits.set(validated.id, state);
+          logger.warn('Unlock failed: incorrect password', { id, attemptCount: state.count });
+        } else {
+          logger.warn('Unlock refused', { id, reason: result.reason });
+        }
+        const mapped = UNLOCK_ERRORS[result.reason];
         return {
           ok: false,
           error: {
-            code: ErrorCode.DECRYPT_FAILED,
-            message: 'Incorrect password or drawer not found',
+            code: mapped.code,
+            message: mapped.message,
           },
         };
       }
       // Success: reset rate limit
       unlockRateLimits.delete(validated.id);
       logger.info('Drawer unlocked', { id });
-      return { ok: true, data };
+      return { ok: true, data: result.data };
     } catch (e) {
       if (e instanceof z.ZodError) {
         logger.warn('unlock-drawer validation failed', { issues: e.issues.length });
@@ -210,14 +247,15 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     try {
       logger.debug('IPC handler called', { handler: 'save-drawer', id });
       const validated = SaveDrawerSchema.parse({ id, password, title, content });
-      const success = await saveDrawer(validated.id, validated.password, validated.title, validated.content);
-      if (!success) {
-        logger.warn('Save failed: invalid ID or password', { id });
+      const result = await saveDrawer(validated.id, validated.password, validated.title, validated.content);
+      if (!result.ok) {
+        const mapped = SAVE_ERRORS[result.reason];
+        logger.warn('Save refused', { id, reason: result.reason });
         return {
           ok: false,
           error: {
-            code: ErrorCode.WRITE_FAILED,
-            message: 'Failed to save drawer (invalid ID or password)',
+            code: mapped.code,
+            message: mapped.message,
           },
         };
       }
@@ -390,6 +428,24 @@ export function registerIpcHandlers(deps: IpcDeps): void {
             error: {
               code: ErrorCode.VALIDATION_ERROR,
               message: 'Refusing to import a symbolic link',
+            },
+          };
+        }
+        // Block B — The lstat above already measured the file and the size was
+        // discarded; the cap in importDrawerRaw below runs on a string this
+        // handler has already read into memory, so the read itself stayed
+        // unbounded. One stat syscall closes it before the allocation, and the
+        // cap is the same MAX_DRAWER_FILE_SIZE every other read path refuses on.
+        if (stat.size > MAX_DRAWER_FILE_SIZE) {
+          logger.warn('import-drawer: file too large', {
+            fileName: path.basename(filePath),
+            size: stat.size,
+          });
+          return {
+            ok: false,
+            error: {
+              code: ErrorCode.WRITE_FAILED,
+              message: getLocale() === 'pt' ? 'Ficheiro demasiado grande.' : 'File too large.',
             },
           };
         }

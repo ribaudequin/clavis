@@ -88,6 +88,7 @@ export const translations: Record<string, TranslationDict> = {
     'error.file_not_found': 'Não foi possível encontrar a gaveta.',
     'error.invalid_json': 'O ficheiro não é uma gaveta Clavis válida.',
     'error.validation_error': 'A data introduzida não é válida.',
+    'error.content_too_large': 'Esta gaveta é demasiado grande para a aplicação abrir ou guardar.',
   },
   'en': {
     'app.title': 'Clavis',
@@ -172,6 +173,7 @@ export const translations: Record<string, TranslationDict> = {
     'error.file_not_found': 'The drawer could not be found.',
     'error.invalid_json': 'That file is not a valid Clavis drawer.',
     'error.validation_error': 'The supplied data is not valid.',
+    'error.content_too_large': 'This drawer is too large for the app to open or save.',
   },
 };
 
@@ -208,6 +210,7 @@ const ERROR_MESSAGE_KEYS: Record<ErrorCode, string> = {
   [ErrorCode.FILE_NOT_FOUND]: 'error.file_not_found',
   [ErrorCode.INVALID_JSON]: 'error.invalid_json',
   [ErrorCode.VALIDATION_ERROR]: 'error.validation_error',
+  [ErrorCode.CONTENT_TOO_LARGE]: 'error.content_too_large',
 };
 
 export function tError(error: AppError): string {

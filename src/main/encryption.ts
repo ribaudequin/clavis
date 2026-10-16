@@ -101,12 +101,29 @@ export function generateSalt(): Buffer {
   return crypto.randomBytes(16);
 }
 
+export class ContentTooLargeError extends Error {
+  constructor() {
+    super('Content exceeds max size');
+    this.name = 'ContentTooLargeError';
+  }
+}
+
 export async function encrypt(plainText: string, password: string | Buffer, params?: KDFParams): Promise<{
   encryptedData: string;
   salt: string;
   iv: string;
   authTag: string;
 }> {
+  // SAV-03 — Mirror of the cap decrypt applies, on the write side: producing a
+  // ciphertext the drawer could never be read back is the data-loss bug, so refuse
+  // here instead. Measured in UTF-8 bytes, not characters — Zod's .max() counts code
+  // points, so text that passes validation can still be up to four times this in
+  // bytes ('ã'.repeat(10_000_000) is 10 million code points and 20 MB). Checked
+  // before the key derivation so a refusal costs nothing.
+  if (Buffer.byteLength(plainText, 'utf8') > MAX_DECRYPTED_SIZE) {
+    throw new ContentTooLargeError();
+  }
+
   const salt = generateSalt();
   const key = await deriveKey(password, salt, params);
   const iv = crypto.randomBytes(IV_LENGTH);
