@@ -469,15 +469,18 @@ export function registerIpcHandlers(deps: IpcDeps): void {
   ipcMain.handle(CHANNELS.CHECK_UPDATE, async (): Promise<{ tag_name?: string } | null> => {
     return new Promise((resolve) => {
       let req: ClientRequest | null = null;
-      const settle = (value: { tag_name?: string } | null): void => {
-        clearTimeout(timer);
-        resolve(value);
-      };
       const timer = setTimeout(() => {
         req?.destroy();
         logger.warn('check-update: request timed out', { timeoutMs: CHECK_UPDATE_TIMEOUT_MS });
         settle(null);
       }, CHECK_UPDATE_TIMEOUT_MS);
+
+      // Hoisted rather than a const arrow so it can close over `timer` above without
+      // the two referring to each other through a temporal dead zone.
+      function settle(value: { tag_name?: string } | null): void {
+        clearTimeout(timer);
+        resolve(value);
+      }
 
       req = https.get(
         'https://api.github.com/repos/ribaudequin/clavis/releases/latest',
