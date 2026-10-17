@@ -71,8 +71,8 @@ describe('store module', () => {
   });
 
   it('listDrawers returns created drawers with title and iconData', async () => {
-    const a = await createDrawer('Gaveta A', 'Passw0rd-A!');
-    const b = await createDrawer('Gaveta B', 'Passw0rd-B!');
+    const a = await createDrawer('Gaveta A', 'Passw0rdAA!');
+    const b = await createDrawer('Gaveta B', 'Passw0rdBB!');
 
     const drawers = await listDrawers();
 
