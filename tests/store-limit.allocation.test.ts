@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import {
   MAX_CONTENT_CODE_POINTS,
   MAX_PLAINTEXT_BYTES,
-  countCodePoints,
+  countCodePoints, // @ts-ignore
 } from '../src/shared/limits';
 
 describe('HYG-8 — allocation at the limit (store-limit.allocation)', () => {
