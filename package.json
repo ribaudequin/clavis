@@ -1,7 +1,7 @@
 {
   "name": "clavis",
   "productName": "clavis",
-  "version": "0.5.1-beta",
+  "version": "0.6.0-beta",
   "description": "Cross-platform encrypted notes application for storing banking info, PINs, passwords, and safe codes.",
   "main": "dist/main/index.js",
   "author": "Marcelo Salvador",
@@ -40,7 +40,7 @@
     "@electron-forge/maker-dmg": "6.4.2",
     "@electron-forge/maker-squirrel": "6.4.2",
     "@electron-forge/maker-zip": "6.4.2",
-    "@playwright/test": "^1.63.0",
+    "@playwright/test": "^1.64.1",
     "@reforged/maker-appimage": "^5.3.1",
     "@storybook/addon-a11y": "^10.6.1",
     "@storybook/addon-docs": "^10.6.1",
