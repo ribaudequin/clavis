@@ -1,6 +1,6 @@
 # Changelog — Clavis
 
-## Unreleased
+## v0.5.1-beta (2026-10-17)
 
 The capacity counter used to state two limits, and one of them could never be the limit that
 refuses a save. `303 -> 320` tests, 20 files, all four gates green and — for the first time — lint
