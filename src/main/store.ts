@@ -465,11 +465,6 @@ export async function saveDrawer(
     passwordBuffer.fill(0);
     return { ok: false, reason: 'invalid_id' };
   }
-  if (!isPasswordStrong(passwordBuffer.toString('utf8'))) {
-    passwordBuffer.fill(0);
-    logger.warn('Save failed: password too weak', { id });
-    return { ok: false, reason: 'password_too_weak' };
-  }
   try {
     const filePath = getDrawerFilePath(id);
     // HYG-7 — defensive copy: force a new primitive so a mutable reference
