@@ -141,7 +141,7 @@ describe('encryption module', () => {
     vi.resetModules();
     vi.doMock('../src/shared/limits.js', async (importActual) => {
       const actual = await importActual();
-      const spread = { ...(actual as any) };
+      const spread = actual;
     });
     const { MAX_DECRYPTED_SIZE: mockedSize } = await import('../src/main/encryption.js');
     expect(mockedSize).toBe(5555);

@@ -68,7 +68,7 @@ describe('HYG-7 — mutation at the limit (store-limit.mutation)', () => {
     vi.resetModules();
     vi.doMock('../src/shared/limits.js', async (importActual) => {
       const actual = await importActual();
-      const spread = { ...(actual as any) };
+      const spread = actual;
     });
     const { SaveDrawerSchema: MockSchema } = await import('../src/main/validation.js');
     // With correct wiring: schema allows up to 500 code points.
