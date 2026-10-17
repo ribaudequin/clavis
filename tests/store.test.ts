@@ -58,7 +58,7 @@ afterEach(async () => {
 
 describe('store module', () => {
   it('createDrawer creates a .clavis file with mode 0o600 and a valid UUID id', async () => {
-    const drawer = await createDrawer('Minha Gaveta', 'Str0ng!Pass');
+    const drawer = await createDrawer('Minha Gaveta', 'Str0ngPass1!');
 
     expect(UUID_RE.test(drawer.id)).toBe(true);
     expect(drawer.title).toBe('Minha Gaveta');
@@ -100,12 +100,12 @@ describe('store module', () => {
   });
 
   it('saveDrawer updates content (unlock again returns new content)', async () => {
-    const drawer = await createDrawer('Gaveta', 'Str0ng!Pass');
+    const drawer = await createDrawer('Gaveta', 'Str0ngPass1!');
 
-    const saved = await saveDrawer(drawer.id, 'Str0ng!Pass', 'Novo Título', 'conteúdo atualizado');
+    const saved = await saveDrawer(drawer.id, 'Str0ngPass1!', 'Novo Título', 'conteúdo atualizado');
     expect(saved).toEqual({ ok: true });
 
-    const result = await unlockDrawer(drawer.id, 'Str0ng!Pass');
+    const result = await unlockDrawer(drawer.id, 'Str0ngPass1!');
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.data.title).toBe('Novo Título');
@@ -113,7 +113,7 @@ describe('store module', () => {
   });
 
   it('deleteDrawer removes the file and returns true', async () => {
-    const drawer = await createDrawer('Para Apagar', 'Str0ng!Pass');
+    const drawer = await createDrawer('Para Apagar', 'Str0ngPass1!');
     const filePath = getDrawerFilePath(drawer.id);
 
     await expect(fs.stat(filePath)).resolves.toBeDefined();
@@ -145,7 +145,7 @@ describe('store module', () => {
   });
 
   it('saveDrawer rejects weak password', async () => {
-    const drawer = await createDrawer('Test', 'Str0ng!Pass');
+    const drawer = await createDrawer('Test', 'Str0ngPass1!');
     const result = await saveDrawer(drawer.id, 'weak', 'Title', 'content');
     expect(result).toEqual({ ok: false, reason: 'password_too_weak' });
   });
@@ -273,7 +273,7 @@ describe('store module', () => {
       await fs.mkdir(path.dirname(getDrawerFilePath(HUGE_ID)), { recursive: true });
       await fs.writeFile(getDrawerFilePath(HUGE_ID), JSON.stringify(drawer), { mode: 0o600 });
 
-      expect(await unlockDrawer(HUGE_ID, 'Str0ng!Pass')).toEqual({
+      expect(await unlockDrawer(HUGE_ID, 'Str0ngPass1!')).toEqual({
         ok: false,
         reason: 'kdf_out_of_bounds',
       });
