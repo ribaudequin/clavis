@@ -17,9 +17,9 @@ export const SaveDrawerSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255, 'Title too long'),
   // The cap is in code points, not bytes — Zod's .max() folds surrogate pairs, so this
   // admits up to 4x MAX_PLAINTEXT_BYTES of UTF-8 text. The byte cap lives in
-  // encrypt() (SAV-01); the message keeps the word "maximum" because ipc-handlers.ts
-  // sniffs for it to classify the failure as CONTENT_TOO_LARGE.
-  content: z.string().max(MAX_CONTENT_CODE_POINTS, `Content too large (maximum ${MAX_CONTENT_CODE_POINTS.toLocaleString('en-US')} code points)`),
+  // encrypt() (SAV-01). Main-process log text only: the renderer translates on
+  // ErrorCode, not on this string.
+  content: z.string().max(MAX_CONTENT_CODE_POINTS, `Content too large (max ${MAX_CONTENT_CODE_POINTS.toLocaleString('en-US')} code points)`),
 });
 
 export const DeleteDrawerSchema = z.object({

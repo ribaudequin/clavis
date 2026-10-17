@@ -264,8 +264,12 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     } catch (e) {
       if (e instanceof z.ZodError) {
         logger.warn('save-drawer validation failed', { issues: e.issues.length });
-        // Se o erro é devido ao limite de tamanho (.max), reporta como CONTENT_TOO_LARGE
-        const isTooBig = e.issues.some((iss: any) => iss.code === 'too_big' || (iss.message && iss.message.toLowerCase().includes('maximum')));
+        // Zod tags every .max() violation with code 'too_big' regardless of the message,
+        // so that is the whole test. The message used to be sniffed for the word
+        // "maximum" as a fallback — dead, because the code check always fires first, and
+        // actively harmful, because any validation message containing that word would be
+        // misreported as CONTENT_TOO_LARGE.
+        const isTooBig = e.issues.some((iss) => iss.code === 'too_big');
         return {
           ok: false,
           error: {

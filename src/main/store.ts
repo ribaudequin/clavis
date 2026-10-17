@@ -172,10 +172,28 @@ export async function migrateDrawersFrom(oldDrawersPath: string, newDrawersPath:
   return copied;
 }
 
+// OLD_DATA_DIR is derived from os.homedir() and has no relationship to userData, so a
+// run with --user-data-dir pointed anywhere else would be seeded with the real user's
+// legacy drawers: measured on this box, a "clean" test profile came up holding 10 of
+// them. An overridden userData means the run is not operating on the real profile, so
+// the migration must not run at all.
+function userDataWasOverridden(): boolean {
+  try {
+    const { app } = require('electron');
+    return app.commandLine.hasSwitch('user-data-dir');
+  } catch {
+    return false;
+  }
+}
+
 async function migrateOldData(): Promise<void> {
   if (migrated) return;
   if (process.env.NODE_ENV === 'test') return;
   migrated = true;
+  if (userDataWasOverridden()) {
+    logger.info('Skipping legacy data migration: userData was overridden');
+    return;
+  }
   try {
     const oldDrawersPath = path.join(OLD_DATA_DIR, 'drawers');
     const stats = await fs.stat(oldDrawersPath).catch(() => null);

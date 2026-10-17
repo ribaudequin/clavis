@@ -43,7 +43,7 @@ describe('Zod schema validation', () => {
     });
     expect({ success: result.success, message: result.error?.issues[0]?.message }).toEqual({
       success: false,
-      message: `Content too large (maximum ${MAX_CONTENT_CODE_POINTS.toLocaleString('en-US')} code points)`,
+      message: `Content too large (max ${MAX_CONTENT_CODE_POINTS.toLocaleString('en-US')} code points)`,
     });
   });
 

@@ -48,6 +48,7 @@ import type { IpcListener } from '../src/main/ipc-handlers';
 import * as store from '../src/main/store';
 import * as fsPromises from 'fs/promises';
 import { app } from 'electron';
+import { MAX_CONTENT_CODE_POINTS } from '../src/shared/limits';
 import https from 'https';
 import { CHANNELS } from '../src/shared/channels';
 import type { Channel } from '../src/shared/channels';
@@ -494,6 +495,23 @@ describe('IPC handlers', () => {
         expect(result.error.code).toBe(ErrorCode.CONTENT_TOO_LARGE);
         expect(result.error.message).toBe('Content exceeds the maximum size');
       }
+    });
+
+    // The Zod branch of the save handler had no coverage at all, and it is invisible to
+    // the test above: both it and the SaveFailureReason map emit the same
+    // 'Content exceeds the maximum size', so mutating `iss.code === 'too_big'` to a
+    // wrong string left all 56 tests green. Two violations, two classifications.
+    it('classifies a schema ceiling violation as CONTENT_TOO_LARGE and any other as VALIDATION_ERROR', async () => {
+      const handler = getHandler(CHANNELS.SAVE_DRAWER);
+      const tooBig = await handler({}, VALID_UUID, 'password12345', 'Title', 'x'.repeat(MAX_CONTENT_CODE_POINTS + 1));
+      const tooShort = await handler({}, VALID_UUID, 'short', 'Title', 'content');
+      expect({
+        tooBig: { ok: tooBig.ok, code: tooBig.ok ? null : tooBig.error.code },
+        tooShort: { ok: tooShort.ok, code: tooShort.ok ? null : tooShort.error.code },
+      }).toEqual({
+        tooBig: { ok: false, code: ErrorCode.CONTENT_TOO_LARGE },
+        tooShort: { ok: false, code: ErrorCode.VALIDATION_ERROR },
+      });
     });
 
     it('maps every save failure reason to its own code and message', async () => {
