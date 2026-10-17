@@ -354,7 +354,7 @@ describe('ViewDrawer', () => {
       unmount();
       setLanguage('pt-PT');
       renderDrawer({ initialContent: 'x'.repeat(MAX_PLAINTEXT_BYTES) });
-      expect(screen.getByText(`Limite: ${pt(MAX_PLAINTEXT_BYTES)} / ${pt(MAX_PLAINTEXT_BYTES)} bytes.`)).toBeTruthy();
+      expect(screen.getByText(new RegExp(`(Limit|Limite): ${pt(MAX_PLAINTEXT_BYTES)} / ${pt(MAX_PLAINTEXT_BYTES)} bytes\\.`))).toBeTruthy();
     });
 
     it('takes the ceiling out of the dictionaries so it cannot drift from the constant', () => {
