@@ -158,7 +158,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           },
         };
       }
-      if (e instanceof Error && e.message.includes('Password must be at least 8 characters')) {
+      if (e instanceof Error && e.message.includes('Password must be at least 12 characters')) {
         logger.warn('create-drawer password too short', {});
         return {
           ok: false,
