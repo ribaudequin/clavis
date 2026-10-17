@@ -115,7 +115,7 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
     const value = content || '';
     return {
       codePoints: countCodePoints(value),
-      bytes: new Blob([value]).size,
+      bytes: new TextEncoder().encode(value).length,
       // Formatted once here rather than per render: the ceiling does not move, and the
       // locale decides the separator (pt-PT spaces, en commas).
       maxBytes: formatNumber(MAX_PLAINTEXT_BYTES),
