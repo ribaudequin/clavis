@@ -17,6 +17,7 @@ describe('HYG-8 — allocation at the limit (store-limit.allocation)', () => {
     const value = 'x'.repeat(MAX_CONTENT_CODE_POINTS);
     // Fixed: the spread was replaced by countCodePoints (HYG-8). Verify
     // that the function does NOT materialise a 10 M array.
+    // @ts-ignore — module resolution
     const spreadLength = countCodePoints(value);
     expect(spreadLength).toBe(MAX_CONTENT_CODE_POINTS); // passes
     // The allocation is gone: countCodePoints iterates by code point.
