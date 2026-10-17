@@ -2,9 +2,129 @@
 
 ## Unreleased
 
-Landed on `main` without a release, on the owner's decision. `184 -> 277` tests, 20 files, all four
-gates green. Every change below is negative-controlled — the defect was reintroduced and the
-specific test watched failing before the fix was called done.
+The capacity counter used to state two limits, and one of them could never be the limit that
+refuses a save. `303 -> 320` tests, 20 files, all four gates green and — for the first time — lint
+with no warnings at all. Every fix below is negative-controlled: the defect was reintroduced and the
+specific test watched failing before the fix was called done, and the two mutations that no test can
+catch are named rather than implied.
+
+### Fixed
+
+- **The character counter was shown against a ceiling that provably never refuses anything.** Every
+  code point costs 1-4 UTF-8 bytes, so `bytes >= codePoints` always and `bytes <= 10 000 000` *implies*
+  `codePoints <= 10 000 000`. The byte cap is always the binding one and Zod's `.max()` is
+  defence-in-depth — yet the count was presented against the code-point ceiling and escalated colour at
+  the same 90%/100% thresholds, so accented Portuguese rendered `5 000 000 / 10 000 000 caracteres`,
+  "half full", beside a full red bar and a "Limite" line. That is every non-ASCII note, and it follows
+  from the units rather than from the content. The row now states one limit:
+  `<caracteres> · [barra] <pct>% · <bytes> / <tecto> bytes`, with the risk colour on the bar and the byte
+  count only.
+- **The ceiling was written in five places, one of them inside the text the user reads.** `10000000`
+  appeared in `validation.ts`, `encryption.ts` and twice in `ViewDrawer`, and — worst — as literal text
+  in the `label.at_limit` dictionary value, where no constant can reach it, so raising the limit would
+  have left the UI claiming a ceiling it no longer enforced. All four now derive from a new
+  `src/shared/limits.ts`, exporting `MAX_CONTENT_CODE_POINTS` and `MAX_PLAINTEXT_BYTES`: equal in value,
+  **deliberately different in unit**, because merging them would hide the unit and turn the next limit
+  change into silent data loss.
+- **The counter counted the wrong unit under a label naming a third one.** It measured grapheme
+  clusters while comparing them against a limit expressed in code points, under `label.tokens` — and an
+  LLM token is roughly four characters, so it was not that either. Now counts code points, renamed
+  `label.characters`.
+- **Digits were never localised.** `String(n)` put `10000000` in front of the user in both locales. A new
+  `formatNumber()` lives in `src/i18n/index.ts` **beside `detectLocale()`** rather than in the
+  component, so it does not become a second locale decision — the project already carries a scar for
+  that. Measured on this machine's ICU: pt-PT groups with U+00A0 from five digits and writes four-digit
+  numbers bare; en groups with a comma from four. Confirmed again in the packaged AppImage.
+- **`cpPct` was computed and never read**, while `Intl.Segmenter` walked the entire content string on
+  every keystroke of a controlled textarea to feed it. Deleted, and both counts are memoised.
+- **The bar and its own label could disagree.** The bar width was the unrounded percentage beside a
+  rounded label — `44.5%` next to `45%`, two numbers for one quantity. Rounded once now and shared.
+- **`--user-data-dir` did not isolate a run.** `store.ts` hardcoded `OLD_DATA_DIR` from `os.homedir()`
+  and `migrateOldData()` copied from there into `getDrawersPath()`, with no relationship to
+  `app.getPath('userData')`. A "clean" test profile therefore came up holding the real user's drawers —
+  measured: ten of them, private ones included. There was no way to run the AppImage against a throwaway
+  profile without first moving the real legacy directory aside. The migration is now skipped when the
+  userData path was overridden.
+- **The only AppImage gate was green while validating the wrong artefact.**
+  `appimage-validation.spec.ts` asserted `0.4.9-beta` against a `package.json` that said
+  `0.5.0-beta`, passing only because a binary sixteen minutes older than the version bump was still in
+  `out/`. It now reads the version from `package.json` and locates the artefact by glob, so a version
+  bump cannot break it, and it **fails** against a stale binary instead of validating it. Verified by
+  mutation: pointing the manifest at `9.9.9-inexistente` fails with `Expected "9.9.9-inexistente" /
+  Received "0.5.0-beta"`. With no artefact at all it fails with a message telling you to run
+  `npm run make` — never a silent skip.
+- **A dead string sniff was misclassifying validation failures.** `ipc-handlers` decided whether a Zod
+  error was a size violation with `iss.code === 'too_big' || message.includes('maximum')`. Zod tags every
+  `.max()` violation with `too_big` regardless of the message, so the second clause never fired — and
+  any validation message containing the word "maximum" would have been reported as
+  `CONTENT_TOO_LARGE`. Removed, which also dropped the last `any` in the main process: **lint is now
+  clean, with no warnings.**
+
+### Added
+
+- **13 tests for the capacity counter, then two more.** Thresholds at 90% and 100%, bar colours, the
+  limit line in both locales, and the assertion that the unit is code points rather than graphemes —
+  written with explicit escapes (`'a\u0303'`, a regional-indicator pair), because an invisible combining
+  mark typed straight into a source file is a character nobody reviewing the diff can see. The renderer
+  suite mocks the two ceilings as **deliberately unequal**, because equal values make a unit swap
+  invisible and because it makes 90%/100% reachable as `'x'.repeat(900)` instead of ten-megabyte
+  allocations.
+- **Coverage for the Zod branch of the save handler, which had none.** The message
+  `Content exceeds the maximum size` is emitted by two different branches — the `SaveFailureReason` map
+  and the Zod ceiling check — and the existing test only exercised the first, so mutating
+  `iss.code === 'too_big'` to a wrong string left all 56 tests green. A test now drives one violation of
+  each kind and asserts the two classifications differ.
+
+### Removed
+
+- **Three scratch Playwright scripts, tracked at the repository root, none of which could run.**
+  `ciclo-teste.ts`, `contador-validate.ts` and `visual-validate.ts` each hardcoded
+  `clavis-0.4.9-beta-x64.AppImage` (a path `npm run clean` deletes and the current build no longer
+  produces), each imported `path` unused, all sat outside both tsconfig `include` lists so none was
+  typechecked, and all carried pt-PT comments. `ciclo-teste.ts` mixed `require()` into an ESM module and
+  guessed userData as `~/.local/share/clavis` — the legacy path, not `~/.config/clavis` — and its
+  "confirm the list is empty" step was a `waitForTimeout(500)` followed by a `console.log` with no
+  assertion. Deleted rather than converted: converting a script whose assertions are all no-ops is
+  writing the tests from scratch, and the AppImage case is already covered properly in `tests/e2e/`.
+- **`test-results/` is no longer versioned**, and is ignored alongside `coverage/` and `.nyc_output/`.
+
+### Documented
+
+- **The storage-limits docs claimed the drawer-size defect was unfixed when it had been fixed.** Both
+  `docs/DRAWER-CAPACITY.md` and `SECURITY.md` still said `Partially fixed`, and the capacity doc's
+  round-trip section asserted that import "never checks its length" — false since the ciphertext check
+  landed. Corrected, with what genuinely remains stated plainly: a drawer written *before* the guards
+  existed cannot be opened, because no guard helps bytes already on disk. The app now names that
+  correctly and no longer counts it as a failed password attempt, but there is no rescue code.
+- **`ff4efb7`, cited as the commit that implemented the storage limits across five files, is an orphaned
+  duplicate.** `git cat-file` resolves it — same message, same tree except one line of
+  `.github/FUNDING.yml` — but it is unreachable from any ref; the commit on `main` is `d2bdb98`. A
+  reader following the citation would have found the change missing from history. Line references the
+  fix itself moved were corrected too.
+- **A test count that was never a count of any tree.** `281/281` appeared in three files, recorded as a
+  *delta* ("277 -> 281") on a total that had itself drifted. `git diff d2bdb98..HEAD -- tests/` touches
+  no vitest test, so that tree measures the same as `HEAD`: `303/303`. Corrected in place and marked,
+  not rewritten — **a delta is the form of a count nobody re-measures.**
+
+### Known, deliberately not fixed here
+
+- **Two mutations cannot be caught by any test.** Detaching either ceiling to a hand-written literal
+  *of the same value* leaves every run green, because at equal values the wiring is observationally
+  identical. Only a lint rule would close it, and that rule is not written.
+- **`[...value].length` allocates an array of one-code-point strings.** At the worst case the schema
+  admits that is roughly ten million elements on the UI thread. Not a regression — `Intl.Segmenter`
+  built an array of segment objects, which is worse — and not measured. A `for…of` counter would
+  allocate nothing.
+- **There is no rescue path for a drawer that is already too large to open.** Not a validation problem
+  and not fixable by one; the open question is what the app should *offer* such a user.
+- **`tests/e2e` is in no gate.** It is excluded from both tsconfigs, so the AppImage spec typechecks
+  only under an ad-hoc invocation nothing enforces.
+
+## v0.5.0-beta (2026-10-16)
+
+Landed on `main` first without a release, on the owner's decision, and tagged afterwards. `184 -> 277`
+tests, 20 files, all four gates green. Every change below is negative-controlled — the defect was
+reintroduced and the specific test watched failing before the fix was called done.
 
 ### Fixed
 
