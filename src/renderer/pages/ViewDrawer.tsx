@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Result } from '../../shared/types';
+import { MAX_PLAINTEXT_BYTES } from '../../shared/limits';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import DiscardChangesModal from '../components/DiscardChangesModal';
-import { t, tError } from '../../i18n';
+import { t, tError, formatNumber } from '../../i18n';
 import { toast } from 'react-hot-toast';
 
 interface ViewDrawerProps {
@@ -105,12 +106,25 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
     }
   }
 
-  const codePoints = Array.from(new Intl.Segmenter('pt', { granularity: 'grapheme' }).segment(content || '')).length;
-  const bytes = new TextEncoder().encode(content || '').length;
-  const MAX_CODE = 10_000_000;
-  const MAX_BYTES = 10_000_000;
-  const cpPct = Math.min(codePoints / MAX_CODE, 1);
-  const bytePct = Math.min(bytes / MAX_BYTES, 1);
+  // Counted in the two units the ceilings are actually expressed in: code points (what
+  // the save schema's .max() counts) and UTF-8 bytes (what encrypt() enforces). Not
+  // grapheme clusters — those were both the wrong unit for the label and O(n) work
+  // repeated on every keystroke, since content is a controlled textarea. The bar is
+  // driven by bytes alone because that is the cap that refuses the save (SAV-01).
+  const { codePoints, bytes, maxBytes } = React.useMemo(() => {
+    const value = content || '';
+    return {
+      codePoints: [...value].length,
+      bytes: new TextEncoder().encode(value).length,
+      // Formatted once here rather than per render: the ceiling does not move, and the
+      // locale decides the separator (pt-PT spaces, en commas).
+      maxBytes: formatNumber(MAX_PLAINTEXT_BYTES),
+    };
+  }, [content]);
+  const bytePct = Math.min(bytes / MAX_PLAINTEXT_BYTES, 1);
+  // Rounded once and reused by both the bar width and the label, so the two cannot
+  // disagree — an unrounded width beside a rounded label reads as two different numbers.
+  const pct = Math.min(Math.round(bytePct * 100), 100);
   const atRisk = bytePct >= 0.9;
 
   return (
@@ -143,14 +157,19 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
           className="flex-1 w-full border border-input rounded px-3 py-2 text-sm bg-white resize-none min-h-[300px] disabled:opacity-50"
         />
         <div className="mt-2 flex items-center gap-3 text-xs text-gray-500">
-          <span className={atRisk ? 'text-amber-600 font-medium' : ''}>{t('label.tokens', { cp: String(codePoints), max: String(MAX_CODE) })}</span>
-          <span>·</span>
-          <span className={atRisk ? 'text-amber-600 font-medium' : ''}>{t('label.bytes', { b: String(bytes), max: String(MAX_BYTES) })}</span>
-          <span>·</span>
+          {/* Characters are a count, not a limit. The code-point ceiling can never be the one
+              that refuses a save: every code point costs 1-4 UTF-8 bytes, so passing the byte
+              cap implies passing it. Showing it as a percentage of anything was therefore
+              misleading by construction — it read "half full" next to a full red bar. */}
+          <span className="shrink-0">{t('label.characters', { cp: formatNumber(codePoints) })}</span>
+          <span aria-hidden="true">·</span>
           <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
-            <div className={bytePct >= 1 ? 'bg-red-600' : bytePct >= 0.9 ? 'bg-amber-500' : 'bg-green-500'} style={{ width: `${Math.min(bytePct * 100, 100)}%`, height: '100%', borderRadius: 9999 }} />
+            <div className={bytePct >= 1 ? 'bg-red-600' : bytePct >= 0.9 ? 'bg-amber-500' : 'bg-green-500'} style={{ width: `${pct}%`, height: '100%', borderRadius: 9999 }} />
           </div>
-          {bytePct >= 1 && <span className="text-red-600 font-semibold">{t('label.at_limit', { b: String(bytes), max: String(MAX_BYTES) })}</span>}
+          <span className="shrink-0 tabular-nums">{t('label.percent', { pct: String(pct) })}</span>
+          <span aria-hidden="true">·</span>
+          <span className={atRisk ? 'shrink-0 text-amber-600 font-medium tabular-nums' : 'shrink-0 tabular-nums'}>{t('label.bytes', { b: formatNumber(bytes), max: maxBytes })}</span>
+          {bytePct >= 1 && <span className="text-red-600 font-semibold">{t('label.at_limit', { b: formatNumber(bytes), max: maxBytes })}</span>}
         </div>
       </main>
 

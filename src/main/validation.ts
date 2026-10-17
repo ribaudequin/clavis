@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_CONTENT_CODE_POINTS } from '../shared/limits.js';
 
 export const CreateDrawerSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255, 'Title too long'),
@@ -14,7 +15,11 @@ export const SaveDrawerSchema = z.object({
   id: z.string().uuid('Invalid drawer ID'),
   password: z.string().min(8, 'Password must be at least 8 characters').max(128, 'Password too long'),
   title: z.string().min(1, 'Title is required').max(255, 'Title too long'),
-  content: z.string().max(10_000_000, 'Content too large (max 10MB)'),
+  // The cap is in code points, not bytes — Zod's .max() folds surrogate pairs, so this
+  // admits up to 4x MAX_PLAINTEXT_BYTES of UTF-8 text. The byte cap lives in
+  // encrypt() (SAV-01); the message keeps the word "maximum" because ipc-handlers.ts
+  // sniffs for it to classify the failure as CONTENT_TOO_LARGE.
+  content: z.string().max(MAX_CONTENT_CODE_POINTS, `Content too large (maximum ${MAX_CONTENT_CODE_POINTS.toLocaleString('en-US')} code points)`),
 });
 
 export const DeleteDrawerSchema = z.object({

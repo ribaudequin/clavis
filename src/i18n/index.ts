@@ -65,9 +65,10 @@ export const translations: Record<string, TranslationDict> = {
     'label.licence': 'Licença',
     'msg.about_description': 'A Clavis é uma aplicação de notas cifradas, de código aberto e multiplataforma, criada para manter as suas palavras-passe, PINs, dados bancários e códigos seguros privados e protegidos.',
     'msg.source_welcome': 'O código-fonte, os problemas e as contribuições são bem-vindos no',
-    'label.tokens': '{cp} / {max} tokens',
+    'label.characters': '{cp} caracteres',
+    'label.percent': '{pct}%',
     'label.bytes': '{b} / {max} bytes',
-    'label.at_limit': 'Limite: {b} / 10 000 000 bytes.',
+    'label.at_limit': 'Limite: {b} / {max} bytes.',
     'label.credits': 'Créditos',
     'label.support_project': 'Apoiar este projeto',
     'msg.support_description': 'Se lhe for útil, pode apoiar o trabalho.',
@@ -153,9 +154,10 @@ export const translations: Record<string, TranslationDict> = {
     'label.licence': 'Licence',
     'msg.about_description': 'Clavis is an open-source, cross-platform encrypted notes app built to keep your passwords, PINs, bank details, and safe codes private and secure.',
     'msg.source_welcome': 'Source code, issues, and contributions are welcome on',
-    'label.tokens': '{cp} / {max} tokens',
+    'label.characters': '{cp} characters',
+    'label.percent': '{pct}%',
     'label.bytes': '{b} / {max} bytes',
-    'label.at_limit': 'Limit: {b} / 10,000,000 bytes.',
+    'label.at_limit': 'Limit: {b} / {max} bytes.',
     'label.credits': 'Credits',
     'label.support_project': 'Support this project',
     'msg.support_description': "If it's useful to you, support the work.",
@@ -198,6 +200,15 @@ function detectLocale(): Locale {
 
 export function applyDocumentLanguage(): void {
   document.documentElement.lang = detectLocale();
+}
+
+// Alongside t(), never in the component: a second place that asks for the locale is a
+// second decision about it, and this file already carries a note about `getLocale()`
+// in the main process drifting from detectLocale(). Formatting numbers here is what
+// puts the pt-PT space separator and the en comma in front of the user, instead of
+// the ungrouped digits that String(n) produces.
+export function formatNumber(value: number): string {
+  return new Intl.NumberFormat(detectLocale()).format(value);
 }
 
 export function t(key: string, params?: Record<string, string>): string {

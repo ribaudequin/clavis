@@ -1,11 +1,14 @@
 import * as crypto from 'crypto';
 import { promisify } from 'util';
 import { logger } from './logger.js';
+import { MAX_PLAINTEXT_BYTES } from '../shared/limits.js';
 
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH = 32;
 const IV_LENGTH = 16;
-export const MAX_DECRYPTED_SIZE = 10_000_000;
+// The name stays MAX_DECRYPTED_SIZE because that is what store.ts imports and derives
+// the import ceilings from, but the value and the unit now come from shared/limits.ts.
+export const MAX_DECRYPTED_SIZE = MAX_PLAINTEXT_BYTES;
 
 // Argon2 memoryCost is expressed in KiB.
 // 2^18 KiB = 256 MiB — comfortably above OWASP's ~19 MiB minimum while staying

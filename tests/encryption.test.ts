@@ -8,6 +8,7 @@ import {
   ContentTooLargeError,
   MAX_DECRYPTED_SIZE,
 } from '../src/main/encryption';
+import { MAX_PLAINTEXT_BYTES } from '../src/shared/limits';
 
 describe('encryption module', () => {
   it('should generate a 16-byte salt', () => {
@@ -124,5 +125,12 @@ describe('encryption module', () => {
       parallelism: 4,
     });
     expect(implicit.equals(explicit)).toBe(true);
+  });
+
+  // Every boundary test in this file is relative to MAX_DECRYPTED_SIZE, so none of them
+  // would notice it drifting back to a hand-written literal. This one is the wiring
+  // guard: the cap in bytes is the shared constant, and only that constant states it.
+  it('enforces the shared plaintext-byte ceiling, not a literal of its own', () => {
+    expect(MAX_DECRYPTED_SIZE).toBe(MAX_PLAINTEXT_BYTES);
   });
 });
