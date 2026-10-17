@@ -67,8 +67,7 @@ describe('HYG-7 — mutation at the limit (store-limit.mutation)', () => {
   it('mutation guard — Zod .max() tracks MAX_CONTENT_CODE_POINTS, not a literal/byte constant', async () => {
     vi.resetModules();
     vi.doMock('../src/shared/limits.js', async (importActual) => {
-      const actual = await importActual();
-      return { ...actual, MAX_CONTENT_CODE_POINTS: 500, MAX_PLAINTEXT_BYTES: 500 };
+      return { ...(await importActual() as any), MAX_CONTENT_CODE_POINTS: 500, MAX_PLAINTEXT_BYTES: 500 };
     });
     const { SaveDrawerSchema: MockSchema } = await import('../src/main/validation.js');
     // With correct wiring: schema allows up to 500 code points.
