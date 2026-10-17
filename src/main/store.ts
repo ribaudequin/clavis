@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { encrypt, decrypt, MAX_DECRYPTED_SIZE, DEFAULT_MEMORY_COST, MIN_MEMORY_COST, MAX_MEMORY_COST, MIN_TIME_COST, MAX_TIME_COST, MIN_PARALLELISM, MAX_PARALLELISM, DEFAULT_TIME_COST, DEFAULT_PARALLELISM, deriveKey, ContentTooLargeError } from './encryption.js';
 import { logger } from './logger.js';
 import { EncryptedDrawer, DrawerListItem } from '../shared/types.js';
+import { EncryptedDrawerSchema } from './validation.js';
 
 const DRAWER_EXT = '.clavis';
 
@@ -613,7 +614,7 @@ export async function importDrawerRaw(fileContent: string): Promise<boolean> {
       throw new FileTooLargeError();
     }
 
-    const drawer: EncryptedDrawer = JSON.parse(fileContent);
+    const drawer = EncryptedDrawerSchema.parse(JSON.parse(fileContent));
     if (!drawer.id || !isValidId(drawer.id)) {
       logger.warn('importDrawerRaw: invalid drawer ID', {});
       return false;

@@ -26,6 +26,24 @@ export const DeleteDrawerSchema = z.object({
   id: z.string().uuid('Invalid drawer ID'),
 });
 
+export const EncryptedDrawerSchema = z.object({
+  id: z.string().uuid('Invalid drawer id'),
+  title: z.string().min(1).max(255),
+  iconData: z.string().max(4096),
+  createdAt: z.number().int().nonnegative(),
+  updatedAt: z.number().int().nonnegative(),
+  encryptedData: z.string(),
+  salt: z.string(),
+  iv: z.string(),
+  authTag: z.string(),
+  keyDerivation: z.object({
+    algorithm: z.enum(['argon2id', 'scrypt']),
+    iterations: z.number().int().positive(),
+    memory: z.number().int().positive(),
+    parallelism: z.number().int().positive(),
+  }),
+});
+
 export const ExportDrawerSchema = z.object({
   id: z.string().uuid('Invalid drawer ID'),
 });
