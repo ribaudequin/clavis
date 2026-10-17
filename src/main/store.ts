@@ -9,6 +9,17 @@ import { EncryptedDrawer, DrawerListItem } from '../shared/types.js';
 
 const DRAWER_EXT = '.clavis';
 
+async function atomicWrite(filePath: string, data: string): Promise<void> {
+  const dir = path.dirname(filePath);
+  const tmp = path.join(dir, `.tmp-${Date.now()}-${path.basename(filePath)}`);
+  await fs.writeFile(tmp, data, { encoding: 'utf8', mode: 0o600 });
+  const fd = await fs.open(tmp, 'r+');
+  try { await fd.sync(); } finally { await fd.close(); }
+  // keep previous version as .prev
+  try { await fs.rename(filePath, filePath + '.prev'); } catch { /* no previous */ }
+  await fs.rename(tmp, filePath);
+}
+
 export class DrawerAlreadyExistsError extends Error {
   constructor(id: string) {
     super(`Drawer with ID ${id} already exists — overwrite blocked`);
@@ -308,7 +319,7 @@ export async function createDrawer(
     },
   };
 
-  await fs.writeFile(getDrawerFilePath(id), JSON.stringify(drawer, null, 2), { encoding: 'utf8', mode: 0o600 });
+  await atomicWrite(getDrawerFilePath(id), JSON.stringify(drawer, null, 2));
   logger.info('Drawer created', { id, titleLength: title?.length || 0 });
   return drawer;
 }
@@ -526,7 +537,7 @@ export async function saveDrawer(
       authTag,
     };
 
-    await fs.writeFile(filePath, JSON.stringify(updatedDrawer, null, 2), { encoding: 'utf8', mode: 0o600 });
+    await atomicWrite(filePath, JSON.stringify(updatedDrawer, null, 2));
     passwordBuffer.fill(0);
     logger.info('Drawer saved', { id, titleLength: title?.length || 0 });
     return { ok: true };
@@ -656,7 +667,7 @@ export async function importDrawerRaw(fileContent: string): Promise<boolean> {
     }
 
     await ensureDataDir();
-    await fs.writeFile(filePath, fileContent, { encoding: 'utf8', mode: 0o600 });
+    await atomicWrite(filePath, fileContent);
     logger.info('Drawer imported', { id: drawer.id });
     return true;
   } catch (e) {
