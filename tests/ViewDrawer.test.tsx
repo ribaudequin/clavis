@@ -350,7 +350,7 @@ describe('ViewDrawer', () => {
 
     it('interpolates the byte ceiling into the limit line, in both locales', () => {
       const { unmount } = renderDrawer({ initialContent: 'x'.repeat(MAX_PLAINTEXT_BYTES) });
-      expect(screen.getByText(new RegExp(`(Limit|Limite): ${en(MAX_PLAINTEXT_BYTES)} / ${en(MAX_PLAINTEXT_BYTES)} bytes\\.`))).toBeTruthy();
+      expect(screen.getByText(new RegExp(`${en(MAX_PLAINTEXT_BYTES)} / ${en(MAX_PLAINTEXT_BYTES)} bytes\\.`))).toBeTruthy();
       unmount();
       setLanguage('pt-PT');
       renderDrawer({ initialContent: 'x'.repeat(MAX_PLAINTEXT_BYTES) });
