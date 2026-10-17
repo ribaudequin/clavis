@@ -15,6 +15,15 @@ vi.mock('../src/renderer/hooks/useModalKeyboard', () => ({ useModalKeyboard: () 
 vi.mock('../src/shared/limits', () => ({
   MAX_CONTENT_CODE_POINTS: 2_000,
   MAX_PLAINTEXT_BYTES: 1_000,
+  countCodePoints: (s: string) => {
+    let count = 0;
+    for (let i = 0; i < s.length; ) {
+      const cp = s.codePointAt(i) ?? 0;
+      count++;
+      i += cp > 0xffff ? 2 : 1;
+    }
+    return count;
+  },
 }));
 import ViewDrawer from '../src/renderer/pages/ViewDrawer';
 import { Result } from '../src/shared/types';

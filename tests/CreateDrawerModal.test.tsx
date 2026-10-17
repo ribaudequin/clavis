@@ -38,7 +38,7 @@ afterEach(() => {
   cleanup();
 });
 
-function fillForm(title: string, password = 'secret123'): void {
+function fillForm(title: string, password = 'StrongPass1!'): void {
   fireEvent.change(screen.getByLabelText(/^title$|^título$/i), { target: { value: title } });
   fireEvent.change(screen.getByLabelText(/^password$|^palavra-passe$|^senha$/i), { target: { value: password } });
   fireEvent.change(screen.getByLabelText(/confirm/i), { target: { value: password } });
@@ -62,7 +62,7 @@ describe('CreateDrawerModal', () => {
     fillForm('Banco Central do Estado');
     submitForm();
 
-    await waitFor(() => expect(createDrawer).toHaveBeenCalledWith('Banco Central do Estado', 'secret123'));
+    await waitFor(() => expect(createDrawer).toHaveBeenCalledWith('Banco Central do Estado', 'StrongPass1!'));
     expect(screen.queryByRole('button', { name: CREATE_ANYWAY })).toBeFalsy();
     expect(onCreated).toHaveBeenCalled();
   });
@@ -92,7 +92,7 @@ describe('CreateDrawerModal', () => {
 
     await waitFor(() => expect(onCreated).toHaveBeenCalled());
     expect(createDrawer).toHaveBeenCalledTimes(1);
-    expect(createDrawer).toHaveBeenCalledWith('Banco Central', 'secret123');
+    expect(createDrawer).toHaveBeenCalledWith('Banco Central', 'StrongPass1!');
   });
 
   it('warns when the title differs from an existing one only by case and whitespace', async () => {
@@ -128,7 +128,7 @@ describe('CreateDrawerModal', () => {
     fillForm('Banco Central');
     submitForm();
 
-    await waitFor(() => expect(createDrawer).toHaveBeenCalledWith('Banco Central', 'secret123'));
+    await waitFor(() => expect(createDrawer).toHaveBeenCalledWith('Banco Central', 'StrongPass1!'));
     expect(screen.queryByRole('alert')).toBeFalsy();
   });
 

@@ -88,8 +88,8 @@ describe('store module', () => {
   });
 
   it('unlockDrawer with correct password returns decrypted content; wrong password is reported as such', async () => {
-    const drawer = await createDrawer('Segredos', 'correct-password');
-    const result = await unlockDrawer(drawer.id, 'correct-password');
+    const drawer = await createDrawer('Segredos', 'Correct-123!');
+    const result = await unlockDrawer(drawer.id, 'Correct-123!');
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.data.title).toBe('Segredos');
