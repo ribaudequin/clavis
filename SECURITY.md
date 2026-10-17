@@ -127,8 +127,8 @@ Three items are documented honestly rather than presented as working controls.
 `encryption.ts` lazily `require()`s the `argon2` native module. **If that module fails to load** — most commonly when a wrong-architecture `argon2.node` is bundled, such as a Windows build cross-compiled on Linux — the code **falls back to Node's `scrypt`** (`N` clamped to 2^14–2^17, `r = 8`, `p` from the stored parameters).
 
 - The main process **logs a warning** at startup and per derivation, but there is **no user-visible indication** that a drawer was encrypted with a different KDF.
-- Worse, drawer metadata **hardcodes `algorithm: "argon2id"`** (`store.ts`) regardless of which backend actually ran. **In the fallback case the file's stated KDF is inaccurate.**
-- **Impact is limited to the KDF, not the cipher.** AES-256-GCM and the `.clavis` file format are unaffected, and drawers created under either backend remain unlockable, because decryption uses the per-file stored parameters.
+- Worse, drawer metadata previously **hardcoded `algorithm: "argon2id"`** (`store.ts`) regardless of which backend actually ran. **This is fixed:** `encryption.ts` now returns the real backend, and `store.ts` writes it to `keyDerivation`. In the fallback case the file's stated KDF is now accurate.
+- **Impact is limited to the KDF, not the cipher.** AES-256-GCM and the `.clavis` file format are unaffected. The drawer now records the actual backend (`algorithm: 'argon2id'` or `'scrypt'`) in `keyDerivation`; decryption uses that value, so drawers created with either backend open correctly as long as the matching backend is present. If `argon2` is unavailable, a scrypt drawer opens with scrypt; it does not become unlockable by claiming `argon2id`.
 
 ### 2. `frame-ancestors 'none'` provides no protection
 
