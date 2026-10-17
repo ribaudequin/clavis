@@ -58,7 +58,7 @@ afterEach(async () => {
 
 describe('store module', () => {
   it('createDrawer creates a .clavis file with mode 0o600 and a valid UUID id', async () => {
-    const drawer = await createDrawer('Minha Gaveta', 's3cret-password!');
+    const drawer = await createDrawer('Minha Gaveta', 'Str0ng!Pass');
 
     expect(UUID_RE.test(drawer.id)).toBe(true);
     expect(drawer.title).toBe('Minha Gaveta');
@@ -71,8 +71,8 @@ describe('store module', () => {
   });
 
   it('listDrawers returns created drawers with title and iconData', async () => {
-    const a = await createDrawer('Gaveta A', 'password-a');
-    const b = await createDrawer('Gaveta B', 'password-b');
+    const a = await createDrawer('Gaveta A', 'Passw0rd-A!');
+    const b = await createDrawer('Gaveta B', 'Passw0rd-B!');
 
     const drawers = await listDrawers();
 
@@ -95,17 +95,17 @@ describe('store module', () => {
     expect(result.data.title).toBe('Segredos');
     expect(result.data.content).toBe('');
 
-    const wrong = await unlockDrawer(drawer.id, 'wrong-password');
+    const wrong = await unlockDrawer(drawer.id, 'W1rong!Pass');
     expect(wrong).toEqual({ ok: false, reason: 'wrong_password' });
   });
 
   it('saveDrawer updates content (unlock again returns new content)', async () => {
-    const drawer = await createDrawer('Gaveta', 'password-123');
+    const drawer = await createDrawer('Gaveta', 'Str0ng!Pass');
 
-    const saved = await saveDrawer(drawer.id, 'password-123', 'Novo Título', 'conteúdo atualizado');
+    const saved = await saveDrawer(drawer.id, 'Str0ng!Pass', 'Novo Título', 'conteúdo atualizado');
     expect(saved).toEqual({ ok: true });
 
-    const result = await unlockDrawer(drawer.id, 'password-123');
+    const result = await unlockDrawer(drawer.id, 'Str0ng!Pass');
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.data.title).toBe('Novo Título');
@@ -113,7 +113,7 @@ describe('store module', () => {
   });
 
   it('deleteDrawer removes the file and returns true', async () => {
-    const drawer = await createDrawer('Para Apagar', 'password-123');
+    const drawer = await createDrawer('Para Apagar', 'Str0ng!Pass');
     const filePath = getDrawerFilePath(drawer.id);
 
     await expect(fs.stat(filePath)).resolves.toBeDefined();
@@ -138,16 +138,16 @@ describe('store module', () => {
     expect(isValidId('123e4567-e89b-12d3-a456-426614174000')).toBe(true);
   });
 
-  it('createDrawer rejects password shorter than 8 characters', async () => {
-    await expect(createDrawer('Test', 'short')).rejects.toThrow('Password must be at least 8 characters');
-    await expect(createDrawer('Test', '')).rejects.toThrow('Password must be at least 8 characters');
-    await expect(createDrawer('Test', '1234567')).rejects.toThrow('Password must be at least 8 characters');
+  it('createDrawer rejects password shorter than 12 or lacking composition', async () => {
+    await expect(createDrawer('Test', 'short')).rejects.toThrow('Password must be at least 12 characters with upper, lower, digit, symbol');
+    await expect(createDrawer('Test', '')).rejects.toThrow('Password must be at least 12 characters with upper, lower, digit, symbol');
+    await expect(createDrawer('Test', '123456789012')).rejects.toThrow('Password must be at least 12 characters with upper, lower, digit, symbol');
   });
 
-  it('saveDrawer rejects password shorter than 8 characters', async () => {
-    const drawer = await createDrawer('Test', 'valid-password-123');
-    const result = await saveDrawer(drawer.id, 'short', 'Title', 'content');
-    expect(result).toEqual({ ok: false, reason: 'password_too_short' });
+  it('saveDrawer rejects weak password', async () => {
+    const drawer = await createDrawer('Test', 'Str0ng!Pass');
+    const result = await saveDrawer(drawer.id, 'weak', 'Title', 'content');
+    expect(result).toEqual({ ok: false, reason: 'password_too_weak' });
   });
 
   // SAV-02 — These four used to be indistinguishable from a wrong password: all six
@@ -157,7 +157,7 @@ describe('store module', () => {
   describe('unlock failure reasons', () => {
     const ABSENT_ID = '123e4567-e89b-12d3-a456-426614174040';
     const GARBAGE_ID = '123e4567-e89b-12d3-a456-426614174041';
-    const PASSWORD = 'correct-password-123';
+    const PASSWORD = 'Correct-123!';
 
     async function writeFile(id: string, body: string): Promise<void> {
       await fs.mkdir(path.dirname(getDrawerFilePath(id)), { recursive: true });
@@ -273,11 +273,11 @@ describe('store module', () => {
       await fs.mkdir(path.dirname(getDrawerFilePath(HUGE_ID)), { recursive: true });
       await fs.writeFile(getDrawerFilePath(HUGE_ID), JSON.stringify(drawer), { mode: 0o600 });
 
-      expect(await unlockDrawer(HUGE_ID, 'password-123')).toEqual({
+      expect(await unlockDrawer(HUGE_ID, 'Str0ng!Pass')).toEqual({
         ok: false,
         reason: 'kdf_out_of_bounds',
       });
-      expect(await saveDrawer(HUGE_ID, 'password-123', 't', 'c')).toEqual({
+      expect(await saveDrawer(HUGE_ID, 'Str0ng!KDF', 't', 'c')).toEqual({
         ok: false,
         reason: 'kdf_out_of_bounds',
       });
@@ -308,7 +308,7 @@ describe('store module', () => {
   });
 
   describe('Size limits', () => {
-    const PASSWORD = 'correct-password-123';
+    const PASSWORD = 'Correct-123!';
     const SIZE_WARNING = 'Unlock failed: encrypted file exceeds max size';
 
     // The envelope createDrawer/saveDrawer write, field for field. A synthetic hex
@@ -495,7 +495,7 @@ describe('store module', () => {
         const drawer = await createDrawer('Acentos', PASSWORD);
         const refused = await saveDrawer(drawer.id, PASSWORD, 'Acentos', 'ã'.repeat(10_000_000));
         expect(refused).not.toEqual({ ok: false, reason: 'invalid_id' });
-        expect(refused).not.toEqual({ ok: false, reason: 'password_too_short' });
+        expect(refused).not.toEqual({ ok: false, reason: 'password_too_weak' });
         expect(refused).not.toEqual({ ok: false, reason: 'write_failed' });
       });
     });
@@ -508,7 +508,7 @@ describe('store module', () => {
   // is now consulted by fs.stat before each read, so the refusal costs one stat
   // syscall instead of the file's size in memory.
   describe('stat.size guards before reads', () => {
-    const PASSWORD = 'correct-password-123';
+    const PASSWORD = 'Correct-123!';
 
     async function writeOverCapFile(id: string): Promise<void> {
       await fs.mkdir(path.dirname(getDrawerFilePath(id)), { recursive: true });

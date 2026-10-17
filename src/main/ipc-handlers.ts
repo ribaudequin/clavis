@@ -109,7 +109,7 @@ const UNLOCK_ERRORS: Record<UnlockFailureReason, { code: ErrorCode; message: str
 // boolean used to do.
 const SAVE_ERRORS: Record<SaveFailureReason, { code: ErrorCode; message: string }> = {
   invalid_id: { code: ErrorCode.VALIDATION_ERROR, message: 'Invalid drawer ID' },
-  password_too_short: { code: ErrorCode.PASSWORD_TOO_SHORT, message: 'Password must be at least 8 characters' },
+  password_too_weak: { code: ErrorCode.PASSWORD_TOO_SHORT, message: 'Password must be at least 12 characters with uppercase, lowercase, digit, symbol' },
   kdf_out_of_bounds: { code: ErrorCode.VALIDATION_ERROR, message: 'Drawer key derivation parameters are out of bounds' },
   content_too_large: { code: ErrorCode.CONTENT_TOO_LARGE, message: 'Content exceeds the maximum size' },
   too_large: { code: ErrorCode.CONTENT_TOO_LARGE, message: 'Drawer file exceeds the maximum size' },
@@ -163,7 +163,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           ok: false,
           error: {
             code: ErrorCode.PASSWORD_TOO_SHORT,
-            message: 'Password must be at least 8 characters',
+            message: 'Password must be at least 12 characters with uppercase, lowercase, digit, symbol',
             // details: undefined (ERR-01 fixed),
           },
         };

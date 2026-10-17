@@ -271,15 +271,15 @@ describe('IPC handlers', () => {
     });
 
     it('returns PASSWORD_TOO_SHORT when store throws with password message', async () => {
-      vi.mocked(store.createDrawer).mockRejectedValue(new Error('Password must be at least 8 characters'));
+      vi.mocked(store.createDrawer).mockRejectedValue(new Error('Password must be at least 12 characters with upper, lower, digit, symbol'));
 
       const handler = getHandler(CHANNELS.CREATE_DRAWER);
-      const result = await handler({}, 'Title', 'whatever1');
+      const result = await handler({}, 'Title', 'Str0ng!Pass');
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.error.code).toBe(ErrorCode.PASSWORD_TOO_SHORT);
-        expect(result.error.message).toBe('Password must be at least 8 characters');
+        expect(result.error.message).toBe('Password must be at least 12 characters with uppercase, lowercase, digit, symbol');
       }
     });
 
@@ -519,7 +519,7 @@ describe('IPC handlers', () => {
       const handler = getHandler(CHANNELS.SAVE_DRAWER);
       const reasons = [
         'invalid_id',
-        'password_too_short',
+        'password_too_weak',
         'kdf_out_of_bounds',
         'content_too_large',
         'too_large',
