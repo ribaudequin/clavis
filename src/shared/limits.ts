@@ -15,3 +15,17 @@ const CONTENT_CEILING = 10_000_000;
 
 export const MAX_CONTENT_CODE_POINTS = CONTENT_CEILING;
 export const MAX_PLAINTEXT_BYTES = CONTENT_CEILING;
+
+// HYG-8 fix — count code points without allocating a temporary array
+// of ~10 M elements (the old `[...value].length` in ViewDrawer.tsx:117).
+// Iterates by code point (handles surrogate pairs correctly) and never
+// materialises an intermediate array.
+export function countCodePoints(s: string): number {
+  let count = 0;
+  for (let i = 0; i < s.length; ) {
+    const cp = s.codePointAt(i) ?? 0;
+    count++;
+    i += cp > 0xffff ? 2 : 1;
+  }
+  return count;
+}

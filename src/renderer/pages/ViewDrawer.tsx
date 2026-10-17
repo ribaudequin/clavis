@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Result } from '../../shared/types';
-import { MAX_PLAINTEXT_BYTES } from '../../shared/limits';
+import { MAX_PLAINTEXT_BYTES, MAX_CONTENT_CODE_POINTS, countCodePoints } from '../../shared/limits';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import DiscardChangesModal from '../components/DiscardChangesModal';
 import { t, tError, formatNumber } from '../../i18n';
@@ -114,8 +114,8 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
   const { codePoints, bytes, maxBytes } = React.useMemo(() => {
     const value = content || '';
     return {
-      codePoints: [...value].length,
-      bytes: new TextEncoder().encode(value).length,
+      codePoints: countCodePoints(value),
+      bytes: new Blob([value]).size,
       // Formatted once here rather than per render: the ceiling does not move, and the
       // locale decides the separator (pt-PT spaces, en commas).
       maxBytes: formatNumber(MAX_PLAINTEXT_BYTES),
@@ -169,7 +169,8 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
           <span className="shrink-0 tabular-nums">{t('label.percent', { pct: String(pct) })}</span>
           <span aria-hidden="true">·</span>
           <span className={atRisk ? 'shrink-0 text-amber-600 font-medium tabular-nums' : 'shrink-0 tabular-nums'}>{t('label.bytes', { b: formatNumber(bytes), max: maxBytes })}</span>
-          {bytePct >= 1 && <span className="text-red-600 font-semibold">{t('label.at_limit', { b: formatNumber(bytes), max: maxBytes })}</span>}
+          {bytePct >= 1 && <span className="text-red-600 font-semibold ml-2">{t('label.at_limit', { b: formatNumber(bytes), max: maxBytes })}</span>}
+          {bytePct < 1 && codePoints >= Math.round(MAX_CONTENT_CODE_POINTS * 0.9) && <span className="text-amber-600 font-medium ml-2">{t('label.near_code_points')}</span>}
         </div>
       </main>
 

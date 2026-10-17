@@ -416,3 +416,4 @@ rather than in jsdom.
 ---
 
 *Formatting based on `MEMORY.md` changelog + git tags. Updated 2026-09-12.*
+## v0.5.1-beta (2026-10-17) — 321/321 tests, lint 0, AppImage rebuilt, HYG-7/8/10/11/12/13/14 closed, BR-13 verified, P3.31 smoke tests added

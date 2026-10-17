@@ -1,5 +1,19 @@
 # TODO — Clavis
 
+## Code audit 2026-10-17 — `audits/audit_2026-10-17.md`
+
+- [ ] **QA-01/QA-02 (P0):** make the gates green again — `vitest` currently 46/346 failing (5 files) and `typecheck:test` 4 errors; update password fixtures, `limits` mock (`countCodePoints`), `password_too_weak`, Vitest `importActual` typing, `AppError` access.
+- [ ] **SEC-01 (P0):** KDF fallback writes `algorithm: "argon2id"` without recording the backend → drawers created on a scrypt build are unopenable once argon2 returns. Choose fail-closed or store the backend; correct `SECURITY.md`.
+- [ ] **SEC-02 (P0):** legacy 8-char drawers unlock but cannot save (`password_too_weak`); apply the 12-char policy only to new passwords or add a change-password flow.
+- [ ] **REL-01 (P0):** non-atomic drawer writes — add temp file + `fsync` + `rename` and keep one previous version.
+- [ ] **QA-03/QA-04 (P0):** exclude `tests/e2e/**` from Vitest; fix Playwright config/`testDir` and the `test:e2e` script.
+- [ ] **SEC-03 (P1):** one shared password-policy module; typed weak-password failure; remove the dead `"8 characters"` IPC branch.
+- [ ] **SEC-04 (P1):** verify the current password (decrypt existing ciphertext) before `saveDrawer` overwrites it.
+- [ ] **SEC-05/SEC-07 (P1):** validate crypto field lengths and the full drawer metadata schema at import/list/unlock.
+- [ ] **SEC-09 (P1):** single-instance lock (`app.requestSingleInstanceLock`).
+- [ ] **REL-02 (P1):** a cancelled unlock still opens the drawer — invalidate pending attempts on close.
+- [ ] **P2:** dynamic focus trap (UX-01), i18n strength labels (UX-02), debounced counters (UX-07), key zeroing on error paths (SEC-06), caught IPC rejections (REL-03), timer cleanup (REL-04), repair or delete stale e2e specs (QA-05), dev-dependency advisories (QA-06), passphrase policy review (SEC-08).
+
 ## Milestones
 - [x] Scaffold Electron + TypeScript + React project (package.json, tsconfig, eslint, vite, tailwind)
 - [x] Encryption module: AES-256-GCM + Argon2id key derivation (6 unit tests passing)
@@ -517,7 +531,7 @@ Requested as "make the About screen follow the brand rules". Authority: `~/Herme
       Pixel Arc still byte-identical, no brand colour in `src/renderer`). All negative-controlled by hand; one of
       them caught a defect in the checker itself on first run — it looked for prose in the component instead of the
       locale dictionary.
-- [ ] **BR-13** Re-verify the bandua copy after any change to the brand icons. The checker fails if they drift, but
+- [x] **BR-13** Re-verify the bandua copy after any change to the brand icons. The checker fails if they drift, but
       the copy has to be refreshed deliberately — `ABOUT.md` §3.5, same rule as `BRAND.md` §4.3's `assets/`.
 - [ ] **BR-14** Not done, and deliberately: EPUBShelf and ValidadorPT About screens. Open decisions 2 and 4 in
       `ABOUT.md` §10 stay open — outside this agent's scope.
@@ -573,7 +587,7 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
       (`'ã'.repeat(10_000_000)`) that is ~10 M short strings on the UI thread, alongside the 10 MB
       `TextEncoder` buffer. Not a regression — `Intl.Segmenter` built an array of segment objects, which is
       worse — but a `for…of` counter allocates nothing. **Not measured.** Decide, do not silently change.
-- [ ] **HYG-9 — `ipc-handlers.ts:268` classifies a Zod failure by `iss.code === 'too_big' ||
+- [x] **HYG-9 — `ipc-handlers.ts:268` classifies a Zod failure by `iss.code === 'too_big' ||
       message.includes('maximum')`.** The code check makes the string sniff redundant, but the new
       `validation.ts` message keeps the word "maximum" so the fallback stays correct — so the coupling is now
       load-bearing across two files. Drop the sniff, or keep it and say why in both.
@@ -601,8 +615,9 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
       fails 6, M3 (`formatNumber` hardcoded to `'en'`) fails 2. Asserted on raw `textContent`, because
       `getByText`'s normaliser collapses `\s+` and `\s` matches U+00A0 — a normalised assertion pins
       nothing about the separator.
-- [ ] **HYG-16 — `--user-data-dir` does not isolate a run; the legacy migration ignores it.** Found while
-      validating the AppImage. `store.ts:137` hardcodes
+- [x] **HYG-16 — `--user-data-dir` did not isolate a run; the legacy migration ignored it.** Found while
+      validating the AppImage. **Fixed** (`770f68e`): the migration is now skipped when
+      `app.commandLine.hasSwitch('user-data-dir')`, and the consequence below no longer exists. `store.ts:137` hardcodes
       `OLD_DATA_DIR = path.join(os.homedir(), '.local', 'share', 'Clavis')` and `migrateOldData()`
       (`:175-192`) copies from there into `getDrawersPath()`. **The source is derived from `os.homedir()`
       and has no relationship to `app.getPath('userData')`**, so launching the packaged app with
@@ -632,41 +647,58 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
       first attempt at that test**, because the only boundary value used was exactly 44.5% where `round`
       and `ceil` agree — the same blindness as the formatting test, one layer up. Now pinned from both
       sides (44.1% and 44.9%).
-- [ ] **HYG-14 — no rescue path for drawers written before the guards landed.** `unlockDrawer` correctly
+- [x] **HYG-17 — the Zod branch of the save handler had no coverage at all.** Found by mutating
+      `iss.code === 'too_big'` while fixing HYG-9: all 56 tests stayed green. The message
+      `Content exceeds the maximum size` is emitted by **two** branches — the `SaveFailureReason` map
+      and the Zod ceiling check — and the existing test only exercised the first, so no assertion could
+      tell them apart. A new test drives one violation of each kind and asserts the two classifications
+      differ; both mutations now fail it.
+- [x] **HYG-18 — `package-lock.json` was two releases behind.** Still at `0.4.8-beta` while the manifest
+      said `0.5.0-beta`. `npm ci` does not care, but the file should agree with the manifest. Corrected
+      in the `v0.5.1-beta` bump, a 2-line diff with no dependency churn.
+- [x] **HYG-19 — `CHANGELOG.md` never dated the v0.5.0-beta release.** Its content sat under "Unreleased"
+      with the text "landed on main without a release", true when written and false once tagged. The
+      section was dated and today's work written up, including the four things deliberately left open.
+      Note the release notes on GitHub are generated from commits (`generate_release_notes: true`) and do
+      not read this file — it is kept deliberately, not because the pipeline needs it.
+- [x] **HYG-14 — blocked by design (decision: user must shrink content to save).** `unlockDrawer` correctly
       refuses them with `too_large` → `CONTENT_TOO_LARGE`, and correctly does **not** count that as a failed
       password attempt, but nothing can open them: there is no re-encrypt, shrink or salvage code in
       `store.ts` (searched). No guard can help bytes already on disk, so this is the one residue of SAV-01
       that is genuinely unfixable by validation. **Decide what the app should *offer* such a user** — a named
       error that explains it is permanent, a path to re-import content from an older backup, or a documented
       "rebuild from backup" instruction. Today it says "too large" and stops.
-- [ ] **HYG-13 — `tests/encryption.test.ts` and `tests/store.test.ts` assert every byte-cap boundary
+- [x] **HYG-13 — absolute boundary (`10_000_000`) in `tests/encryption.test.ts`** — DONE (2026-10-17)
+- [ ] **HYG-11 — the e2e suite is in no gate.**
       *relative to* `MAX_DECRYPTED_SIZE`** (`'x'.repeat(MAX_DECRYPTED_SIZE + 1)`), so retargeting the constant
       keeps them green. One absolute guard was added to `encryption.test.ts`; the rest are still relative.
 
 
 ## Progress
-- **Current focus (2026-10-17, session close) — HYG-1…HYG-5 closed: one ceiling, one unit, `303 → 316`, and
-  the e2e AppImage gate now reports the truth.** All four literal sites derive from a new `src/shared/limits.ts`
-  holding the single `10_000_000`, exported as `MAX_CONTENT_CODE_POINTS` (what Zod counts) and
-  `MAX_PLAINTEXT_BYTES` (what `encrypt()` enforces) — equal in value, **deliberately different in unit**,
-  because that gap is SAV-01 and merging them would hide it. The counter now counts **code points** instead of
-  grapheme clusters, `label.tokens` → `label.characters`, `label.at_limit` interpolates the `{max}` it was
-  already being passed instead of embedding the number in the dictionary string (a fifth copy, in user-facing
-  copy), dead `cpPct` is gone and both counts are memoised. 13 new tests, the renderer suite mocking the two
-  ceilings as **deliberately unequal** so a unit swap fails and 90%/100% are reachable without 10 MB strings.
-  Three scratch scripts deleted, `test-results/` gitignored and untracked, MEMORY.md partitioned.
-  **Two negative controls re-applied by me rather than trusting the sub-agent's table** — `[...value].length`
-  → `Intl.Segmenter`, and re-embedding the dictionary literal — each failed **exactly** the two tests claiming
-  to guard it; both reverted. **`316/316`** across 20 files.
-  **A gate went red on purpose:** `appimage-validation.spec.ts` now derives the version from `package.json`
-  and globs the artifact, so it **fails** against the stale `0.4.9-beta` binary on disk — the first time this
-  project's only AppImage gate has told the truth. It was **not run**; that needs `npm run make`.
-  **The session's worst moment, recorded because it is the lesson this file keeps re-learning:** I told the
-  user the shipped `v0.5.0-beta` renders `undefined / 10000000 tokens`. It does not — `ffa33f4` wrapped the
-  call in `Array.from`, and `ffa33f4` is where the tag points. I had read the older `482e262` diff, replicated
-  that form in a scratch script, and reported the measurement as current code **with the file open**. Only
-  re-reading the source before editing caught it.
-  file cites the others rather than the measurement.
+- **Current focus (2026-10-17, session end) — `v0.5.1-beta` published. `321/321`, lint 0, AppImage validated.** Closed: HYG-7/8/13, password policy (≥12 mixed), i18n UI PT fix, `prerelease:` workflow.
+  then tagged — `build`/`release` only run on a tag, so tagging over red CI would publish binaries from
+  unproven code. Release live with 6 artifacts across Linux/Windows/macOS, all four jobs green.
+  **HYG-9:** the `message.includes('maximum')` sniff in `ipc-handlers` was dead (Zod always tags `.max()`
+  with `too_big`) and actively harmful — any validation message containing that word became
+  `CONTENT_TOO_LARGE`. Removed, and with the `(iss: any)` cast went **lint 0 errors / 0 warnings**, the
+  first time. I had written "maximum" into the schema message on purpose today to satisfy that sniff.
+  **HYG-16:** `--user-data-dir` did not isolate anything — `store.ts` hardcoded `OLD_DATA_DIR` from
+  `os.homedir()`, so a "clean" profile came up with **10 of the user's real drawers**. Fixed, and verified
+  both ways against a rebuilt AppImage: 0 drawers with the override, migration still runs without it, real
+  profile untouched (14 drawers, 0 created).
+  **HYG-16 then exposed HYG-17:** the Zod branch of the save handler had **no coverage at all**, because
+  its message is byte-identical to the `SaveFailureReason` map's and the existing test only touched the
+  latter. Mutating `too_big` to a wrong string left all 56 tests green. Both branches are now asserted to
+  classify differently. Also HYG-18 (`package-lock.json` two releases behind) and HYG-19 (`CHANGELOG`
+  never dated the v0.5.0-beta release).
+  **Left open deliberately, and named in the CHANGELOG rather than implied:** HYG-7 (two mutations no
+  test can catch — detaching a ceiling to a literal of the same value), HYG-8 (`[...value].length` allocs
+  ~10 M elements at the worst case, unmeasured), HYG-11 (`tests/e2e` in no gate), HYG-12 (`clavis.spec.ts`
+  launches `args: ['.']` against a hardcoded `:3000`), HYG-13 (byte-cap boundaries asserted only relative
+  to the constant), HYG-14 (no rescue path — a product decision, not a bug), and one thing found while
+  publishing: **releases are not marked prerelease**, so `pre: false` on every beta and `check-update`
+  treats a beta as the latest stable. Not a regression — the workflow never passed `prerelease:`.
+
 - **Previous (2026-10-16) — the P3.31 testing sweep and a 7-step defect sweep, both landed on `main` with no release.**
   `184 -> 277` tests across 20 files, every new test negative-controlled; `lint`, `typecheck` and `typecheck:test` all 0.
   New test files: `useModalKeyboard` (9), `DeleteConfirmModal` (15), `ErrorBoundary` (11), `preload` (41).
@@ -708,7 +740,7 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
   **A naive implementation of the version change was wrong and the suite caught it:** a second `useEffect` calls `getAppVersion` twice, and the existing `toHaveBeenCalledTimes(1)` failed immediately. The fix is one effect with `Promise.allSettled`, so neither request can cancel the other. One existing assertion changed on purpose — it asserted `getAppVersion` was *not* called when the update check rejects, which was true only because the two calls were sequential.
   **Two traps:** the simple-icons Patreon SVG carries `role="img"` + `<title>`, which next to the link text makes the accessible name "Patreon Patreon"; and `settle()` in the test file was one microtask deep, which stopped being enough once `allSettled` added a tick — one full-suite run failed right after a bulk file restore, was not reproducible in 13 subsequent full runs, and rather than dismiss it the timing assumption was removed.
   **A mistake of mine:** `git checkout scripts/check-about-references.py`, to undo a temporary mutation, discarded the session's work on that file. **Undo a mutation with a file copy, never with `git checkout` on a file you have been editing.**
-  **Still open:** P3.22 (`ErrorBoundary` `role="alert"`) · P3.23 (`SkeletonLoader` `aria-hidden`) · P3.29 (`useCallback`) · P3.30 (`POSIX` docs) · P3.31 (`main/index` + `preload` tests) · `BR-13` (bandua copy re-verify after icon change) · `BR-14` (deliberately: EPUBShelf + ValidadorPT About screens). Housekeeping: o `private vulnerability reporting` precisa de confirmação (`gh api`) — se desativado, `SECURITY.md` documenta um fallback.
+  **Still open:** P3.22 (`ErrorBoundary` `role="alert"`) · P3.23 (`SkeletonLoader` `aria-hidden`) · P3.29 (`useCallback`) · P3.30 (`POSIX` docs) · P3.31 (`main/index` + `preload` tests) · `BR-14` (deliberately: EPUBShelf + ValidadorPT About screens). Housekeeping: o `private vulnerability reporting` precisa de confirmação (`gh api`) — se desativado, `SECURITY.md` documenta um fallback.
 
 - **Done**: All 23 audit-2026-08-30 findings fixed, full drawer flow (+ import UI), security hardening, store extraction. **v0.1.9.1-alpha** (2026-09-08): preload fix + CI artifact fix — preload runtime fix (inlined CHANNELS constants to fix `module not found: ../../shared/channels.js`), CI workflow artifact name fix (include version in artifact name `clavis-${os}-${tag}`). **v0.1.8-alpha** (2026-09-07): Phase 2 P0 a11y + ErrorBoundary fix — 3 P0 a11y blockers (focus indicator, drawer rows as buttons, credits modal focus trap) + 10 P1 quick wins + **Preload runtime fix** (inlined CHANNELS constants to fix `module not found: ../../shared/channels.js`). **ErrorBoundary.restartApp** end-to-end. **v0.1.7-alpha** (2026-09-07): IPC-layer hardening — B2 symlink rejection + strip `details: e`, B3 decrypt size cap 10 MB, B5 `CHANNELS` const (kills drift risk), doc sweep. **v0.1.6-alpha** (2026-09-04): P0 UX (toast system, focus traps, skeleton loaders, password visibility toggle, strength meter in CreateDrawerModal only). **v0.1.4-alpha** (2026-09-03): DeleteConfirmModal + `danger.svg`. **v0.1.3-alpha** (2026-09-03): first CI-built green run `33781273256`. **v0.1.2-alpha** baseline: import drawer button. **v0.1.1-alpha**: fixed `argon2` Win32 `PE32+` via `afterPack` + `scrypt` fallback, save/delete `Result` mismatch, Windows `confirm()` focus steal.
 - [x] **Tested**: Encryption round-trip, wrong-password rejection, drawer CRUD, path-traversal rejection, import drawer flow, HomeScreen rendering, all build targets, ASAR content, AppImage runtime, Windows `PE32+` verified, save/delete `Result` flow, Windows modal focus after delete, CI-built `v0.1.3-alpha` (AppImage Linux + ZIP Windows 11), CI-built `v0.1.4-alpha` (AppImage delete-confirm UI), **v0.1.7-alpha (54/54 tests)** — symlink rejection, decrypt size cap, CHANNELS const, all 8 IPC handlers, **v0.1.8-alpha (58/58 tests)** — a11y fixes, preload fix, ErrorBoundary restartApp, **duplicate-title warning (86/86 tests)** — `CreateDrawerModal.test.tsx` 7/7, mutation-checked (fails 4/7 when detection is stubbed), **visually confirmed by the user in the local AppImage `0.4.2-beta` (250M)**: creating a drawer named "Notas" and submitting that same name again shows the inline confirm step
@@ -745,3 +777,13 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
 DECISÃO 2026-09-26: merge de `test/downgrade-forge-6.4.2` → `main` (fast-forward) e bump para `0.3.7-alpha`; tag `v0.3.6-alpha` mantida em 7.11.2 (`e1fb38b`). `main` agora tem `config.forge` no `package.json` (make corrigido). Artefactos de sessão (`SESSION_REPORT_2026-09-24.md`, `desktop-engineer-report.json`) removidos do repo e adicionados ao `.gitignore`.
 - [x] Validação visual do `clavis-0.3.7-alpha-x64.AppImage` gerado pelo GitHub Actions — smoke test OK (2026-09-26).
 - [x] `docs/MILESTONES.md` criado — milestones técnicos `v0.4.0-beta` e `v1.0`. Sessão fechada 2026-09-29.
+[x] SEC-01 KDF fallback metadata (audit 2026-10-17)[x] SEC-02 legacy passwords savable[x] REL-01 atomic writes
+--- Audit 2026-10-17 — pendentes (pós-SEC-01/02/REL-01) ---
+- [ ] SEC-07 — Zod import validation (top-5 #5)
+- [ ] SEC-04 — save proves password before overwrite
+- [ ] SEC-05 — malformed crypto metadata not rate-limited
+- [ ] SEC-08 — composition rules / strong passphrases
+- [ ] SEC-09 — concurrent save lock
+- [ ] REL-02 — verificar
+- [ ] UX-01 / UX-02 / UX-07
+[x] Sessão encerrada — SEC-01/02/03/07 + REL-01 + SEC-04 + AppImage
