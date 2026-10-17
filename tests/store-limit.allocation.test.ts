@@ -10,7 +10,7 @@ import {
   MAX_CONTENT_CODE_POINTS,
   MAX_PLAINTEXT_BYTES,
   countCodePoints,
-} from '../src/shared/limits';
+} from '../src/shared/limits.js';
 
 describe('HYG-8 — allocation at the limit (store-limit.allocation)', () => {
   it('should not allocate an array of 10 M elements to count code points', () => {
