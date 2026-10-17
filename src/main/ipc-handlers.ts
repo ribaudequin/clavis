@@ -109,6 +109,7 @@ const UNLOCK_ERRORS: Record<UnlockFailureReason, { code: ErrorCode; message: str
 // boolean used to do.
 const SAVE_ERRORS: Record<SaveFailureReason, { code: ErrorCode; message: string }> = {
   invalid_id: { code: ErrorCode.VALIDATION_ERROR, message: 'Invalid drawer ID' },
+  wrong_password: { code: ErrorCode.WRONG_PASSWORD, message: 'Password is incorrect' },
   password_too_weak: { code: ErrorCode.PASSWORD_TOO_SHORT, message: 'Password must be at least 12 characters with uppercase, lowercase, digit, symbol' },
   kdf_out_of_bounds: { code: ErrorCode.VALIDATION_ERROR, message: 'Drawer key derivation parameters are out of bounds' },
   content_too_large: { code: ErrorCode.CONTENT_TOO_LARGE, message: 'Content exceeds the maximum size' },

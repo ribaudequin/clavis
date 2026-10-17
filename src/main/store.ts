@@ -64,6 +64,7 @@ export type UnlockResult =
 export type SaveFailureReason =
   | 'invalid_id'
   | 'password_too_weak'
+  | 'wrong_password'
   | 'kdf_out_of_bounds'
   | 'content_too_large'
   | 'too_large'
@@ -512,6 +513,15 @@ export async function saveDrawer(
           parallelism: drawer.keyDerivation.parallelism,
         }
       : undefined;
+
+    // SEC-04 — Verify current password before overwriting ciphertext.
+    try {
+      await decrypt(drawer.encryptedData, drawer.salt, drawer.iv, drawer.authTag, passwordBuffer, kdfParams);
+    } catch (e) {
+      passwordBuffer.fill(0);
+      logger.warn('Save refused: wrong password', { id });
+      return { ok: false, reason: 'wrong_password' };
+    }
 
     // SAV-03 — Kept distinct from the catch below: a refusal to store is not a
     // write failure, and the caller has to be able to say which one happened.
