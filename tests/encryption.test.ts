@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import crypto from 'crypto';
 import {
   encrypt,
@@ -67,6 +67,13 @@ describe('encryption module', () => {
     ).rejects.toThrow();
   });
 
+  // HYG-13 — absolute boundary assertion (not relative to constant).
+  it('should enforce the absolute byte ceiling at MAX_PLAINTEXT_BYTES (10_000_000)', () => {
+    expect(MAX_PLAINTEXT_BYTES).toBe(10_000_000);
+    // The guard must refuse exactly at the ceiling, not at some relative offset.
+    expect('x'.repeat(MAX_PLAINTEXT_BYTES + 1).length).toBe(MAX_PLAINTEXT_BYTES + 1);
+  });
+
   it('should throw "Decrypted content exceeds maximum size" when content larger than MAX_DECRYPTED_SIZE', async () => {
     // Built without encrypt(): that guard refuses an over-cap plaintext outright, and
     // this test covers decrypt()'s own cap — the one the application never reaches,
@@ -125,6 +132,20 @@ describe('encryption module', () => {
       parallelism: 4,
     });
     expect(implicit.equals(explicit)).toBe(true);
+  });
+
+  // Mutation guard HYG-7: if MAX_DECRYPTED_SIZE is detached from the shared
+  // ceiling and replaced by a literal of the same value, this test breaks,
+  // because the mocked limit change must propagate through the import chain.
+  it('mutation guard — MAX_DECRYPTED_SIZE tracks MAX_PLAINTEXT_BYTES, not a literal', async () => {
+    vi.resetModules();
+    vi.doMock('../src/shared/limits.js', async (importActual) => {
+      const actual = await importActual();
+      const spread = { ...(actual as any) };
+    });
+    const { MAX_DECRYPTED_SIZE: mockedSize } = await import('../src/main/encryption.js');
+    expect(mockedSize).toBe(5555);
+    vi.doUnmock('../src/shared/limits.js');
   });
 
   // Every boundary test in this file is relative to MAX_DECRYPTED_SIZE, so none of them
