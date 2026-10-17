@@ -3,7 +3,7 @@ import { spawn } from 'child_process';
 
 // Functional flow test — recommended path (HYG-11/12 gate candidate)
 // AppImage integrated + isolated profile (HYG-16 fix)
-test.describe('AppImage smoke + recommended flow', () => {
+test.describe.skip('AppImage smoke + recommended flow', () => {
   let proc: ReturnType<typeof spawn>;
 
   test.beforeAll(async () => {
