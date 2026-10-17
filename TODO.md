@@ -323,12 +323,15 @@ negative-controlled. `184 → 277` tests.
 
 ## Storage limits hardening — `PLANO-STORAGE-LIMITS-2026-10-16.md`
 
-Surfaced by researching what keeping the 20 MB import cap exposed. **Nothing here is fixed yet.**
+Surfaced by researching what keeping the 20 MB import cap exposed. **All fixed in `d2bdb98`.**
+> **Reading the entries below:** the `store.ts` / `encryption.ts` line numbers they quote are as of the
+> **pre-fix** tree (`d2bdb98~1`), because the fix itself moved them. The narrative of each entry is the
+> historical review and is left as written; current locations are in `docs/DRAWER-CAPACITY.md`.
 The owner decision on record: **keep 20 MB**. Two hostile reviews have run; the second killed every
 load-bearing claim in the first draft, and the corrections are recorded in the plan.
 
 - [x] **SAV-01 — a drawer can be saved and then never opened again. THREE doors, two need no attacker.**
-      Implementado em `ff4efb7` (0a): `isCiphertextOverCap()` + rejeição no import (`store.ts:593`).
+      Implementado em `d2bdb98` (0a): `isCiphertextOverCap()` + rejeição no import (`store.ts:593`).
       Door 1 (save) fechado por `SAV-03` (`encrypt()` guard); Door 2 (import) fechado; Door 3 (migração) fechado (`migrateDrawersFrom` com `stat.size`).
       `unlockDrawer` refuses any drawer whose `encryptedData` decodes above `MAX_DECRYPTED_SIZE`
       (`store.ts:271-278`) and returns `null`, which `ipc-handlers.ts:167-180` reports as
@@ -355,7 +358,7 @@ load-bearing claim in the first draft, and the corrections are recorded in the p
         through the application and survives only via a direct unit test; (b) "cannot be backed up"
         is **false** for most of the range — at 10 000 004 bytes the file is 20 000 611 chars, under
         the cap, so export→delete→import **succeeds** and still yields an unopenable drawer.
-- [x] **SAV-02 — `unlockDrawer` retorna `{ok,reason}` (`SAV-02`, `store.ts`).** Feito (`ff4efb7`).
+- [x] **SAV-02 — `unlockDrawer` retorna `{ok,reason}` (`SAV-02`, `store.ts`).** Feito (`d2bdb98`).
       causes return `null` — invalid id (`:231`), read failure (`:238`), parse failure (`:239`), KDF
       out of bounds (`:255`), ciphertext over cap (`:278`), wrong password (`:281`) — and
       `ipc-handlers.ts:167-180` collapses all six into one message *and* one rate-limiter increment.
@@ -519,23 +522,150 @@ Requested as "make the About screen follow the brand rules". Authority: `~/Herme
 - [ ] **BR-14** Not done, and deliberately: EPUBShelf and ValidadorPT About screens. Open decisions 2 and 4 in
       `ABOUT.md` §10 stay open — outside this agent's scope.
 
+## Repo hygiene + capacity counter — `HYG-1…HYG-6` (2026-10-17)
+
+Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after `v0.5.0-beta`.
+**HYG-1…HYG-5 closed.** Gates: lint **0 errors / 1 warning** (pre-existing `ipc-handlers.ts:268` `any`),
+`typecheck` clean, `typecheck:test` clean, **`316/316`** across 20 files (`303 → 316`).
+
+- [x] **HYG-1 — the three root-level scratch scripts are deleted.** `ciclo-teste.ts`, `contador-validate.ts`,
+      `visual-validate.ts` — all three hardcoded `clavis-0.4.9-beta-x64.AppImage` (a path `npm run clean`
+      deletes and the current build does not produce), imported `path` unused, sat outside **both** tsconfig
+      `include` lists, and carried pt-PT comments. `ciclo-teste.ts` additionally mixed `require()` into ESM and
+      read the **legacy** `~/.local/share/clavis` instead of `~/.config/clavis`, and its "confirm the list is
+      empty" step was a `waitForTimeout(500)` plus a `console.log` with no assertion. Deleted rather than
+      converted: converting a script whose assertions are all no-ops is writing the tests from scratch, and
+      `tests/e2e/appimage-validation.spec.ts` already covers the AppImage-launch case.
+- [x] **HYG-2 — `test-results/` gitignored and `test-results/.last-run.json` untracked** (kept on disk).
+- [x] **HYG-3 — the capacity counter now has 13 tests, and four real defects fixed behind them.** The counter
+      had **zero** assertions on its thresholds, its numbers or its copy. Now, in `tests/ViewDrawer.test.tsx`
+      (`capacity counter`), plus one wiring guard each in `tests/encryption.test.ts` and
+      `tests/validation.test.ts`:
+      - **Unit fixed:** counted **grapheme clusters** while comparing them against a Zod `.max()` that counts
+        **code points**. Now `[...value].length`. The suite mocks the ceilings as deliberately **unequal**
+        (`2_000` cp vs `1_000` bytes) so 90%/100% are reachable as `'x'.repeat(900)` instead of 10 MB
+        allocations — and because **equal values make a unit swap invisible**.
+      - **Key renamed:** `label.tokens` → `label.characters` (both locales). A token is ~4 characters; a
+        grapheme is one; neither is what was being counted.
+      - **Copy un-embedded:** `label.at_limit` had `10 000 000` **written into the dictionary string** — a fifth
+        copy of the ceiling, in user-facing copy, where no constant can reach it. Both locales now use the
+        `{max}` the component was already passing and ignoring.
+      - **One literal:** all four sites derive from `src/shared/limits.ts`. The two exports are equal in value
+        and **deliberately different in unit** (`MAX_CONTENT_CODE_POINTS` = schema, `MAX_PLAINTEXT_BYTES` =
+        `encrypt()`), because that gap **is** SAV-01. `MAX_DECRYPTED_SIZE = MAX_PLAINTEXT_BYTES` keeps the name
+        so `store.ts` does not churn. **Merging them would hide the unit.**
+      - Two mutations are **provably undetectable** and are not claimed as caught: detaching either site to a
+        literal *of the same value* leaves every run green.
+- [x] **HYG-4 — per-keystroke work ended.** `Intl.Segmenter().segment()` ran over the whole content string on
+      every render of a controlled textarea, feeding the dead `cpPct` and a label. Both counts are now
+      `useMemo`'d on `content` and `cpPct` is deleted.
+- [x] **HYG-5 — MEMORY.md partitioned.** 3 entries kept per section, the rest moved to `/MEMORY/HISTORY.md`.
+- [x] **HYG-6 — the `281/281` figure corrected, not rewritten.** It was recorded as a **delta** ("277 → 281")
+      on a total that had itself drifted. `303/303` was the measured figure and is now `316/316`.
+
+### Left open, from the same work
+
+- [ ] **HYG-7 — two mutations are undetectable by construction.** Detaching `MAX_DECRYPTED_SIZE` or the Zod
+      `.max()` to a hand-written `10_000_000` leaves every run green, because at equal values the wiring is
+      observationally identical. Only a lint rule (ban numeric literals equal to the ceiling in those files)
+      would close it. **Decide whether that rule is worth its cost.**
+- [ ] **HYG-8 — `[...value].length` allocates an N-element array.** At the worst case the schema admits
+      (`'ã'.repeat(10_000_000)`) that is ~10 M short strings on the UI thread, alongside the 10 MB
+      `TextEncoder` buffer. Not a regression — `Intl.Segmenter` built an array of segment objects, which is
+      worse — but a `for…of` counter allocates nothing. **Not measured.** Decide, do not silently change.
+- [ ] **HYG-9 — `ipc-handlers.ts:268` classifies a Zod failure by `iss.code === 'too_big' ||
+      message.includes('maximum')`.** The code check makes the string sniff redundant, but the new
+      `validation.ts` message keeps the word "maximum" so the fallback stays correct — so the coupling is now
+      load-bearing across two files. Drop the sniff, or keep it and say why in both.
+- [ ] **HYG-10 — the counter shows two equal maxima, and the UI never says which cap refuses the save.** A
+      user stopped by the byte cap sees the character counter sitting at exactly its own limit. Correct as
+      specified, and `docs/DRAWER-CAPACITY.md` explains it — the screen does not.
+- [ ] **HYG-11 — the e2e suite is in no gate.** `tests/e2e` is excluded from both tsconfigs, so the edited
+      `appimage-validation.spec.ts` typechecks only under an ad-hoc `tsc` invocation that nothing enforces.
+      It also **now fails** against the stale binary on disk, correctly. It was **not run** in this session: a
+      real run needs `npm run make`.
+- [ ] **HYG-12 — `tests/e2e/clavis.spec.ts` launches `args: ['.']` in 11 places**, and `src/main/index.ts:41`
+      hardcodes `localhost:3000`, which this machine's WhatsApp bridge occupies — so on this box the e2e
+      suite is testing another process's page. Untouched; pre-existing.
+- [x] **HYG-15 — the capacity numbers are now formatted for the active locale.** `String(n)` put
+      `10000000` in front of the user in **both** locales. `formatNumber()` was added to `src/i18n/index.ts`
+      **beside `detectLocale()`**, not in the component, precisely so it does not become the second locale
+      decision the project already has a scar for (`getLocale()` in `ipc-handlers.ts`). Measured on this box:
+      pt-PT uses **U+00A0** and groups from 5 digits (`10 000 000`), and writes 4-digit numbers bare
+      (`2000`); en uses a comma and groups at 4 (`2,000`, `10,000,000`) — **the two locales disagree at
+      4 digits and agree at 7**, which is the pt-PT `minimumGroupingDigits` rule, not a bug.
+      Two tests added, and **the first version of the grouping test passed a mutation that removed the
+      formatting entirely**, because every value it used (1, 2, 8, 10) is below 1000 where `formatNumber(n)`
+      and `String(n)` are the same string. The live counter had to be pushed to 2000 characters before the
+      test could see the difference. Now M1 (live count → `String`) fails 1, M2 (byte ceiling → `String`)
+      fails 6, M3 (`formatNumber` hardcoded to `'en'`) fails 2. Asserted on raw `textContent`, because
+      `getByText`'s normaliser collapses `\s+` and `\s` matches U+00A0 — a normalised assertion pins
+      nothing about the separator.
+- [ ] **HYG-16 — `--user-data-dir` does not isolate a run; the legacy migration ignores it.** Found while
+      validating the AppImage. `store.ts:137` hardcodes
+      `OLD_DATA_DIR = path.join(os.homedir(), '.local', 'share', 'Clavis')` and `migrateOldData()`
+      (`:175-192`) copies from there into `getDrawersPath()`. **The source is derived from `os.homedir()`
+      and has no relationship to `app.getPath('userData')`**, so launching the packaged app with
+      `--user-data-dir=/tmp/whatever` starts from an empty profile and then **copies the user's real legacy
+      drawers into it** — measured on this box: a "clean" test profile came up holding 10 of the user's
+      drawers, including private ones. Consequence: there is no way to run the AppImage against a throwaway
+      profile without first moving the real legacy directory aside, which nobody testing this app would
+      think to do. The copies are `0o600` and the originals are untouched (verified: real profile still 14
+      drawers, 0 created, legacy still 9), so this is a testing-safety hazard rather than data loss.
+      **Decide:** honour `--user-data-dir` for the migration source too, gate the migration on an explicit
+      opt-out env var, or skip migration entirely when the destination was overridden. Also worth asking why
+      `~/.local/share/Clavis` is still populated at all — the migration copies but never removes, so the
+      user's drawers now exist in two places indefinitely.
+- [x] **HYG-10 + HYG-15b — the character counter is a count again, not a limit.** It was presented
+      against the code-point ceiling and escalated colour at 90%/100% exactly like the byte counter,
+      which produced a screen that said "half full" beside a full red bar. **The ceiling it was shown
+      against can never refuse a save:** every code point costs 1-4 UTF-8 bytes, so `bytes >= codePoints`
+      always and `bytes <= 10 000 000` implies `codePoints <= 10 000 000`. The byte cap is provably the
+      binding one; the Zod `.max()` is defence-in-depth. So the layout now states only one limit:
+      `<chars> · [bar] <pct>% · <bytes> / <ceiling> bytes`, with the risk colour on the byte count and
+      the bar alone. `label.characters` lost its `{max}` (asserted absent per locale — a stray placeholder
+      is how the misleading layout came back), `label.percent` added, `MAX_CONTENT_CODE_POINTS` no longer
+      reaches the view. Percentage rounded **once** and shared by the bar width and the label, after a
+      test caught them disagreeing (bar `44.5%`, label `45%`).
+      Five negative controls: reintroducing the character ceiling fails 6, colouring the character count
+      fails 1, un-rounding the bar width fails 1, `ceil` fails 1 and `floor` fails 1. **`ceil` survived the
+      first attempt at that test**, because the only boundary value used was exactly 44.5% where `round`
+      and `ceil` agree — the same blindness as the formatting test, one layer up. Now pinned from both
+      sides (44.1% and 44.9%).
+- [ ] **HYG-14 — no rescue path for drawers written before the guards landed.** `unlockDrawer` correctly
+      refuses them with `too_large` → `CONTENT_TOO_LARGE`, and correctly does **not** count that as a failed
+      password attempt, but nothing can open them: there is no re-encrypt, shrink or salvage code in
+      `store.ts` (searched). No guard can help bytes already on disk, so this is the one residue of SAV-01
+      that is genuinely unfixable by validation. **Decide what the app should *offer* such a user** — a named
+      error that explains it is permanent, a path to re-import content from an older backup, or a documented
+      "rebuild from backup" instruction. Today it says "too large" and stops.
+- [ ] **HYG-13 — `tests/encryption.test.ts` and `tests/store.test.ts` assert every byte-cap boundary
+      *relative to* `MAX_DECRYPTED_SIZE`** (`'x'.repeat(MAX_DECRYPTED_SIZE + 1)`), so retargeting the constant
+      keeps them green. One absolute guard was added to `encryption.test.ts`; the rest are still relative.
+
+
 ## Progress
-- **Current focus (2026-10-16) — documentation corrected, no code changed. The storage-limits docs were wrong about the unit, the guilty line, and their own arithmetic.**
-  `docs/DRAWER-CAPACITY.md` + `SECURITY.md` claimed Zod's `.max()` counts UTF-16 code units; it counts **code points**
-  (verified against Zod 4.5.4: `'😀'.repeat(4)` = 4 code points / 8 units / 16 bytes, and passes `.max(4)`). Both
-  attributed the refusal to `decrypt()`; the guard that fires is **`store.ts:271` (`unlockDrawer`)**, returning a bare
-  `null` from six causes, so an oversized drawer reads as "Incorrect password or drawer not found" and still
-  increments the rate limiter. `decrypt()`'s byte cap at `encryption.ts:149` is **unreachable through the app**.
-  **Envelope arithmetic measured, not reasoned:** claimed ~560/~815/~1 100; actual **393** / **647** / **1 922**
-  (255 × `U+0001` escapes to 6 chars each). The 4 096 allowance leaves **1.1×** headroom, not "roughly 3×". The file is
-  `JSON.stringify(drawer, null, 2)` — the indentation is part of the cost — and `iconData` is derived from the id, not
-  user input. **A wrong number had spread across four files, each citing the others:** "four emoji in a 9.9 MB note" is
-  9 900 016 bytes, under the cap, never triggered; the plan's own table was right while the prose under it was wrong.
-  Realistic trigger is `'ã'.repeat(10_000_000)` — 10 M code points accepted, 20 MB of UTF-8 refused — so accented
-  Portuguese bricks and the safe figure is ~9.1 M characters. Both docs now describe the **bug**, not a fix, since
-  SAV-01…SAV-06 is untouched. `PLANO-STORAGE-LIMITS` Block C marked partly resolved, post-fix reshape deferred.
-  All four gates green, no code touched: `lint` 0, `typecheck` 0, `typecheck:test` 0, **`281/281`**, build OK.
-  **Lesson added: an error copied between documents acquires the appearance of independent confirmation**, because each
+- **Current focus (2026-10-17, session close) — HYG-1…HYG-5 closed: one ceiling, one unit, `303 → 316`, and
+  the e2e AppImage gate now reports the truth.** All four literal sites derive from a new `src/shared/limits.ts`
+  holding the single `10_000_000`, exported as `MAX_CONTENT_CODE_POINTS` (what Zod counts) and
+  `MAX_PLAINTEXT_BYTES` (what `encrypt()` enforces) — equal in value, **deliberately different in unit**,
+  because that gap is SAV-01 and merging them would hide it. The counter now counts **code points** instead of
+  grapheme clusters, `label.tokens` → `label.characters`, `label.at_limit` interpolates the `{max}` it was
+  already being passed instead of embedding the number in the dictionary string (a fifth copy, in user-facing
+  copy), dead `cpPct` is gone and both counts are memoised. 13 new tests, the renderer suite mocking the two
+  ceilings as **deliberately unequal** so a unit swap fails and 90%/100% are reachable without 10 MB strings.
+  Three scratch scripts deleted, `test-results/` gitignored and untracked, MEMORY.md partitioned.
+  **Two negative controls re-applied by me rather than trusting the sub-agent's table** — `[...value].length`
+  → `Intl.Segmenter`, and re-embedding the dictionary literal — each failed **exactly** the two tests claiming
+  to guard it; both reverted. **`316/316`** across 20 files.
+  **A gate went red on purpose:** `appimage-validation.spec.ts` now derives the version from `package.json`
+  and globs the artifact, so it **fails** against the stale `0.4.9-beta` binary on disk — the first time this
+  project's only AppImage gate has told the truth. It was **not run**; that needs `npm run make`.
+  **The session's worst moment, recorded because it is the lesson this file keeps re-learning:** I told the
+  user the shipped `v0.5.0-beta` renders `undefined / 10000000 tokens`. It does not — `ffa33f4` wrapped the
+  call in `Array.from`, and `ffa33f4` is where the tag points. I had read the older `482e262` diff, replicated
+  that form in a scratch script, and reported the measurement as current code **with the file open**. Only
+  re-reading the source before editing caught it.
   file cites the others rather than the measurement.
 - **Previous (2026-10-16) — the P3.31 testing sweep and a 7-step defect sweep, both landed on `main` with no release.**
   `184 -> 277` tests across 20 files, every new test negative-controlled; `lint`, `typecheck` and `typecheck:test` all 0.

@@ -3,7 +3,9 @@
 A short, factual reference for Clavis's storage limits. Every number here is traceable to a
 constant in the source; the file-size figures were measured, not estimated.
 
-> ⚠️ **Partially fixed (2026-10-16, commit `ff4efb7`).** The save path (`encrypt()` guard + `SaveDrawerSchema`) and the unlock path (`store.ts:271`) still measure different things — **code points** vs **UTF-8 bytes** — so non-ASCII text above ~10 MB of UTF-8 is refused at save (`SAV-03`) and reported correctly (`SAV-02`: `{ok:false,reason:'content_too_large'}` or `'too_large'`). Import (`SAV-01`) and all reads (`Block B`) now check `stat.size` / ciphertext length. The Zod `.max()` limit remains 10 M code points; the practical ceiling for accented Portuguese stays at ~9.1 M characters. See `TODO.md` SAV-01…SAV-06.
+> ⚠️ **Fixed in code (2026-10-16, commit `d2bdb98` — not `ff4efb7`, which is an orphaned duplicate of the same change).** The save path (`encrypt()` guard + `SaveDrawerSchema`) and the unlock path (`store.ts:333`, via `isCiphertextOverCap` at `store.ts:117`) measure different things — **code points** vs **UTF-8 bytes** — and that mismatch is now **handled rather than open**: non-ASCII text above ~10 MB of UTF-8 is refused at save (`SAV-03`) and reported as `CONTENT_TOO_LARGE` (`SAV-02`: `{ok:false,reason:'content_too_large'}` or `'too_large'`), never as a password problem. Import (`SAV-01`) and all reads (`Block B`) check `stat.size` / ciphertext length. The Zod `.max()` limit remains 10 M code points; the practical ceiling for accented Portuguese stays at ~9.1 M characters.
+>
+> **What is still open is narrower, and it is not a data-loss path any more:** a drawer written *during* the window when the save guard did not exist cannot be opened, because no guard can help bytes already on disk. The app now names that correctly ("too large") instead of blaming the password, and it no longer counts it as a failed password attempt. There is no rescue path in the code. See `TODO.md` SAV-01…SAV-06 and HYG-14.
 
 ---
 
@@ -30,7 +32,7 @@ They are separate checks in separate places, and they do not all measure the sam
 | Ciphertext on unlock | `10_000_000` bytes (`store.ts`) | **bytes** — checked before `decrypt()` (`SAV-01`) |
 | Decrypted content | `10_000_000` bytes (`encryption.ts`) | **bytes** — `decrypt()` enforces it; unreachable through the app (`SAV-01`) |
 | Imported `.clavis` file | `20_004_096` chars (`store.ts`) | **characters of JSON** — derived (`MAX_DECRYPTED_SIZE * 2 + 4_096`) + `ABSOLUTE_IMPORT_CEILING` (`A4`) |
-| Import ciphertext | floor(`len/2`) > `MAX_DECRYPTED_SIZE` (`store.ts:593`) | **bytes** of decoded ciphertext (`SAV-01`) |
+| Import ciphertext | floor(`len/2`) > `MAX_DECRYPTED_SIZE` (`store.ts:598`) | **bytes** of decoded ciphertext (`SAV-01`) |
 
 **Fixed in code, not in the unit.** `unlockDrawer()` returns a typed `{ok:false,reason}` (`SAV-02`), `encrypt()` rejects oversized content (`SAV-03`), `importDrawerRaw()` rejects oversized ciphertext (`SAV-01`), and all read paths (`Block B`) use `stat.size` before allocating. The gap between code-point and byte counting remains by design — the fix is that an oversized drawer is refused clearly, not silently.
 
@@ -113,17 +115,25 @@ not encrypted. A drawer with a sensitive name discloses that name to anyone who 
 
 ## Why the import cap is derived
 
-> **Partly closed, and the part that is still open is the dangerous one.** A drawer holding the
-> maximum 10 MB of **ASCII** text can be created, unlocked, edited, exported and imported back.
-> For any non-ASCII content the round trip *also* succeeds — and that is the problem, not the
-> comfort. The export, the delete and the import all work, so the user's backup looks healthy,
-> while the drawer itself cannot be opened. A round trip that completes is not a round trip that
-> preserves anything.
+> **Closed — and what closed it matters more than the numbers.** A drawer holding the maximum 10 MB of
+> **ASCII** text can be created, unlocked, edited, exported and imported back. For any non-ASCII content
+> the round trip also succeeds. That used to be the dangerous case: the export, the delete and the import
+> all worked, so a user's backup looked healthy while the drawer itself could not be opened — a round trip
+> that completes is not a round trip that preserves anything. **It can no longer be reached from the
+> outside.** Content that would produce such a drawer is refused at save (`SAV-03`), and a hand-written
+> oversized `.clavis` is refused at import (`SAV-04`, `store.ts:598`):
 
-Importantly, the failure is **not** caught at import either: `importDrawerRaw()` checks that
-`encryptedData` is present and a string (`store.ts:419`) but never checks its length, so an
-oversized drawer imports cleanly and appears in the drawer list under its plaintext title. See
-SAV-04 in `TODO.md`.
+```ts
+// SAV-01 — Such a drawer imports cleanly and is then refused at unlock forever,
+// so the ciphertext length has to be checked where the drawer is admitted.
+if (isCiphertextOverCap(drawer.encryptedData)) {
+  logger.warn('importDrawerRaw: ciphertext exceeds max size', { id: drawer.id });
+  return false;
+}
+```
+
+Node's hex decoder stops at the first invalid pair, so the decoded length never exceeds `floor(len / 2)`.
+The residue is only drawers that were **already on disk** before the guards landed — see the banner above.
 
 `importDrawerRaw()` caps the **file** at `20_004_096` characters, and that number is no longer
 typed by hand. It is computed from the limit that decides what may be saved in the first place:
@@ -190,7 +200,7 @@ retrying with the correct password walks into the lockout. The message is not me
 actively misdirects. A typed reason instead of `null` is the only thing that can rescue drawers
 already in this state — see SAV-02 in `TODO.md`.
 
-Because this guard runs before `decrypt()`, the byte cap inside `decrypt()` (`encryption.ts:149`) is
+Because this guard runs before `decrypt()`, the byte cap inside `decrypt()` (`encryption.ts:169`) is
 **unreachable through the application**. It survives only because `tests/encryption.test.ts` calls
 `decrypt()` directly. Any analysis that blames `decrypt()` for the refusal is looking at the wrong
 line.
@@ -200,11 +210,14 @@ line.
 ## Practical guidance
 
 - For everyday notes, **10 MB is far more than enough** — about 6 600 pages of Portuguese.
-- **Do not plan around 10 MB of non-ASCII text.** The save schema counts code points and the unlock
-  guard counts bytes, so accented Portuguese starts failing to open above ~9.1 M characters and
-  fails much earlier in CJK or emoji-heavy text. Unfixed — SAV-01…SAV-06.
-- A successful export → import round trip does **not** prove a drawer is recoverable. Oversized
-  drawers export and import successfully and still cannot be opened.
+- **Do not plan around 10 MB of non-ASCII text.** The save schema counts code points and the byte guard
+  counts UTF-8, so accented Portuguese starts being refused at save above ~9.1 M characters, and CJK or
+  emoji-heavy text is refused far earlier. **This is now a refusal with a clear message, not silent data
+  loss** — the drawer is not written, and the stored file is left untouched.
+- A drawer written **before** these guards existed may be on disk in a state the app can no longer open.
+  The app reports it as too large rather than blaming the password, and does **not** count it as a failed
+  password attempt — but there is no rescue path. If you have one, restore it from a backup written before
+  the limit was raised, or split the content into smaller drawers.
 - A `.clavis` file at the limit is about **twice** the text: budget 20 MB of disk or backup space
   for a 10 MB drawer.
 - A drawer at the limit is slow to unlock: Argon2id at 2^18 KiB dominates the wall time, not the
