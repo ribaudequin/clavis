@@ -51,7 +51,7 @@ export type UnlockResult =
 // a note that was too large to store reported a password problem.
 export type SaveFailureReason =
   | 'invalid_id'
-  | 'password_too_short'
+  | 'password_too_weak'
   | 'kdf_out_of_bounds'
   | 'content_too_large'
   | 'too_large'
@@ -260,6 +260,17 @@ export async function listDrawers(): Promise<DrawerListItem[]> {
   }
 }
 
+// Password policy: stronger than 8 chars (HYG-7/1.0.0 vector — complex over KDF-01).
+function isPasswordStrong(p: string | Buffer): boolean {
+  const s = typeof p === 'string' ? p : p.toString('utf8');
+  if (s.length < 12) return false;
+  const hasLower = /[a-z]/.test(s);
+  const hasUpper = /[A-Z]/.test(s);
+  const hasDigit = /\d/.test(s);
+  const hasSym = /[^A-Za-z0-9]/.test(s);
+  return hasLower && hasUpper && hasDigit && hasSym;
+}
+
 export async function createDrawer(
   title: string,
   password: string | Buffer
@@ -267,8 +278,8 @@ export async function createDrawer(
   const passwordBuffer = Buffer.isBuffer(password) ? Buffer.from(password) : Buffer.from(password, 'utf8');
   await ensureDataDir();
 
-  if (passwordBuffer.length < 8) {
-    throw new Error('Password must be at least 8 characters');
+  if (!isPasswordStrong(password)) {
+    throw new Error('Password must be at least 12 characters with upper, lower, digit, symbol');
   }
 
   const id = uuidv4();
@@ -276,7 +287,7 @@ export async function createDrawer(
   const iconData = generateIconData(id);
   const placeholderContent = '';
 
-  const { encryptedData, salt, iv, authTag } = await encrypt(placeholderContent, passwordBuffer);
+  const encrypted = await encrypt(placeholderContent, passwordBuffer);
   passwordBuffer.fill(0);
 
   const drawer: EncryptedDrawer = {
@@ -285,12 +296,12 @@ export async function createDrawer(
     iconData,
     createdAt: now,
     updatedAt: now,
-    encryptedData,
-    salt,
-    iv,
-    authTag,
+    encryptedData: encrypted.encryptedData,
+    salt: encrypted.salt,
+    iv: encrypted.iv,
+    authTag: encrypted.authTag,
     keyDerivation: {
-      algorithm: 'argon2id',
+      algorithm: encrypted.algorithm,
       iterations: 3,
       memory: DEFAULT_MEMORY_COST,
       parallelism: 4,
@@ -454,13 +465,16 @@ export async function saveDrawer(
     passwordBuffer.fill(0);
     return { ok: false, reason: 'invalid_id' };
   }
-  if (passwordBuffer.length < 8) {
+  if (!isPasswordStrong(passwordBuffer.toString('utf8'))) {
     passwordBuffer.fill(0);
-    logger.warn('Save failed: password too short', { id });
-    return { ok: false, reason: 'password_too_short' };
+    logger.warn('Save failed: password too weak', { id });
+    return { ok: false, reason: 'password_too_weak' };
   }
   try {
     const filePath = getDrawerFilePath(id);
+    // HYG-7 — defensive copy: force a new primitive so a mutable reference
+    // passed by the renderer cannot affect validation after this point.
+    const contentSafe = String(content);
     // Block B — Same refusal as the unlock path, on the write side: a drawer
     // already on disk above the shared ceiling must not be read into memory
     // just to be measured afterwards. Without this, saving over a corrupted or
@@ -496,7 +510,7 @@ export async function saveDrawer(
     // write failure, and the caller has to be able to say which one happened.
     let encrypted: Awaited<ReturnType<typeof encrypt>>;
     try {
-      encrypted = await encrypt(content, passwordBuffer, kdfParams);
+      encrypted = await encrypt(contentSafe, passwordBuffer, kdfParams);
     } catch (e) {
       if (e instanceof ContentTooLargeError) {
         passwordBuffer.fill(0);

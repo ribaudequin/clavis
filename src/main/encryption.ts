@@ -116,6 +116,7 @@ export async function encrypt(plainText: string, password: string | Buffer, para
   salt: string;
   iv: string;
   authTag: string;
+  algorithm: 'argon2id' | 'scrypt';
 }> {
   // SAV-03 — Mirror of the cap decrypt applies, on the write side: producing a
   // ciphertext the drawer could never be read back is the data-loss bug, so refuse
@@ -143,6 +144,7 @@ export async function encrypt(plainText: string, password: string | Buffer, para
     salt: salt.toString('hex'),
     iv: iv.toString('hex'),
     authTag: authTag.toString('hex'),
+    algorithm: argon2 ? 'argon2id' : 'scrypt',
   };
 }
 
