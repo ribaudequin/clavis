@@ -1,5 +1,93 @@
 # Changelog — Clavis
 
+## v0.6.1-beta (2026-10-18)
+
+A test-suite audit round. **No user-facing behaviour change** — the app is byte-for-byte
+the same as v0.6.0-beta. What changed is that the suite can once again be believed.
+
+### Fixed
+
+- **Three tests had been disabled, and one of them was hiding a guard that guarded nothing.**
+  `label.at_limit` was reworded from `"Limit: …"` to `"Save blocked — BYTE limit: …"`, two
+  `ViewDrawer` tests hardcoded the old English copy, and they were skipped rather than
+  updated. The skip had a side effect nobody noticed: three *live* negative guards asserted
+  `queryByText(/^Limit: …/)` → `null`, anchored on a prefix the reword had already deleted, so
+  they matched nothing. Mutating the at-limit condition so the red "save blocked" line renders
+  on **every keystroke** passed the suite **25/25**. It now fails two tests. Both assertions
+  interpolate the template from the translation dictionary instead of typing English copy, so
+  a future reword cannot break them the same way.
+- **`npm run test:e2e` collected 42 files instead of 3.** The Playwright config sat at
+  `tests/e2e/playwright.config.ts` with `testDir: './tests/e2e'`, which resolves relative to
+  the config and therefore pointed at `tests/e2e/tests/e2e`; nothing passed `--config`, so it
+  was an orphan. With no config found, Playwright fell back to a default `testMatch` that also
+  matches `*.test.ts` and swept in all 39 vitest files. Config moved to the root with an
+  explicit `testMatch` and `testIgnore`.
+- **The `macOS Safari` Playwright project pointed WebKit at the Electron binary.** It declared
+  no `launchOptions`, so it inherited the `executablePath` set for the Electron project while
+  its device descriptor selects webkit. Removed — there is no web target to run it against.
+
+### Changed
+
+- **The packaged-app flow test is real again.** `tests/playwright/functional-flow.spec.ts` had
+  five independent defects in 12 lines: it drove a browser page against `http://localhost:3000`
+  with nothing serving that origin (the recorded failure was `Cannot GET /`), read the artifact
+  through a hardcoded `/home/…` path, called `require()` in an ESM TypeScript file, passed a
+  `--user-data-dir` that isolated nothing, and was skipped. Rewritten on `_electron.launch`
+  against the AppImage — Electron has no baseURL; the window comes from `app.firstWindow()` —
+  running create → unlock (including a **rejected** wrong password) → edit → save → **reopen** →
+  delete. The reopen is the step that earns it: everything before it happens inside one
+  decrypted session and would pass even if saving did nothing.
+
+### Known issues (unchanged from v0.6.0-beta, filed as HYG-20/21/22)
+
+Named rather than left for a user to discover:
+
+- **`tests/e2e/clavis.spec.ts` (10 tests) has never run and does not pass.** Selectors from the
+  pre-0.6.0 UI, fixtures the new password policy rejects, and it launches with `args: ['.']`
+  against the developer's **real** user profile. Deliberately left failing rather than skipped.
+- **Nothing runs e2e in CI.** The `quality` job covers lint, both typechecks and vitest only.
+- **The password policy is still defined in two places.** `validation.ts` accepts 8 characters;
+  `store.ts` requires 12 plus four character classes. The store is authoritative, so the app is
+  safe, but the two rule sets can drift.
+- **`atomicWrite` renames the live file to `.prev` before the replacement lands**, so a crash
+  between the two renames leaves no `.clavis` at all. `.prev` files are also never cleaned up.
+
+## v0.6.0-beta (2026-10-17)
+
+An audit round against v0.5.1-beta. Five High and twelve Medium findings; the ones that changed
+behaviour are below. **This release was tagged without its notes being written** — the entry was
+reconstructed afterwards from the commits, so treat the wording as a summary rather than as a
+contemporaneous record.
+
+### Fixed
+
+- **SEC-01 — a drawer created on a machine where `argon2` failed to load could become permanently
+  unopenable.** The KDF fallback wrote `algorithm: "argon2id"` into the metadata regardless of
+  which backend actually ran, so the drawer recorded a promise the file could not keep. The
+  metadata now records the backend that was really used, and `SECURITY.md` — which asserted the
+  opposite — was corrected.
+- **SEC-04 — `saveDrawer` overwrote ciphertext without checking the password.** It now verifies
+  the supplied password against the existing ciphertext first and refuses with `wrong_password`
+  on mismatch, leaving the file untouched.
+- **SEC-07 — imported drawers were not schema-validated**, so a malformed `.clavis` could be
+  written into the store and fail later at read time. Import now validates with
+  `EncryptedDrawerSchema`.
+- **QA-01/QA-02 — the password policy contradicted itself.** It is now one rule, stated in one
+  place and enforced in the store: **at least 12 characters with an uppercase letter, a
+  lowercase letter, a digit and a symbol.**
+
+### Changed
+
+- **SEC-02 — legacy passwords remain savable.** The policy check was removed from `saveDrawer`
+  so an existing drawer created under an older, weaker policy can still be edited and saved.
+  This cannot weaken any drawer: `saveDrawer` only succeeds if the supplied password already
+  decrypts the stored ciphertext, so a non-compliant password can be *reused* but never
+  *established*, on a new drawer or an old one.
+- **REL-01 — writes are atomic and keep the previous version.** Content is written to a
+  temporary file and renamed into place, with the prior ciphertext retained as `.prev`.
+- **The `prerelease` flag is computed from the tag name**, so beta tags publish as prereleases
+  instead of being badged "Latest".
+
 ## v0.5.1-beta (2026-10-17)
 
 The capacity counter used to state two limits, and one of them could never be the limit that
