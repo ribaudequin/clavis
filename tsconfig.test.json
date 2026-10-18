@@ -13,7 +13,8 @@
     "src/renderer/**/*.tsx",
     "src/types/**/*",
     "tests/**/*.ts",
-    "tests/**/*.tsx"
+    "tests/**/*.tsx",
+    "playwright.config.ts"
   ],
   "exclude": ["node_modules", "dist", "out"]
 }

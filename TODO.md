@@ -668,14 +668,73 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
       that is genuinely unfixable by validation. **Decide what the app should *offer* such a user** — a named
       error that explains it is permanent, a path to re-import content from an older backup, or a documented
       "rebuild from backup" instruction. Today it says "too large" and stops.
+- [~] **HYG-11 — the e2e suite is in no gate.** **Partly closed 2026-10-18.** Proven it was never in
+      one: `git log --all -S "playwright" -- .github/` is **empty** — no workflow, any commit, any branch.
+      The four commits that skipped e2e "to prevent CI breakage" prevented a *local* `npm test` failure
+      (a Playwright spec named `.test.ts`, which vitest collects). The suite is now **runnable**:
+      `playwright.config.ts` moved to the root with `testDir: './tests/e2e'`, `testMatch: '**/*.spec.ts'`
+      and `testIgnore: '**/*.test.ts'` — `npm run test:e2e` went from **42 collected files to 13 in 3** —
+      and the `Desktop Safari` project that inherited the Electron `executablePath` was removed. **Still
+      open: nothing runs it in CI, and `clavis.spec.ts`'s 10 tests now fail loudly** (see HYG-20). A
+      `quality` job step is the last piece and was deliberately not done before the suite was trustworthy.
+- [ ] **HYG-20 — `tests/e2e/clavis.spec.ts` (10 tests) has never run and is stale.** Not skipped — it
+      *looks* active and executes nowhere. All 11 e2e failures are here, and none is a port-3000 problem:
+      it launches with `electron.launch({ args: ['.'] })` and never touches an HTTP origin. Three causes:
+      (1) selectors from the pre-0.6.0 UI — `input[placeholder="Enter password"]` matches nothing, the
+      real placeholder is `t('label.password')`; (2) fixtures the new policy rejects — `'testpassword'`
+      is 12 chars but has no upper/digit/symbol; (3) **`args: ['.']` points at the developer's real
+      user profile**, the exact hazard HYG-16 was filed for, so running it as-is can touch real drawers.
+      Fix the selectors and fixtures and give it a temp `--user-data-dir` like the new
+      `functional-flow.spec.ts` has, before running it anywhere.
+- [ ] **HYG-21 — assertions that no longer assert.** Found by mutation, 2026-10-18.
+      (1) `tests/store-limit.allocation.test.ts` claims to prove `countCodePoints` allocates no 10 M
+      array, but does only `expect(countCodePoints(v)).toBe(MAX)` + `expect(typeof x).toBe('number')` —
+      it still passes if `countCodePoints` is reverted to `[...value].length`, the exact regression it
+      names. (2) `tests/sec01-kdf-metadata.test.ts` — test 1 is a tautology, test 2 is titled
+      "encoded in drawer metadata" but never touches `store`, and `expect(enc.algorithm).toBe('argon2id')`
+      fails on precisely the cross-build targets where the scrypt fallback exists. (3) `password_too_weak`
+      is **unreachable** since `7d36e71` yet `tests/store.test.ts:498` and `tests/ipc-handlers.test.ts:522`
+      still assert it, while the live `wrong_password` is absent from the reason list at `:520` and
+      `ErrorCode.WRONG_PASSWORD` appears **zero** times in `tests/`. (4) `tests/ViewDrawer.test.tsx` mocks
+      `countCodePoints` by **reimplementing** it instead of importing it, and
+      `store-limit.allocation.test.ts` carries two leftover `@ts-ignore` from the five commits that fought
+      the import extension instead of fixing it.
+- [ ] **HYG-22 — SEC-03 never landed, in either half.** `validation.ts:6` and `:16` still `.min(8)` while
+      `store.ts:277-285` requires 12 + four character classes, so the policy lives in two files with two
+      rule sets; and `ipc-handlers.ts:161` still classifies Zod failures with `e.message.includes(...)`,
+      which `tests/ipc-handlers.test.ts:274` then pins by **mocking the store and comparing two
+      hardcoded copies** of the message — rewording either side keeps the test green while production
+      degrades to `WRITE_FAILED`. Also still open from the audit: `store.ts:20-21` renames the live file
+      to `.prev` **before** the replacement lands, so a crash between the two renames leaves no `.clavis`
+      at all, and `.prev` is never cleaned up.
 - [x] **HYG-13 — absolute boundary (`10_000_000`) in `tests/encryption.test.ts`** — DONE (2026-10-17)
-- [ ] **HYG-11 — the e2e suite is in no gate.**
-      *relative to* `MAX_DECRYPTED_SIZE`** (`'x'.repeat(MAX_DECRYPTED_SIZE + 1)`), so retargeting the constant
+- [ ] **HYG-13b — the byte-cap boundaries are still asserted only *relative to* the constant.** Every
+      boundary test builds its input as `'x'.repeat(MAX_DECRYPTED_SIZE + 1)`, so retargeting the constant
       keeps them green. One absolute guard was added to `encryption.test.ts`; the rest are still relative.
 
 
 ## Progress
-- **Current focus (2026-10-17, session end) — `v0.5.1-beta` published. `321/321`, lint 0, AppImage validated.** Closed: HYG-7/8/13, password policy (≥12 mixed), i18n UI PT fix, `prerelease:` workflow.
+- **Current focus (2026-10-18) — test-suite audit after the v0.6.0-beta "CI fixes". The suite was green
+  partly because it had been made so; the three skips are now real tests again (`348/348`, zero skipped).**
+  **e2e was never in CI at all** — `git log --all -S "playwright" -- .github/` is empty — so the four
+  commits skipping tests *"to prevent CI breakage"* prevented a local `npm test` failure, not a CI one.
+  **The skipped tests hid a vacuous guard, proven by mutation:** `ViewDrawer.tsx:172` `bytePct >= 1` → `>= 0`
+  (red at-limit line on every keystroke) passed **`25/25`**, because the live negative guards matched a
+  `/^Limit: …/` prefix the 0.6.0 copy reword had deleted. Both ViewDrawer tests now interpolate
+  `label.at_limit` from `translations[locale]` instead of hardcoding English copy; the same mutation now
+  fails 2 tests. `functional-flow.spec.ts` rewritten onto `_electron.launch` (it had `page.goto` against
+  an origin nothing serves, a hardcoded home-directory artifact path, and `require()` in ESM) — passes
+  11.8s and catches an unsaved edit on reopen.
+  **Verified no security regression was hidden:** SEC-02 and SEC-04 are correct, checked empirically by
+  driving the compiled `dist/main`. The code is safer than the suite certifies.
+  **Newly open, and deliberately not skipped:** HYG-20 (`clavis.spec.ts`'s 10 tests have never run, are
+  stale, and point `args: ['.']` at the real user profile), HYG-21 (four assertion sets that no longer
+  assert), HYG-22 (SEC-03's single policy module and the removal of the `e.message` sniff, both never
+  done), HYG-13b (byte-cap boundaries asserted only relative to the constant). HYG-11 is partly closed —
+  e2e is runnable, but nothing gates it yet.
+  Gates: lint 0 errors / 2 pre-existing warnings, both typechecks clean, `348/348`, e2e `13 in 3 files`.
+
+- **Previous focus (2026-10-17, session end) — `v0.5.1-beta` published. `321/321`, lint 0, AppImage validated.** Closed: HYG-7/8/13, password policy (≥12 mixed), i18n UI PT fix, `prerelease:` workflow.
   then tagged — `build`/`release` only run on a tag, so tagging over red CI would publish binaries from
   unproven code. Release live with 6 artifacts across Linux/Windows/macOS, all four jobs green.
   **HYG-9:** the `message.includes('maximum')` sniff in `ipc-handlers` was dead (Zod always tags `.max()`

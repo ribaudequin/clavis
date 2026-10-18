@@ -179,6 +179,19 @@ describe('ViewDrawer', () => {
     const en = (n: number): string => new Intl.NumberFormat('en').format(n);
     const pt = (n: number): string => new Intl.NumberFormat('pt-PT').format(n);
 
+    // The at-limit line is interpolated out of the dictionary rather than typed out, on
+    // purpose. It used to be hardcoded here as "Limit: {b} / {max} bytes."; 0.6.0-beta
+    // reworded it to "Save blocked — BYTE limit: ...", two tests failed, and they were
+    // skipped instead of fixed — which left the negative guards below matching nothing
+    // at all (they anchored on "^Limit:", a prefix that no longer exists, so they passed
+    // even with the line rendering on every keystroke). Reading the template keeps every
+    // assertion below honest through a reword: the only way they pass is if the line is
+    // actually shown, or actually absent.
+    const atLimitText = (locale: 'en' | 'pt-PT', b: number, max: number): string =>
+      translations[locale]['label.at_limit']
+        .replace('{b}', locale === 'pt-PT' ? pt(b) : en(b))
+        .replace('{max}', locale === 'pt-PT' ? pt(max) : en(max));
+
     function setLanguage(lang: string): void {
       Object.defineProperty(window.navigator, 'language', { value: lang, configurable: true });
     }
@@ -289,7 +302,7 @@ describe('ViewDrawer', () => {
       const { container } = renderDrawer({ initialContent: 'x'.repeat(890) });
       expect(capacityBar(container).className).toContain('bg-green-500');
       expect(capacityBar(container).style.width).toBe('89%');
-      expect(screen.queryByText(new RegExp(`^Limit: ${en(890)} / ${en(MAX_PLAINTEXT_BYTES)} bytes\\.$`))).toBeNull();
+      expect(screen.queryByText(atLimitText('en', 890, MAX_PLAINTEXT_BYTES))).toBeNull();
       expect(screen.getByText(new RegExp(`^${en(890)} / ${en(MAX_PLAINTEXT_BYTES)} bytes$`)).className).not.toContain('text-amber-600');
     });
 
@@ -298,14 +311,15 @@ describe('ViewDrawer', () => {
       expect(capacityBar(container).className).toContain('bg-amber-500');
       expect(capacityBar(container).style.width).toBe('90%');
       expect(screen.getByText(new RegExp(`^${en(900)} / ${en(MAX_PLAINTEXT_BYTES)} bytes$`)).className).toContain('text-amber-600');
-      expect(screen.queryByText(new RegExp(`^Limit: ${en(900)} / ${en(MAX_PLAINTEXT_BYTES)} bytes\\.$`))).toBeNull();
+      expect(screen.queryByText(atLimitText('en', 900, MAX_PLAINTEXT_BYTES))).toBeNull();
     });
 
-    it.skip('turns the bar red at the byte ceiling and reveals the limit line', () => {
+    it('turns the bar red at the byte ceiling and reveals the limit line', () => {
       const { container } = renderDrawer({ initialContent: 'x'.repeat(MAX_PLAINTEXT_BYTES) });
       expect(capacityBar(container).className).toContain('bg-red-600');
       expect(capacityBar(container).style.width).toBe('100%');
-      expect(screen.getByText(`Limit: ${en(MAX_PLAINTEXT_BYTES)} / ${en(MAX_PLAINTEXT_BYTES)} bytes.`)).toBeTruthy();
+      const limitLine = screen.getByText(atLimitText('en', MAX_PLAINTEXT_BYTES, MAX_PLAINTEXT_BYTES));
+      expect(limitLine.className).toContain('text-red-600');
     });
 
     // The locale decides the digit grouping, and it is NOT a detail: pt-PT writes
@@ -348,13 +362,16 @@ describe('ViewDrawer', () => {
       }).toEqual({ 'pt-PT': '10\u00a0000\u00a0000', en: '10,000,000' });
     });
 
-    it.skip('interpolates the byte ceiling into the limit line, in both locales', () => {
+    it('interpolates the byte ceiling into the limit line, in both locales', () => {
       const { unmount } = renderDrawer({ initialContent: 'x'.repeat(MAX_PLAINTEXT_BYTES) });
-      expect(screen.getByText(new RegExp(`${en(MAX_PLAINTEXT_BYTES)} / ${en(MAX_PLAINTEXT_BYTES)} bytes\\.`))).toBeTruthy();
+      expect(screen.getByText(atLimitText('en', MAX_PLAINTEXT_BYTES, MAX_PLAINTEXT_BYTES))).toBeTruthy();
       unmount();
       setLanguage('pt-PT');
       renderDrawer({ initialContent: 'x'.repeat(MAX_PLAINTEXT_BYTES) });
-      expect(screen.getByText(new RegExp(`(Limit|Limite): ${pt(MAX_PLAINTEXT_BYTES)} / ${pt(MAX_PLAINTEXT_BYTES)} bytes\\.`))).toBeTruthy();
+      // The pt-PT template is a different sentence, not a translation of the prefix:
+      // "Guardar bloqueado — limite de BYTES: ...". Reading both out of the dictionary is
+      // what keeps this a two-locale assertion rather than a guess about pt-PT wording.
+      expect(screen.getByText(atLimitText('pt-PT', MAX_PLAINTEXT_BYTES, MAX_PLAINTEXT_BYTES))).toBeTruthy();
     });
 
     it('takes the ceiling out of the dictionaries so it cannot drift from the constant', () => {
