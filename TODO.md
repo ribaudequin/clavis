@@ -793,9 +793,15 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
   green. Gates: lint 0 errors / 2 pre-existing warnings, both typechecks 0, **348/348**, e2e **10/10**
   against the AppImage, and 10/10 against the packaged build in each of `LANGUAGE=en` and `LANGUAGE=pt`.
   New: HYG-23 (the `process.env.CI` branch is dead in packaged builds), HYG-24 (the export blob's
-  synchronous revoke), and a note that e2e is Linux-only by choice. **Being released as `v0.6.2-beta`,**
-  and this tag is the new `e2e` job's **first execution on Actions** — a red run there means the
-  workflow, not the specs, is the untested part.
+  synchronous revoke), and a note that e2e is Linux-only by choice. **Released as `v0.6.2-beta`**
+  (tag on `bdff981`), and the new gate was **proved on Actions in the order the discipline requires**:
+  push of `main` alone first, run `39148169911` — `quality` + `e2e (en)` + `e2e (pt)` green,
+  `build`/`release` **skipped**; only then the tag, run `39148385652` — **7 jobs green**,
+  6 artifacts, `prerelease: true`. The job log shows the intended ordering rather than asserting it:
+  `Package binaries` → `End-to-end tests against the packaged AppImage` → `Upload artifacts`, so the
+  released binary is the one the flow test drove. **Both locale legs passed on their first execution**,
+  which the local runs predicted — and the pt leg's local failure had already been fixed before the
+  matrix went in.
 
 - **Previous focus (2026-10-18) — test-suite audit after the v0.6.0-beta "CI fixes". The suite was green
   partly because it had been made so; the three skips are now real tests again (`348/348`, zero skipped).**

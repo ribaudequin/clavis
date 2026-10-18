@@ -58,11 +58,17 @@ that `tests/e2e` is trustworthy enough to block a release.
 - **Four assertions that no longer assert** (HYG-21): a test that claims to prove `countCodePoints`
   allocates nothing passes if it is reverted to `[...value].length`; `password_too_weak` is
   unreachable yet two tests still assert it while `wrong_password` appears zero times in `tests/`.
-- **The e2e gate is Linux-only**, and the `e2e` job is new: **this release is its first execution
-  on Actions.** The specs were verified locally in three configurations (AppImage, packaged build
-  under `LANGUAGE=en`, packaged build under `LANGUAGE=pt` — 10/10 in each) and a product-level
-  mutation confirmed the gate fails on a real regression, but the workflow itself had never run
-  before this tag. If it goes red, the workflow is the untested part, not the specs.
+- **The e2e gate is Linux-only.** It has now run on Actions for this release (both locale legs,
+  first execution, both green), but it has never run on Windows or macOS.
+
+### Verified
+
+- `main` pushed alone first, so the tag could not publish an unproven commit: run
+  `39148169911` — `quality`, `e2e (en)` and `e2e (pt)` green, `build`/`release` **skipped**.
+  Then the tag, run `39148385652` — **7 jobs green**, 6 artifacts, `prerelease: true`.
+- The Linux `build` job's step order is the guarantee, and it is visible in the log rather
+  than asserted here: `Package binaries` → `End-to-end tests against the packaged AppImage` →
+  `Upload artifacts`.
 
 ## v0.6.1-beta (2026-10-18)
 
