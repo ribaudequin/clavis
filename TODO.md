@@ -724,28 +724,72 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
       tests asserted `getByRole('list')` in the state where `HomeScreen` renders a call to action
       instead of a `<ul role="list">` (`HomeScreen.tsx:254-267`).
 - [ ] **HYG-21 — assertions that no longer assert.** Found by mutation, 2026-10-18.
-      (1) `tests/store-limit.allocation.test.ts` claims to prove `countCodePoints` allocates no 10 M
-      array, but does only `expect(countCodePoints(v)).toBe(MAX)` + `expect(typeof x).toBe('number')` —
+      **Sub-item (3) CLOSED 2026-10-18 with HYG-22:** `password_too_weak` was unreachable, so it was
+      deleted from `SaveFailureReason` and `SAVE_ERRORS` rather than left asserted; `wrong_password` is
+      now in the reason list, and `ErrorCode.WRONG_PASSWORD` has coverage for the first time (it
+      appeared **zero** times in `tests/` before).
+      Still open: (1) `tests/store-limit.allocation.test.ts` claims to prove `countCodePoints` allocates
+      no 10 M array, but does only `expect(countCodePoints(v)).toBe(MAX)` + `expect(typeof x).toBe('number')` —
       it still passes if `countCodePoints` is reverted to `[...value].length`, the exact regression it
       names. (2) `tests/sec01-kdf-metadata.test.ts` — test 1 is a tautology, test 2 is titled
       "encoded in drawer metadata" but never touches `store`, and `expect(enc.algorithm).toBe('argon2id')`
-      fails on precisely the cross-build targets where the scrypt fallback exists. (3) `password_too_weak`
-      is **unreachable** since `7d36e71` yet `tests/store.test.ts:498` and `tests/ipc-handlers.test.ts:522`
-      still assert it, while the live `wrong_password` is absent from the reason list at `:520` and
-      `ErrorCode.WRONG_PASSWORD` appears **zero** times in `tests/`. (4) `tests/ViewDrawer.test.tsx` mocks
-      `countCodePoints` by **reimplementing** it instead of importing it, and
+      fails on precisely the cross-build targets where the scrypt fallback exists. (4) `tests/ViewDrawer.test.tsx`
+      mocks `countCodePoints` by **reimplementing** it instead of importing it, and
       `store-limit.allocation.test.ts` carries two leftover `@ts-ignore` from the five commits that fought
       the import extension instead of fixing it.
-- [ ] **HYG-22 — SEC-03 never landed, in either half.** `validation.ts:6` and `:16` still `.min(8)` while
-      `store.ts:277-285` requires 12 + four character classes, so the policy lives in two files with two
-      rule sets; and `ipc-handlers.ts:161` still classifies Zod failures with `e.message.includes(...)`,
-      which `tests/ipc-handlers.test.ts:274` then pins by **mocking the store and comparing two
-      hardcoded copies** of the message — rewording either side keeps the test green while production
-      degrades to `WRITE_FAILED`. Also still open from the audit: `store.ts:20-21` renames the live file
-      to `.prev` **before** the replacement lands, so a crash between the two renames leaves no `.clavis`
-      at all, and `.prev` is never cleaned up.
+- [x] **HYG-22 — SEC-03 never landed, in either half — CLOSED 2026-10-18.** See
+      `PLANO-PASSWORD-POLICY-2026-10-18.md`. All three defects fixed, plus two found on the way.
+      **(a) One policy, one module.** New `src/main/password-policy.ts` owns the constant, the four
+      character classes, `isPasswordCompliant` and `describePasswordPolicy`; `store.ts`'s private copy
+      is deleted, and both `.min(8)` in `validation.ts` are gone. The policy is a `refine`, not a
+      `.min()/.regex` chain, so a violation arrives as **one** Zod issue on `password` that can be
+      classified by path. **`SaveDrawerSchema` and `UnlockDrawerSchema` deliberately keep sanity bounds
+      only** — the reason is in a code comment and it is not negotiable: there is no change-password
+      channel in `CHANNELS`, so a save can only re-use the password that already opens the drawer, and
+      enforcing it on save re-opens SEC-02. A regression test writes a hand-made legacy 8-character
+      `.clavis` and saves it.
+      **(b) No message sniffing left anywhere in `src/main`** (`grep -e.message.includes` → empty). The
+      create path classifies by `issue.path` + `issue.code`; a weak password reaches the renderer as
+      `ErrorCode.PASSWORD_TOO_SHORT`, which it did not before — it used to fall through to the generic
+      `VALIDATION_ERROR`. `password_too_weak` removed from `SaveFailureReason` and `SAVE_ERRORS` as
+      unreachable (closes the matching HYG-21 sub-item), and the test that pinned the coupling by
+      comparing two hardcoded copies of the message is replaced by one that rewrites the message and
+      asserts the classification survives.
+      **(c) `atomicWrite` no longer unlinks the live file.** `.prev` eliminated by owner decision — it
+      was read by nothing in `src/`, `tests/` or `docs/`. One `rename(tmp, filePath)` replaces the live
+      inode, so the path is never absent; the temp file is removed if the rename fails, and the
+      **directory** is fsynced after the rename (without that the rename itself is not durable, which
+      would make the staging cosmetic). Windows cannot fsync a directory; the refusal is swallowed
+      deliberately, because propagating it would report a landed save as failed.
+      **Two defects found while fixing these, both by the sub-agents:** the staging filename was built
+      from `Date.now()`, so two writes in the same millisecond shared one temp file and could rename a
+      half-written file over the good one — the corruption the function exists to prevent,
+      reintroduced through its own staging step (now `crypto.randomUUID()`). And the import handler
+      caught `FileTooLargeError` / `DrawerAlreadyExistsError` **by message text** even though the store
+      re-threw them by type with the comment "Propagate to ipc-handlers for explicit message" — the same
+      defect class, left standing in the file this work was cleaning.
 - [x] **HYG-13 — absolute boundary (`10_000_000`) in `tests/encryption.test.ts`** — DONE (2026-10-17)
 - [ ] **HYG-13b — the byte-cap boundaries are still asserted only *relative to* the constant.**
+- [x] **HYG-25 — the shipped asar contained the whole project directory — CLOSED 2026-10-18.**
+      Found by extracting `app.asar` out of the locally built AppImage to verify the HYG-22 fixes
+      were really in the binary. They were — and so was everything else. `packagerConfig` had **no
+      file filter**, so `electron-packager` copied everything not on its built-in ignore list. Inside
+      a 160 MB asar: **119 MB of `/repo/**`** (output of a local `flatpak-make`, gitignored, 74% of
+      the archive), the full TypeScript source, the whole test suite, `docs/`, `scripts/`, and
+      **7.3 MB of gitignored internal notes** — `MEMORY.md`, `SUMMARY.md`, `TODO.md`, `PLANO-*.md`,
+      `AGENTS.md` — inside a public binary, including the owner's name and location.
+      **This also corrects a claim this file carried:** the local-vs-CI AppImage size gap (253 MB vs
+      124 MB) was recorded as `mksquashfs` compression. It was not — the CI artifact is built from a
+      clean checkout and never contained `repo/`.
+      **The filter is a whitelist, not a deny-list**, which is the only shape that cannot drift:
+      `^\/(?!dist($|\/)|node_modules($|\/)|package\.json$|icons($|\/)).+`. Verified: the
+      repackaged asar's top level is exactly `dist`, `icons`, `node_modules`, `package.json`, with
+      `dist/main/index.js`, `dist/main/preload.js`, `dist/renderer/index.html` and the unpacked
+      `argon2` all present, and e2e 10/10 in both locales against it.
+      **The first attempt silently did nothing, and that is the transferable part:** the obvious fix
+      is a `files` key, but `@electron/packager` has no such option — the filter is `ignore`, and
+      its entries must be **bare regex sources**, not `/.../ ` literals, because the packager calls
+      `file.match(entry)` and the delimiters become part of the pattern.
 - [ ] **HYG-23 — `detectLocale()`'s `if (process.env.CI) return 'en'` is dead code in every packaged
       build.** Vite rewrites `process.env` to `{}`, so the shipped bundle reads
       `function f(){return {}.CI?\`en\`:d(navigator.language||\`en\`)}` — a constant `undefined`. It
@@ -768,7 +812,65 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
 
 
 ## Progress
-- **Current focus (2026-10-18, later) — HYG-20 + HYG-11 closed: the e2e suite runs, and it is a gate.
+- **Current focus (2026-10-18, release) — v0.6.3-beta: `beta` stops being a prerelease, and the
+  shipped app stops containing the project directory. HYG-25 closed too.**
+  **The user's report was the whole brief, and it was exactly right.** "A última foi a v0.5.1-beta"
+  was not a memory lapse: `/releases/latest` really did still answer `v0.5.1-beta`, because
+  `v0.6.0-beta`, `v0.6.1-beta` and `v0.6.2-beta` had all been published as **pre-releases** — and the
+  app's update check reads that endpoint. Three releases existed; none was "latest"; every user was
+  told they were current. Owner decision: `beta` is a normal release now, `alpha`/`pre` stay
+  pre-releases. The workflow carries a comment saying why, because the flag is derived from the tag
+  name and that derivation is invisible from the release page.
+  **HYG-25 came out of doing what was asked, not out of planning.** Creating the local AppImage to
+  test meant extracting `app.asar` to confirm the HYG-22 fixes were in the binary — they were, and
+  so was everything else: the source, the tests, and a **119 MB `repo/`** from a local
+  `flatpak-make`, 74% of the asar, plus 7.3 MB of gitignored internal notes in a public binary. The
+  fix is a single-whitelist `ignore` regex, so a new project directory cannot silently ship.
+  **The first attempt at that fix did nothing at all** — `@electron/packager` has no `files` option
+  and `ignore` entries must be bare regex sources — and finding that out required repackaging and
+  inspecting, not reading the docs.
+  **Gates:** lint 0 errors / 2 pre-existing warnings, both typechecks 0, **379/379** across 40 files,
+  e2e 10/10 in both locales against the repackaged app.
+  **Not yet pushed.** When it is, the first check is the release page: `prerelease` must be `false`
+  and `/releases/latest` must answer `v0.6.3-beta`.
+
+- **Previous focus (2026-10-18, end of day) — HYG-22 closed: one password policy, no message sniffing
+  anywhere, and an `atomicWrite` that never unlinks the live drawer. Two sub-agents in parallel with
+  explicit file boundaries, because both owned one region of `src/main/store.ts`.**
+  **The design was forced by a fact, not a preference: `CHANNELS` has no change-password member.** A save
+  can therefore only re-use a password that already opens the drawer, so the strong policy is a
+  **create-time** rule and `SaveDrawerSchema` had to keep sanity bounds. Putting it on save re-opens
+  SEC-02. A regression test writes a hand-made legacy 8-character `.clavis` and saves it, because the
+  reason is otherwise invisible to the next reader.
+  **A weak password now reaches the renderer as `ErrorCode.PASSWORD_TOO_SHORT`.** Before this it fell
+  through to the generic `VALIDATION_ERROR`, because the only thing that recognised it was a substring
+  match against a message thrown by the store. Two more sniffs of the same kind were standing in the
+  import handler — and the store re-threw those errors **by type** with the comment "Propagate to
+  ipc-handlers for explicit message", so the type was provided and ignored. `grep e.message.includes
+  src/main` is now empty, which is an invariant worth keeping rather than a coincidence.
+  **The sub-agent found a corruption bug in the function I was fixing:** the staging filename was
+  `Date.now()`, so two writes in one millisecond shared a temp file and could rename a half-written file
+  over the good one. Now `crypto.randomUUID()`.
+  **The project's lesson arrived an eighth time, to me.** A test I wrote for that collision — two
+  concurrent `saveDrawer` calls with the clock frozen — **passed with the bug present**. Two argon2id
+  derivations ahead of the write take ~300ms each and finish far enough apart that the write/rename
+  sections never interleave, and sequential writes cannot collide even with a shared name. It is
+  rewritten to observe the staging paths instead of racing them, and now fails with `expected 1 to be 2`
+  when `Date.now()` goes back. **A test that passes for a timing reason is a test that cannot fail.**
+  **My own change broke two tests before I noticed**, which is the other half of the lesson: converting
+  the import sniffs to `instanceof` made the `vi.mock` factory in `tests/ipc-handlers.test.ts` incomplete,
+  and `instanceof undefined` throws inside the catch block. Fixed by spreading the real module in the
+  mock, which also makes the assertion non-tautological — a mock defining its own error classes would
+  have the handler and the test comparing the same fake against itself.
+  Gates: lint 0 errors / 2 pre-existing warnings, both typechecks 0, **379/379** across 40 files (was
+  348/39), e2e **10/10** under `LANGUAGE=en` and **10/10** under `LANGUAGE=pt`, both against a freshly
+  built package. Negative controls re-run by me rather than taken on the sub-agents' word: schema relaxed
+  to `.min(8)` → **8 failures**; import sniffs restored → **2 failures**; `Date.now()` staging name →
+  **1 failure**.
+  **Not committed and not released** — `CHANGELOG.md` has no v0.6.3-beta section yet, and this is the
+  first round in a while that changes shipped behaviour rather than tests.
+
+- **Previous focus (2026-10-18) — HYG-20 + HYG-11 closed: the e2e suite runs, and it is a gate.
   Owner decisions: point the stale spec at the packaged build rather than resurrect a source launch;
   delete the phantom Ctrl+N test rather than implement the shortcut.**
   **HYG-20's cause was not the stale selectors.** `electron.launch({ args: ['.'] })` cannot render the

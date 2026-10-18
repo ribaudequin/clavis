@@ -1,5 +1,89 @@
 # Changelog — Clavis
 
+## v0.6.3-beta (2026-10-18)
+
+**The first round in a while that changes shipped behaviour rather than tests** — and it fixes
+something users could see: until now every beta since v0.5.1 was published as a *pre-release*,
+so the app's update check kept telling everyone they were current.
+
+### Fixed
+
+- **The app told users they were up to date when they were not.** The update check reads
+  GitHub's `/releases/latest`, which returns the newest release that is **not** a pre-release.
+  `v0.6.0-beta`, `v0.6.1-beta` and `v0.6.2-beta` were all published as pre-releases, so that
+  endpoint still answered `v0.5.1-beta` — the release that shipped before the `prerelease:`
+  flag was restored. Three releases existed and none of them was "latest". `beta` is now
+  published as a normal release; `alpha` and `pre` remain pre-releases.
+- **HYG-25 — the shipped application contained the entire project directory.** `packagerConfig`
+  had no file filter, so `electron-packager` copied everything not on its built-in ignore list:
+  the TypeScript source, the whole test suite, `docs/`, `scripts/`, and — because a local
+  `flatpak-make` had been run — a **119 MB** `repo/` directory that is 74% of the asar. It also
+  carried `MEMORY.md`, `SUMMARY.md`, `TODO.md` and the `PLANO-*.md` notes (7.3 MB), which are
+  gitignored and were never meant to ship. The filter is a whitelist now: only `dist/`,
+  `node_modules/`, `package.json` and `icons/` are packaged. **Note the earlier entry in MEMORY
+  attributing the local-vs-CI size gap to `mksquashfs` compression was wrong** — the CI artifact
+  is built from a clean checkout and never contained `repo/`.
+
+### Changed
+
+HYG-22 — SEC-03's two halves plus the residue of REL-01. Spec:
+`PLANO-PASSWORD-POLICY-2026-10-18.md`.
+
+### Changed
+
+- **One password policy, one module.** New `src/main/password-policy.ts` owns the minimum
+  length, the four character classes, the check and the wording. Both `.min(8)` in
+  `validation.ts` and the store's private `isPasswordStrong` are gone — the schema the
+  project called its validation authority was not the rule that applied. The policy is now a
+  `refine`, so a violation arrives as one Zod issue on `password` instead of passing the schema
+  and being rejected by a substring match on a thrown message.
+- **A weak password now reaches the UI as "password is too weak", not "failed to create
+  drawer".** Before this the only thing that recognised it was
+  `e.message.includes('Password must be at least 12 characters')`, so rewording either side
+  silently degraded the create path to `WRITE_FAILED`. It is classified by `issue.path` +
+  `issue.code` now.
+- **Save and unlock keep sanity bounds only, deliberately.** There is no change-password
+  channel, so a save can only re-use the password that already opens the drawer. Enforcing the
+  12-character rule on save would make every pre-policy drawer unlockable but unwritable —
+  SEC-02, reopening. The reason is in a code comment and pinned by a test that saves a hand-made
+  legacy 8-character `.clavis`.
+- **Drawer writes no longer unlink the live file.** `.prev` is removed entirely: it was read by
+  nothing in the app, and keeping it required renaming the live drawer away before the
+  replacement landed, which left a window in which no `.clavis` existed at all. A crash in that
+  window destroyed the drawer's only file. `atomicWrite` now does one `rename`, cleans up its
+  temp file if the rename fails, and fsyncs the directory afterwards — without that the rename
+  is not durable across a power cut and the staging step is cosmetic.
+- **No message sniffing remains in `src/main`.** The import handler caught
+  `FileTooLargeError` and `DrawerAlreadyExistsError` by matching their text even though the store
+  re-threw them by type, with the comment "Propagate to ipc-handlers for explicit message"
+  sitting directly above. They are classified with `instanceof` now.
+
+### Fixed
+
+- **The staging filename was `Date.now()`, which is not unique enough.** Two saves of the same
+  drawer inside one millisecond resolved to the same temp path, so their writes interleaved and
+  one renamed a half-written file over the good one — the corruption `atomicWrite` exists to
+  prevent, reintroduced through its own staging step. Now `crypto.randomUUID()`.
+- **`password_too_weak` was unreachable and two tests asserted it.** Deleted from
+  `SaveFailureReason` and `SAVE_ERRORS`; `wrong_password` is in the reason list now, and
+  `ErrorCode.WRONG_PASSWORD` has coverage for the first time (it appeared zero times in
+  `tests/` before).
+
+### Verification
+
+- `vitest` **379/379** across 40 files (was 348/348 across 39).
+- `lint` 0 errors / 2 pre-existing warnings, both typechecks 0.
+- e2e **10/10** under `LANGUAGE=en` and **10/10** under `LANGUAGE=pt`, both against a freshly
+  built package.
+- Negative controls re-run here rather than taken on the sub-agents' word: schema relaxed to
+  `.min(8)` → **8 failures**; import sniffs restored → **2 failures**; `Date.now()` staging name
+  → **1 failure**.
+- **A test written for the `Date.now()` collision passed with the bug present**, because two
+  concurrent saves never interleave inside `atomicWrite` — the argon2id derivation ahead of it
+  takes ~300ms, so the write/rename sections run one after the other and sequential writes cannot
+  collide even with a shared name. It is rewritten to observe the staging paths and now fails
+  correctly. A test that passes for a timing reason is a test that cannot fail.
+
 ## v0.6.2-beta (2026-10-18)
 
 The e2e suite now runs, and it is a gate. **No user-facing behaviour change** — no product

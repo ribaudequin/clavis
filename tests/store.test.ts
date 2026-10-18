@@ -19,6 +19,7 @@ import {
   FileTooLargeError,
 } from '../src/main/store';
 import { encrypt, MAX_DECRYPTED_SIZE } from '../src/main/encryption';
+import { describePasswordPolicy } from '../src/main/password-policy';
 import { logger } from '../src/main/logger';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -139,9 +140,13 @@ describe('store module', () => {
   });
 
   it('createDrawer rejects password shorter than 12 or lacking composition', async () => {
-    await expect(createDrawer('Test', 'short')).rejects.toThrow('Password must be at least 12 characters with upper, lower, digit, symbol');
-    await expect(createDrawer('Test', '')).rejects.toThrow('Password must be at least 12 characters with upper, lower, digit, symbol');
-    await expect(createDrawer('Test', '123456789012')).rejects.toThrow('Password must be at least 12 characters with upper, lower, digit, symbol');
+    // The wording comes from the policy module rather than a literal here: this file
+    // used to hold a third copy of the sentence, alongside one in store.ts and one in
+    // ipc-handlers.ts, which is how they drifted apart unnoticed.
+    await expect(createDrawer('Test', 'short')).rejects.toThrow(describePasswordPolicy());
+    await expect(createDrawer('Test', '')).rejects.toThrow(describePasswordPolicy());
+    await expect(createDrawer('Test', '123456789012')).rejects.toThrow(describePasswordPolicy());
+    await expect(createDrawer('Test', 'Password1Only')).rejects.toThrow(describePasswordPolicy());
   });
 
   it('saveDrawer rejects weak password', async () => {
@@ -494,8 +499,14 @@ describe('store module', () => {
       it('never reports an oversized note as a password or id problem', async () => {
         const drawer = await createDrawer('Acentos', PASSWORD);
         const refused = await saveDrawer(drawer.id, PASSWORD, 'Acentos', 'ã'.repeat(10_000_000));
+        // 'password_too_weak' used to sit in this list and in SaveFailureReason. It is
+        // gone because saveDrawer does not and must not consult the password policy: a
+        // save re-uses the password that already opens the drawer, and there is no
+        // change-password channel to supply a new one. 'wrong_password' is asserted in
+        // its place — it is a real reason the store can return here, and it is the one
+        // a policy check on the save path would have collided with.
         expect(refused).not.toEqual({ ok: false, reason: 'invalid_id' });
-        expect(refused).not.toEqual({ ok: false, reason: 'password_too_weak' });
+        expect(refused).not.toEqual({ ok: false, reason: 'wrong_password' });
         expect(refused).not.toEqual({ ok: false, reason: 'write_failed' });
       });
     });

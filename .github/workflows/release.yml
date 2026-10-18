@@ -218,6 +218,13 @@ jobs:
         with:
           files: dist/**/*
           generate_release_notes: true
-          prerelease: ${{ startsWith(github.ref_name, 'v') && contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'pre') }}
+          # `beta` is deliberately NOT a prerelease. It used to be, and the consequence was
+          # invisible until someone looked: v0.6.0-beta, v0.6.1-beta and v0.6.2-beta were all
+          # published as pre-releases, so GitHub's "Latest" badge — and the `/releases/latest`
+          # endpoint — still pointed at v0.5.1-beta, which had shipped before this flag was
+          # fixed. The app's update check reads `/releases/latest`, so every user was told they
+          # were up to date while three releases sat unpublished as far as they were concerned.
+          # Alpha stays a prerelease; beta is a release.
+          prerelease: ${{ startsWith(github.ref_name, 'v') && contains(github.ref_name, 'alpha') || contains(github.ref_name, 'pre') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

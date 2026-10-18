@@ -1,9 +1,17 @@
 import { z } from 'zod';
 import { MAX_CONTENT_CODE_POINTS } from '../shared/limits.js';
+import { isPasswordCompliant, describePasswordPolicy } from './password-policy.js';
 
+// The policy is a refine, not a .min()/.regex chain: a violation has to arrive at the
+// IPC layer as a Zod issue on `password` that can be classified by path, and a chain of
+// built-in checks would raise four or five issues with four or five unrelated codes
+// (`too_small`, `invalid_string`) and no single one meaning "password policy".
 export const CreateDrawerSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255, 'Title too long'),
-  password: z.string().min(8, 'Password must be at least 8 characters').max(128, 'Password too long'),
+  password: z
+    .string()
+    .max(128, 'Password too long')
+    .refine(isPasswordCompliant, { message: describePasswordPolicy() }),
 });
 
 export const UnlockDrawerSchema = z.object({
@@ -11,9 +19,17 @@ export const UnlockDrawerSchema = z.object({
   password: z.string().min(1, 'Password is required').max(128, 'Password too long'),
 });
 
+// Sanity bounds only — the strong policy is a create-time rule, and both of these
+// schemas are read as "what may arrive" rather than "what a new password must be".
+// There is no change-password channel in CHANNELS, so a save can only re-use the
+// password that already opens the drawer, and drawers created before the
+// 12-character rule still open with 8-character passwords. Enforcing the policy here
+// would strand exactly those users: they could unlock a drawer and then not save it,
+// which is SEC-02 reopening. Unlock has the same reason from the other side — a legacy
+// password has to get as far as the store to be tried.
 export const SaveDrawerSchema = z.object({
   id: z.string().uuid('Invalid drawer ID'),
-  password: z.string().min(8, 'Password must be at least 8 characters').max(128, 'Password too long'),
+  password: z.string().min(1, 'Password is required').max(128, 'Password too long'),
   title: z.string().min(1, 'Title is required').max(255, 'Title too long'),
   // The cap is in code points, not bytes — Zod's .max() folds surrogate pairs, so this
   // admits up to 4x MAX_PLAINTEXT_BYTES of UTF-8 text. The byte cap lives in

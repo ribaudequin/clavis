@@ -11,17 +11,26 @@ vi.mock('https', () => ({
   default: { get: vi.fn() },
 }));
 
-vi.mock('../src/main/store.js', () => ({
-  listDrawers: vi.fn(),
-  createDrawer: vi.fn(),
-  unlockDrawer: vi.fn(),
-  saveDrawer: vi.fn(),
-  deleteDrawer: vi.fn(),
-  readDrawerRaw: vi.fn(),
-  importDrawerRaw: vi.fn(),
-  ensureDataDir: vi.fn(),
-  MAX_DRAWER_FILE_SIZE: 20_004_096,
-}));
+// The real module is spread first so the two error classes are the genuine ones: the
+// handler now classifies a refused import with `instanceof`, and a mock that defined its
+// own copies of those classes would make that assertion tautological — the handler and the
+// test would be comparing the same fake against itself. Only the store functions are
+// replaced; the classes are the subject of the test, not a dependency of it.
+vi.mock('../src/main/store.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/main/store.js')>();
+  return {
+    ...actual,
+    listDrawers: vi.fn(),
+    createDrawer: vi.fn(),
+    unlockDrawer: vi.fn(),
+    saveDrawer: vi.fn(),
+    deleteDrawer: vi.fn(),
+    readDrawerRaw: vi.fn(),
+    importDrawerRaw: vi.fn(),
+    ensureDataDir: vi.fn(),
+    MAX_DRAWER_FILE_SIZE: 20_004_096,
+  };
+});
 
 vi.mock('../src/main/logger.js', () => ({
   logger: {
@@ -53,6 +62,8 @@ import https from 'https';
 import { CHANNELS } from '../src/shared/channels';
 import type { Channel } from '../src/shared/channels';
 import { ErrorCode } from '../src/shared/types';
+import { CreateDrawerSchema } from '../src/main/validation';
+import { describePasswordPolicy } from '../src/main/password-policy';
 import type { ElectronAPI, EncryptedDrawer } from '../src/shared/types';
 
 const VALID_UUID = '123e4567-e89b-12d3-a456-426614174000';
@@ -225,6 +236,13 @@ describe('IPC handlers', () => {
   });
 
   describe('create-drawer', () => {
+    // The tests below used 'password12345' and 'Str0ng!Pass', neither of which any real
+    // Clavis version would accept: with the store mocked, the schema was the only thing
+    // that could have refused them, and it did not. Create is now the one channel where
+    // the schema applies the policy, so a compliant password is the fixture every
+    // non-policy test has to reach the store with.
+    const COMPLIANT_PASSWORD = 'Segur0#Strong!';
+
     it('returns ok with encrypted drawer on success', async () => {
       const drawer: EncryptedDrawer = {
         id: VALID_UUID,
@@ -241,15 +259,15 @@ describe('IPC handlers', () => {
       vi.mocked(store.createDrawer).mockResolvedValue(drawer);
 
       const handler = getHandler(CHANNELS.CREATE_DRAWER);
-      const result = await handler({}, 'My Drawer', 'password12345');
+      const result = await handler({}, 'My Drawer', COMPLIANT_PASSWORD);
 
       expect(result).toEqual({ ok: true, data: drawer });
-      expect(store.createDrawer).toHaveBeenCalledWith('My Drawer', 'password12345');
+      expect(store.createDrawer).toHaveBeenCalledWith('My Drawer', COMPLIANT_PASSWORD);
     });
 
     it('returns VALIDATION_ERROR on Zod failure (empty title)', async () => {
       const handler = getHandler(CHANNELS.CREATE_DRAWER);
-      const result = await handler({}, '', 'password12345');
+      const result = await handler({}, '', COMPLIANT_PASSWORD);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -259,27 +277,81 @@ describe('IPC handlers', () => {
       expect(store.createDrawer).not.toHaveBeenCalled();
     });
 
-    it('returns VALIDATION_ERROR on Zod failure (password too short)', async () => {
+    it('does not let a different field violation take over the policy verdict', async () => {
+      // Both fields are invalid at once. PASSWORD_TOO_SHORT is deliberately chosen over
+      // VALIDATION_ERROR and over the title's own issue message, because it is the code
+      // with a translation and a fix attached; the title violation is not lost, it is
+      // simply outranked. CreateDrawerModal screens an empty title before it ever calls
+      // this channel, so the two together are a hand-crafted input rather than a real one.
+      const handler = getHandler(CHANNELS.CREATE_DRAWER);
+      const result = await handler({}, '', 'short');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.PASSWORD_TOO_SHORT);
+        expect(result.error.message).toBe(describePasswordPolicy());
+      }
+      expect(store.createDrawer).not.toHaveBeenCalled();
+    });
+
+    it('reports a policy-violating password as PASSWORD_TOO_SHORT, not as a generic validation failure', async () => {
       const handler = getHandler(CHANNELS.CREATE_DRAWER);
       const result = await handler({}, 'Title', 'short');
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+        expect(result.error.code).toBe(ErrorCode.PASSWORD_TOO_SHORT);
       }
       expect(store.createDrawer).not.toHaveBeenCalled();
     });
 
-    it('returns PASSWORD_TOO_SHORT when store throws with password message', async () => {
-      vi.mocked(store.createDrawer).mockRejectedValue(new Error('Password must be at least 12 characters with upper, lower, digit, symbol'));
+    it('carries the schema issue message verbatim, so the main process holds one wording', async () => {
+      const handler = getHandler(CHANNELS.CREATE_DRAWER);
+      const result = await handler({}, 'Title', 'short');
+
+      // Compared against the schema's own issue rather than a literal: ipc-handlers used
+      // to carry a third copy of the sentence, which is how "upper, lower, digit,
+      // symbol" (store) and "uppercase, lowercase, digit, symbol" (this file) drifted
+      // apart unnoticed.
+      const parsed = CreateDrawerSchema.safeParse({ title: 'Title', password: 'short' });
+      if (result.ok || parsed.success) throw new Error('expected both to fail');
+      expect(result.error.message).toBe(parsed.error.issues[0].message);
+    });
+
+    it.each([
+      ['too few characters', 'short'],
+      ['no symbol', 'Password1Only'],
+      ['no uppercase letter', 'correct-123!'],
+      ['no digit', 'CorrectPassword!'],
+      ['no lowercase letter', 'CORRECT-123!'],
+    ])('classifies a password with %s as PASSWORD_TOO_SHORT', async (_why, password) => {
+      const handler = getHandler(CHANNELS.CREATE_DRAWER);
+      const result = await handler({}, 'Title', password);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe(ErrorCode.PASSWORD_TOO_SHORT);
+      expect(store.createDrawer).not.toHaveBeenCalled();
+    });
+
+    it('never classifies on message text: a store error carrying the old wording is still a write failure', async () => {
+      // The branch this suite used to pin did
+      // `e.message.includes('Password must be at least 12 characters')` against the string
+      // store.ts threw. Its own test compared two hardcoded copies of that sentence and
+      // stayed green through any reword, while rewording the real string degraded the
+      // create path to WRITE_FAILED / "Failed to create drawer" — the same cause reported
+      // as a different failure. The schema now classifies, so the wording is inert: this
+      // error text is exactly the one that used to trigger the match, and it must not.
+      vi.mocked(store.createDrawer).mockRejectedValue(
+        new Error('Password must be at least 12 characters with upper, lower, digit, symbol')
+      );
 
       const handler = getHandler(CHANNELS.CREATE_DRAWER);
-      const result = await handler({}, 'Title', 'Str0ng!Pass');
+      const result = await handler({}, 'Title', COMPLIANT_PASSWORD);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error.code).toBe(ErrorCode.PASSWORD_TOO_SHORT);
-        expect(result.error.message).toBe('Password must be at least 12 characters with uppercase, lowercase, digit, symbol');
+        expect(result.error.code).toBe(ErrorCode.WRITE_FAILED);
+        expect(result.error.message).toBe('Failed to create drawer');
       }
     });
 
@@ -287,7 +359,7 @@ describe('IPC handlers', () => {
       vi.mocked(store.createDrawer).mockRejectedValue(new Error('disk full'));
 
       const handler = getHandler(CHANNELS.CREATE_DRAWER);
-      const result = await handler({}, 'Title', 'password12345');
+      const result = await handler({}, 'Title', COMPLIANT_PASSWORD);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -504,7 +576,11 @@ describe('IPC handlers', () => {
     it('classifies a schema ceiling violation as CONTENT_TOO_LARGE and any other as VALIDATION_ERROR', async () => {
       const handler = getHandler(CHANNELS.SAVE_DRAWER);
       const tooBig = await handler({}, VALID_UUID, 'password12345', 'Title', 'x'.repeat(MAX_CONTENT_CODE_POINTS + 1));
-      const tooShort = await handler({}, VALID_UUID, 'short', 'Title', 'content');
+      // An empty password: SaveDrawerSchema holds a sanity `.min(1)` and no policy, so
+      // this is the "some other schema violation" case. 'short' cannot be used — under
+      // the strong policy it is still a legal save password, which is the point of
+      // HYG-22's split.
+      const tooShort = await handler({}, VALID_UUID, '', 'Title', 'content');
       expect({
         tooBig: { ok: tooBig.ok, code: tooBig.ok ? null : tooBig.error.code },
         tooShort: { ok: tooShort.ok, code: tooShort.ok ? null : tooShort.error.code },
@@ -514,12 +590,16 @@ describe('IPC handlers', () => {
       });
     });
 
+    // HYG-22 — 'password_too_weak' was removed from the union and from SAVE_ERRORS
+    // because saveDrawer cannot produce it. Listing the reasons exhaustively is what
+    // keeps a removed reason from lingering in the map: the handler indexes SAVE_ERRORS
+    // by reason, so an entry for a reason no store returns is untested and unreachable.
     it('maps every save failure reason to its own code and message', async () => {
       vi.mocked(store.saveDrawer).mockResolvedValue({ ok: true });
       const handler = getHandler(CHANNELS.SAVE_DRAWER);
       const reasons = [
         'invalid_id',
-        'password_too_weak',
+        'wrong_password',
         'kdf_out_of_bounds',
         'content_too_large',
         'too_large',
@@ -535,6 +615,23 @@ describe('IPC handlers', () => {
       }
 
       expect(new Set(envelopes).size).toBe(reasons.length);
+    });
+
+    it('reports a failed password check on save as WRONG_PASSWORD, not as a validation or write failure', async () => {
+      // WRONG_PASSWORD had no assertion anywhere in the suite before HYG-22: it appears
+      // in only one place in SAVE_ERRORS and in the i18n map, so deleting it — or
+      // pointing it at WRITE_FAILED, which "Failed to save drawer" renders as the
+      // generic "The operation could not be completed." — changed nothing observable.
+      vi.mocked(store.saveDrawer).mockResolvedValue({ ok: false, reason: 'wrong_password' });
+
+      const handler = getHandler(CHANNELS.SAVE_DRAWER);
+      const result = await handler({}, VALID_UUID, 'wrong-password', 'Title', 'content');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.WRONG_PASSWORD);
+        expect(result.error.message).toBe('Password is incorrect');
+      }
     });
 
     it('returns VALIDATION_ERROR on invalid id', async () => {
@@ -903,6 +1000,46 @@ describe('IPC handlers', () => {
       }
       expect(readFileMock).not.toHaveBeenCalled();
       expect(store.importDrawerRaw).not.toHaveBeenCalled();
+    });
+
+    // The two refusals importDrawerRaw throws by type, re-thrown by it specifically so this
+    // layer can name them. The handler used to read their message text instead, which meant a
+    // reword of either class turned a known refusal into "Failed to read import file". These
+    // two tests reword the message on purpose: classification has to follow the type.
+    it.each([
+      {
+        name: 'FileTooLargeError',
+        build: () => new store.FileTooLargeError(),
+        expected: /too large|demasiado grande/i,
+      },
+      {
+        name: 'DrawerAlreadyExistsError',
+        build: () => new store.DrawerAlreadyExistsError('11111111-1111-4111-8111-111111111111'),
+        expected: /already exists|já existe/i,
+      },
+    ])('names a $name by its type even after its message is reworded', async ({ build, expected }) => {
+      const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/import.clavis'] });
+      handlers.clear();
+      registerIpcHandlers({
+        ipcMain: { handle: (channel, listener) => { handlers.set(channel, listener); } },
+        dialog: { showOpenDialog },
+      });
+      const dialogResult = await getHandler(CHANNELS.OPEN_FILE_DIALOG)({});
+      if (!dialogResult.ok) throw new Error('expected ok');
+      const token = dialogResult.data!.token;
+
+      readFileMock.mockResolvedValue('{"id":"x"}');
+      const thrown = build();
+      thrown.message = 'a wording this handler has never seen';
+      vi.mocked(store.importDrawerRaw).mockRejectedValue(thrown);
+
+      const result = await getHandler(CHANNELS.IMPORT_DRAWER)({}, token);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.WRITE_FAILED);
+        expect(result.error.message).toMatch(expected);
+      }
     });
   });
 

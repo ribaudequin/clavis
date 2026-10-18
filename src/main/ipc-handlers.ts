@@ -106,16 +106,28 @@ const UNLOCK_ERRORS: Record<UnlockFailureReason, { code: ErrorCode; message: str
 
 // SAV-03 — Same reasoning for the write side: a store that refuses a note for
 // being too large must not be reported as a bad password, which is what the bare
-// boolean used to do.
+// boolean used to do. 'password_too_weak' used to sit in this map; saveDrawer cannot
+// produce it (see SaveFailureReason) and its presence had two tests asserting a
+// failure that does not exist.
 const SAVE_ERRORS: Record<SaveFailureReason, { code: ErrorCode; message: string }> = {
   invalid_id: { code: ErrorCode.VALIDATION_ERROR, message: 'Invalid drawer ID' },
   wrong_password: { code: ErrorCode.WRONG_PASSWORD, message: 'Password is incorrect' },
-  password_too_weak: { code: ErrorCode.PASSWORD_TOO_SHORT, message: 'Password must be at least 12 characters with uppercase, lowercase, digit, symbol' },
   kdf_out_of_bounds: { code: ErrorCode.VALIDATION_ERROR, message: 'Drawer key derivation parameters are out of bounds' },
   content_too_large: { code: ErrorCode.CONTENT_TOO_LARGE, message: 'Content exceeds the maximum size' },
   too_large: { code: ErrorCode.CONTENT_TOO_LARGE, message: 'Drawer file exceeds the maximum size' },
   write_failed: { code: ErrorCode.WRITE_FAILED, message: 'Failed to save drawer' },
 };
+
+// HYG-22 — The only password-policy issue CreateDrawerSchema can raise: the refine
+// that applies isPasswordCompliant. Zod tags a failed refine as 'custom', and it is
+// the sole source of that code on this schema, so path + code identifies it without
+// reading the message. Matching on the wording instead meant that reword either side
+// — the schema's message or store.ts's throw — and the create path silently degraded
+// to WRITE_FAILED / "Failed to create drawer": the same cause, reported as a
+// different failure.
+function isPasswordPolicyIssue(issue: z.core.$ZodIssue): boolean {
+  return issue.path[0] === 'password' && issue.code === 'custom';
+}
 
 export function registerIpcHandlers(deps: IpcDeps): void {
   const { ipcMain, dialog } = deps;
@@ -149,23 +161,28 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     } catch (e) {
       if (e instanceof z.ZodError) {
         logger.warn('create-drawer validation failed', { issues: e.issues.length });
+        // Checked before the generic branch so a weak password reaches the renderer as
+        // the one code with a translation for it. PASSWORD_TOO_SHORT wins over a
+        // co-occurring too_big because a password over 128 characters is still not
+        // policy-compliant, and the fix the user needs is a different password.
+        const policyIssue = e.issues.find(isPasswordPolicyIssue);
+        if (policyIssue) {
+          logger.warn('create-drawer password policy violated', {});
+          return {
+            ok: false,
+            error: {
+              code: ErrorCode.PASSWORD_TOO_SHORT,
+              message: policyIssue.message,
+              // details: undefined (ERR-01 fixed).issues,
+            },
+          };
+        }
         return {
           ok: false,
           error: {
             code: ErrorCode.VALIDATION_ERROR,
             message: e.issues[0]?.message || 'Validation failed',
             // details: undefined (ERR-01 fixed).issues,
-          },
-        };
-      }
-      if (e instanceof Error && e.message.includes('Password must be at least 12 characters')) {
-        logger.warn('create-drawer password too short', {});
-        return {
-          ok: false,
-          error: {
-            code: ErrorCode.PASSWORD_TOO_SHORT,
-            message: 'Password must be at least 12 characters with uppercase, lowercase, digit, symbol',
-            // details: undefined (ERR-01 fixed),
           },
         };
       }
@@ -470,8 +487,11 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         logger.info('Drawer imported', { fileName: path.basename(filePath) });
         return { ok: true, data: undefined };
       } catch (e) {
-        if (e instanceof Error && e.message.includes('File content exceeds max size')) {
-          logger.warn('import-drawer: file too large', { error: e.message });
+        // importDrawerRaw re-throws both of these by type specifically so this layer can say
+        // something useful; matching on their message text instead meant a reword of either
+        // class turned a known refusal into the generic "Failed to read import file".
+        if (e instanceof FileTooLargeError) {
+          logger.warn('import-drawer: file too large', {});
           return {
             ok: false,
             error: {
@@ -480,7 +500,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
             },
           };
         }
-        if (e instanceof Error && e.message.includes('already exists')) {
+        if (e instanceof DrawerAlreadyExistsError) {
           logger.warn('import-drawer: drawer already exists', { error: e.message });
           return {
             ok: false,

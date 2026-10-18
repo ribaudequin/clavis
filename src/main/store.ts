@@ -7,18 +7,49 @@ import { encrypt, decrypt, MAX_DECRYPTED_SIZE, DEFAULT_MEMORY_COST, MIN_MEMORY_C
 import { logger } from './logger.js';
 import { EncryptedDrawer, DrawerListItem } from '../shared/types.js';
 import { EncryptedDrawerSchema } from './validation.js';
+import { isPasswordCompliant, describePasswordPolicy } from './password-policy.js';
 
 const DRAWER_EXT = '.clavis';
 
+// HYG-22 — This used to rename the live file to `<id>.clavis.prev` and only then move
+// the replacement in, so between the two renames there was no .clavis at the path at
+// all: a kill or a power cut in that window destroyed the drawer's only file, and a
+// rename that failed left it at .prev, which nothing in the app ever read back. One
+// rename(tmp, filePath) replaces the live inode in a single metadata operation, so the
+// path is never absent and never holds a half-written file.
 async function atomicWrite(filePath: string, data: string): Promise<void> {
   const dir = path.dirname(filePath);
-  const tmp = path.join(dir, `.tmp-${Date.now()}-${path.basename(filePath)}`);
+  // Not Date.now(): two saves of the same drawer inside one millisecond resolved to the same
+  // temp path, so their writes interleaved and one of them renamed a half-written file over
+  // the good one — the exact corruption this function exists to prevent, reintroduced through
+  // its own staging step.
+  const tmp = path.join(dir, `.tmp-${crypto.randomUUID()}-${path.basename(filePath)}`);
+  // mode is honoured at creation and ignored on an existing inode; the temp file is
+  // new on every call and is the inode that gets renamed over the live one, so this
+  // is the single write in the store where 0o600 actually lands on the .clavis.
   await fs.writeFile(tmp, data, { encoding: 'utf8', mode: 0o600 });
   const fd = await fs.open(tmp, 'r+');
   try { await fd.sync(); } finally { await fd.close(); }
-  // keep previous version as .prev
-  try { await fs.rename(filePath, filePath + '.prev'); } catch { /* no previous */ }
-  await fs.rename(tmp, filePath);
+  try {
+    await fs.rename(tmp, filePath);
+  } catch (e) {
+    // A refused save must not leave a full copy of a drawer sitting in the drawers
+    // directory: listDrawers() filters on the .clavis suffix, so a stray .tmp- file is
+    // invisible to it and would sit there for the life of the profile.
+    await fs.unlink(tmp).catch(() => {});
+    throw e;
+  }
+  // The rename edits the directory, not the temp file, so flushing the temp file's data
+  // does not make the new entry durable: on a power cut the whole write can be undone
+  // regardless, and the barrier that prevents it is the directory's own fsync. Windows
+  // offers no equivalent — open(dir) on a directory fails and FlushFileBuffers refuses a
+  // directory handle — so there the rename's own journal entry is the strongest
+  // guarantee obtainable. Propagating that refusal would report a save that did land as
+  // a failed one, which is the worse outcome, so the platform failure is swallowed.
+  const dfd = await fs.open(dir, 'r').catch(() => null);
+  if (dfd) {
+    try { await dfd.sync(); } catch { /* platform cannot fsync a directory */ } finally { await dfd.close(); }
+  }
 }
 
 export class DrawerAlreadyExistsError extends Error {
@@ -61,9 +92,13 @@ export type UnlockResult =
 // SAV-03 — saveDrawer's bare `false` was what made encrypt()'s refusal invisible:
 // every failure collapsed into "Failed to save drawer (invalid ID or password)", so
 // a note that was too large to store reported a password problem.
+//
+// This union once carried 'password_too_weak' as well, and two tests asserted it. It
+// was unreachable: saveDrawer never consulted the password policy and never will,
+// because a save re-uses the password that already opens the drawer and there is no
+// change-password channel to supply a new one (reason recorded on SaveDrawerSchema).
 export type SaveFailureReason =
   | 'invalid_id'
-  | 'password_too_weak'
   | 'wrong_password'
   | 'kdf_out_of_bounds'
   | 'content_too_large'
@@ -273,17 +308,6 @@ export async function listDrawers(): Promise<DrawerListItem[]> {
   }
 }
 
-// Password policy: stronger than 8 chars (HYG-7/1.0.0 vector — complex over KDF-01).
-function isPasswordStrong(p: string | Buffer): boolean {
-  const s = typeof p === 'string' ? p : p.toString('utf8');
-  if (s.length < 12) return false;
-  const hasLower = /[a-z]/.test(s);
-  const hasUpper = /[A-Z]/.test(s);
-  const hasDigit = /\d/.test(s);
-  const hasSym = /[^A-Za-z0-9]/.test(s);
-  return hasLower && hasUpper && hasDigit && hasSym;
-}
-
 export async function createDrawer(
   title: string,
   password: string | Buffer
@@ -291,8 +315,14 @@ export async function createDrawer(
   const passwordBuffer = Buffer.isBuffer(password) ? Buffer.from(password) : Buffer.from(password, 'utf8');
   await ensureDataDir();
 
-  if (!isPasswordStrong(password)) {
-    throw new Error('Password must be at least 12 characters with upper, lower, digit, symbol');
+  // Defence in depth, not the enforcement point: CreateDrawerSchema already applies the
+  // policy, so on the IPC path this is unreachable. It is kept because store.ts is
+  // exported and callable directly — a caller with no schema in front of it (a future
+  // channel, a script, a test) would otherwise create a drawer the create schema would
+  // have refused. The wording is the policy module's, so the log cannot disagree with
+  // the schema.
+  if (!isPasswordCompliant(password)) {
+    throw new Error(describePasswordPolicy());
   }
 
   const id = uuidv4();

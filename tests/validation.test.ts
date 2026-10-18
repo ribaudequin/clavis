@@ -47,7 +47,7 @@ describe('Zod schema validation', () => {
     });
   });
 
-  it('CreateDrawerSchema requires min 8 chars password', () => {
+  it('CreateDrawerSchema rejects a password that does not meet the policy', () => {
     const result = CreateDrawerSchema.safeParse({
       title: 'Test',
       password: 'short',
