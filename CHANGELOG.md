@@ -24,6 +24,19 @@ so the app's update check kept telling everyone they were current.
   attributing the local-vs-CI size gap to `mksquashfs` compression was wrong** — the CI artifact
   is built from a clean checkout and never contained `repo/`.
 
+### Verified
+
+- `main` pushed alone first, so the tag could not publish an unproven commit: run
+  `39156850554` — `quality`, `e2e (en)` and `e2e (pt)` green, `build`/`release` **skipped**.
+  Then the tag, run `39157060048` — **7 jobs green**, 6 artifacts.
+- The release page is the proof that mattered: **`v0.6.3-beta` carries the `Latest` badge and
+  `prerelease: false`**, and `GET /repos/ribaudequin/clavis/releases/latest` now answers
+  `{"tag": "v0.6.3-beta", "prerelease": false}` — where it answered `v0.5.1-beta` an hour
+  earlier. That endpoint is the only input the app's update check has, so this is the change a
+  user can observe.
+- AppImage: **123 MB** on CI, 131 MB locally, against 253 MB before this release — the 119 MB
+  `repo/` is gone from the shipped archive.
+
 ### Changed
 
 HYG-22 — SEC-03's two halves plus the residue of REL-01. Spec:

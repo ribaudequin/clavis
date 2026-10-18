@@ -830,9 +830,13 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
   and `ignore` entries must be bare regex sources — and finding that out required repackaging and
   inspecting, not reading the docs.
   **Gates:** lint 0 errors / 2 pre-existing warnings, both typechecks 0, **379/379** across 40 files,
-  e2e 10/10 in both locales against the repackaged app.
-  **Not yet pushed.** When it is, the first check is the release page: `prerelease` must be `false`
-  and `/releases/latest` must answer `v0.6.3-beta`.
+  e2e 10/10 in both locales against the repackaged app and the AppImage.
+  **Released.** `main` pushed alone first (run `39156850554` — `quality` + both `e2e` legs green,
+  `build`/`release` skipped), then the tag (run `39157060048` — **7 jobs green**, 6 artifacts).
+  The release page is the proof that mattered: **`v0.6.3-beta` carries the `Latest` badge,
+  `prerelease: false`, and `/releases/latest` answers it** — where it answered `v0.5.1-beta` before.
+  That endpoint is the app's entire input for "is there a new version", so this is the part a user
+  can see.
 
 - **Previous focus (2026-10-18, end of day) — HYG-22 closed: one password policy, no message sniffing
   anywhere, and an `atomicWrite` that never unlinks the live drawer. Two sub-agents in parallel with
