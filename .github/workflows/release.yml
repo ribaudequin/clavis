@@ -43,8 +43,71 @@ jobs:
       - name: Test
         run: npm test
 
-  build:
+  # The e2e suite was in no gate at all — `git log --all -S playwright -- .github/` is empty —
+  # so it could pass while executing nowhere, which is exactly what it had been doing: a spec
+  # whose ten tests had never run asserted a Ctrl+N shortcut the product does not have, and a
+  # spec everyone believed was green was reading the developer's real drawers because it
+  # launched with no --user-data-dir.
+  #
+  # It runs on every push and pull request, not only on tags, which is why it cannot live in
+  # the `build` job: that job is gated on `startsWith(github.ref, 'refs/tags/v')` and never
+  # runs on a PR at all. `electron-forge package` instead of `npm run make` is deliberate —
+  # it produces the fully packaged application (asar, native modules unpacked) in about nine
+  # seconds, with no squashfs or deb step, which is what makes a per-push gate affordable.
+  # The AppImage itself is validated separately, in the build job below.
+  e2e:
     needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Both locales, because every selector in the suite is a two-locale pattern and only one
+    # of them would otherwise ever be exercised. Chromium reads LANGUAGE, not LANG: measured
+    # here, `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8` still renders pt-PT, while `LANGUAGE=en`
+    # switches it. The runner sets no LANGUAGE at all, so without this the pt-PT half of
+    # every regex would be dead code in CI and a one-sided reword would ship green.
+    #
+    # Also why `detectLocale()`'s `process.env.CI` branch cannot be relied on: Vite replaces
+    # `process.env` with `{}` in a packaged build, so that branch is dead code in the
+    # artifact and the CI=1 shortcut does nothing at all there.
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [en, pt]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # xvfb is on the runner image, but the whole point of this job is that it must never
+      # be the reason a run goes red for a missing tool rather than a real failure.
+      - name: Install xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+
+      - name: Build application
+        run: npm run build
+
+      - name: Package application
+        run: npm run package
+
+      # Electron needs a display. No Playwright browser download: _electron drives the
+      # application's own Chromium, not one of Playwright's.
+      - name: End-to-end tests
+        run: xvfb-run -a npm run test:e2e
+        env:
+          CLAVIS_E2E_TARGET: out/clavis-linux-x64/clavis
+          LANGUAGE: ${{ matrix.language }}
+
+  build:
+    needs: [quality, e2e]
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/test/downgrade-forge-6.4.2'
     strategy:
       fail-fast: false
@@ -52,6 +115,9 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
+    # A hung Electron — a native modal nobody can dismiss — would otherwise hold the runner
+    # for its six-hour default, with the release blocked behind it.
+    timeout-minutes: 45
 
     steps:
       - name: Checkout code
@@ -83,7 +149,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev fakeroot build-essential g++ make python3 python3-dev squashfs-tools
+          sudo apt-get install -y dpkg-dev fakeroot build-essential g++ make python3 python3-dev squashfs-tools xvfb
 
       - name: Build application
         run: npm run build
@@ -93,6 +159,18 @@ jobs:
         env:
           WINDOWS_CERT_FILE: ${{ secrets.WINDOWS_CERT_FILE }}
           WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+
+      # The artifact users download, exercised before it is uploaded. Placed here rather than
+      # only in the e2e job so that "the released binary passed the flow" is structural:
+      # `release` needs `build`, so a failure here stops the publication. Linux only, because
+      # that is the only maker whose output these specs can find — artifact.ts prefers an
+      # AppImage and falls back to the packager output.
+      - name: End-to-end tests against the packaged AppImage
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:e2e
+        env:
+          # GitHub runners have no FUSE, so an AppImage is extracted and run from disk.
+          APPIMAGE_EXTRACT_AND_RUN: '1'
 
       - name: List build output
         shell: bash

@@ -105,7 +105,12 @@
 - [x] P1.4: Add password visibility toggle + strength meter to PasswordModal — 1.5h
 - [x] P1.5: Extract CreateDrawerModal to separate component — 0.5h
 - [x] P1.6: Extract CreditsModal to separate component — 0.5h
-- [x] P1.7: Add keyboard shortcuts (Ctrl+N, Escape, Enter, Ctrl+S) — 1h
+- [x] P1.7: Add keyboard shortcuts (Ctrl+N, Escape, Enter, Ctrl+S) — 1h — ⚠️ **partly false, corrected
+  2026-10-18.** Escape (`useModalKeyboard.ts:17`) and Ctrl+S (`ViewDrawer.tsx:103`) exist and are now
+  covered end to end; **Ctrl+S is the only shortcut in all of `src/`**. Enter works as native form
+  submission rather than a handler. **`Ctrl+N` does not exist** — proved by
+  `grep -rn "ctrlKey|metaKey|globalShortcut|accelerator|KeyDown" src/`, and by a never-run e2e test that
+  had been asserting it for months. Implement it or drop it from this line; not decided yet.
 - [x] P1.8: Add aria-live regions for loading states, errors, list updates — 1h
 - [x] P1.9: Empty state illustration + CTA button ("Create your first drawer") — 1h
 
@@ -668,24 +673,56 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
       that is genuinely unfixable by validation. **Decide what the app should *offer* such a user** — a named
       error that explains it is permanent, a path to re-import content from an older backup, or a documented
       "rebuild from backup" instruction. Today it says "too large" and stops.
-- [~] **HYG-11 — the e2e suite is in no gate.** **Partly closed 2026-10-18.** Proven it was never in
-      one: `git log --all -S "playwright" -- .github/` is **empty** — no workflow, any commit, any branch.
-      The four commits that skipped e2e "to prevent CI breakage" prevented a *local* `npm test` failure
-      (a Playwright spec named `.test.ts`, which vitest collects). The suite is now **runnable**:
-      `playwright.config.ts` moved to the root with `testDir: './tests/e2e'`, `testMatch: '**/*.spec.ts'`
-      and `testIgnore: '**/*.test.ts'` — `npm run test:e2e` went from **42 collected files to 13 in 3** —
-      and the `Desktop Safari` project that inherited the Electron `executablePath` was removed. **Still
-      open: nothing runs it in CI, and `clavis.spec.ts`'s 10 tests now fail loudly** (see HYG-20). A
-      `quality` job step is the last piece and was deliberately not done before the suite was trustworthy.
-- [ ] **HYG-20 — `tests/e2e/clavis.spec.ts` (10 tests) has never run and is stale.** Not skipped — it
-      *looks* active and executes nowhere. All 11 e2e failures are here, and none is a port-3000 problem:
-      it launches with `electron.launch({ args: ['.'] })` and never touches an HTTP origin. Three causes:
-      (1) selectors from the pre-0.6.0 UI — `input[placeholder="Enter password"]` matches nothing, the
-      real placeholder is `t('label.password')`; (2) fixtures the new policy rejects — `'testpassword'`
-      is 12 chars but has no upper/digit/symbol; (3) **`args: ['.']` points at the developer's real
-      user profile**, the exact hazard HYG-16 was filed for, so running it as-is can touch real drawers.
-      Fix the selectors and fixtures and give it a temp `--user-data-dir` like the new
-      `functional-flow.spec.ts` has, before running it anywhere.
+- [x] **HYG-11 — the e2e suite is in no gate — CLOSED 2026-10-18.** It was never in one:
+      `git log --all -S "playwright" -- .github/` is **empty** — no workflow, any commit, any branch.
+      **Job graph is now `quality` → `e2e` → `build` → `release`.** The `e2e` job runs **on every push
+      and pull request**, which is why it is its own job and not a step in `build`: `build`'s `if:` is
+      `startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/test/downgrade-forge-6.4.2'`,
+      so it never runs on a PR at all. `electron-forge package` instead of `npm run make` (~9s, no
+      squashfs or deb), `xvfb-run -a`, no Playwright browser download (`_electron` drives the app's own
+      Chromium), `timeout-minutes: 20`. `build` additionally runs the suite **against the AppImage after
+      `npm run make` and before `upload-artifact`** (`APPIMAGE_EXTRACT_AND_RUN=1`, xvfb added to its
+      Linux tool install), so "the released binary passed the flow" is structural — `release` needs
+      `build`. `build` also gained `timeout-minutes: 45`: a hung Electron burns the 6-hour default with
+      the release blocked behind it.
+      **`language: [en, pt]` matrix, added because the pt leg was never running.** Every selector in the
+      suite is a two-locale pattern, but GitHub runners set no `LANGUAGE`, so CI would have exercised
+      only the English half — a one-sided reword of a pt-PT string would ship green. Chromium honours
+      `LANGUAGE`, not `LANG`/`LC_ALL` (measured: `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8` still rendered
+      pt-PT; `LANGUAGE=en` switched it). The matrix **found a real spec bug on its first run** — 4
+      failures, see HYG-20. Running both locales locally before adding the leg was the point: a gate
+      that has never been run is worse than no gate.
+      `playwright.config.ts` also gained `timeout: 120_000`. The 30s default is a **whole-test** budget
+      that the per-expectation `{ timeout: 15000 }` values draw from rather than add to, and argon2id at
+      2^18 KiB (256 MiB) per unlock makes the round trip ~10s on 8 cores and several times that on a
+      2-vCPU runner. This is the setting that stops the first red run from being the runner.
+- [x] **HYG-20 — `tests/e2e/clavis.spec.ts` (10 tests) had never run and was stale — CLOSED 2026-10-18.**
+      **The root cause was not stale selectors, and fixing selectors would not have fixed it.** Measured
+      before changing anything: `electron.launch({ args: ['.'] })` renders Chromium's `Cannot GET /`,
+      title "Error", zero `#root`. `main/index.ts:41` calls `loadURL('http://localhost:3000')` when
+      `app.isPackaged` is false, and **no npm script starts that server** (`build:renderer` is
+      `vite build`). All ten tests died at their first locator. Owner decision: point the spec at the
+      **packaged build** rather than resurrect a source launch.
+      **Three of the ten tests encoded things that were not true.** `Ctrl+N creates drawer` asserted a
+      shortcut that does not exist — `grep -rn "ctrlKey\|metaKey\|globalShortcut" src/` returns only
+      `ViewDrawer.tsx:103` (Ctrl+S) and `useModalKeyboard.ts:17` (Escape), so **P1.7 below is wrong
+      about Ctrl+N**; deleted rather than implemented. Three tests "tested" import by clicking the
+      button and asserting the word "Clavis" was still on screen — true before, after and on failure;
+      replaced by one export → delete → import → unlock round trip. The create modal **has no content
+      field**, which two of them filled.
+      **The dangerous file was a different one.** `appimage-validation.spec.ts` launched with
+      `args: [appImage]` and **no `--user-data-dir`** — the suite believed to be green was reading the
+      developer's real drawers. Isolation is now asserted in `tests/e2e/launch.ts` (compares
+      `app.getPath('userData')` to the temp dir and throws before any test runs), negative-controlled by
+      removing the switch: the suite goes red with a refusal rather than proceeding.
+      **10 real tests now** (8 rewritten + "discard and leave", which had no e2e coverage at all — the
+      destructive button in the unsaved-changes modal). New `launch.ts` and `artifact.ts` (renamed from
+      `appimage.ts`); `appimage-validation.spec.ts` → `artifact-launch.spec.ts`, since it does not
+      always test an AppImage.
+      **Verified in three configurations, not one:** AppImage 10/10, packaged + `LANGUAGE=en` 10/10,
+      packaged + `LANGUAGE=pt` 10/10. The Portuguese leg found a bug the English leg could not: four
+      tests asserted `getByRole('list')` in the state where `HomeScreen` renders a call to action
+      instead of a `<ul role="list">` (`HomeScreen.tsx:254-267`).
 - [ ] **HYG-21 — assertions that no longer assert.** Found by mutation, 2026-10-18.
       (1) `tests/store-limit.allocation.test.ts` claims to prove `countCodePoints` allocates no 10 M
       array, but does only `expect(countCodePoints(v)).toBe(MAX)` + `expect(typeof x).toBe('number')` —
@@ -708,13 +745,59 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
       to `.prev` **before** the replacement lands, so a crash between the two renames leaves no `.clavis`
       at all, and `.prev` is never cleaned up.
 - [x] **HYG-13 — absolute boundary (`10_000_000`) in `tests/encryption.test.ts`** — DONE (2026-10-17)
-- [ ] **HYG-13b — the byte-cap boundaries are still asserted only *relative to* the constant.** Every
+- [ ] **HYG-13b — the byte-cap boundaries are still asserted only *relative to* the constant.**
+- [ ] **HYG-23 — `detectLocale()`'s `if (process.env.CI) return 'en'` is dead code in every packaged
+      build.** Vite rewrites `process.env` to `{}`, so the shipped bundle reads
+      `function f(){return {}.CI?\`en\`:d(navigator.language||\`en\`)}` — a constant `undefined`. It
+      stabilises `tests/i18n.test.ts` and nothing else. Harmless today (the product is meant to follow
+      the system language) but it reads like a CI override, and an e2e comment here once claimed
+      `CI=1` pinned the packaged UI to English when it does nothing. **Decide:** delete the branch, or
+      accept it as test-only and say so where it is written.
+- [ ] **HYG-24 — `HomeScreen.tsx:92` revokes the export blob synchronously right after `a.click()`.**
+      It works because the download starts in the same task, which is a race the platform has not lost
+      yet. The e2e round trip exercises it, but only through the artificial `setSavePath` path that pins
+      the transfer, so a Chromium bump turning the race real would surface as a download timeout
+      pointing at the test harness rather than at this line. Move the revoke into the download's
+      completion, or document why it is safe.
+- [ ] **e2e does not run on Windows or macOS.** The gate is Linux-only (`xvfb` + AppImage), and
+      `artifact.ts` knows how to locate the win32/darwin packager output, so the suite could run on all
+      three — at the cost of minutes per push and the Windows focus quirks this app has already been
+      bitten by. Not decided; recorded so the omission is a choice rather than an oversight. Every
       boundary test builds its input as `'x'.repeat(MAX_DECRYPTED_SIZE + 1)`, so retargeting the constant
       keeps them green. One absolute guard was added to `encryption.test.ts`; the rest are still relative.
 
 
 ## Progress
-- **Current focus (2026-10-18) — test-suite audit after the v0.6.0-beta "CI fixes". The suite was green
+- **Current focus (2026-10-18, later) — HYG-20 + HYG-11 closed: the e2e suite runs, and it is a gate.
+  Owner decisions: point the stale spec at the packaged build rather than resurrect a source launch;
+  delete the phantom Ctrl+N test rather than implement the shortcut.**
+  **HYG-20's cause was not the stale selectors.** `electron.launch({ args: ['.'] })` cannot render the
+  app at all — `main/index.ts:41` does `loadURL('http://localhost:3000')` when unpackaged, and no npm
+  script starts that server. Measured first: `Cannot GET /`, title "Error", zero `#root`. All ten tests
+  died at their first locator; three of them also asserted behaviour that does not exist (`Ctrl+N`), or
+  asserted nothing at all (three "import" tests that only checked the word "Clavis" was on screen).
+  **The file nobody suspected was the dangerous one:** `appimage-validation.spec.ts` had no
+  `--user-data-dir` and was reading the developer's real drawers while reported as green. Isolation is
+  now asserted in `launch.ts`, negative-controlled by removing the switch.
+  **A hostile review of the finished work caught more than the green run did — including two of my own
+  comments being false.** `UI.back` was unanchored and in pt-PT matched the save button too ("Guardar e
+  voltar" also ends in "voltar"), masked by `.first()`; the "Escape cancels the delete" test asserted
+  `getByRole('list')` on a screen with no list, so it passed on a blank window; the focus-trap test
+  passed whether or not `useFocusTrap` existed, because the modal focuses Cancel from its own effect —
+  it now Tabs past the last button first. My claims about a single-instance lock and about
+  `artifact.ts`'s preference order were both wrong and are corrected.
+  **The `language: [en, pt]` matrix found a real bug on its first run:** 4 tests asserted
+  `getByRole('list')` where `HomeScreen` renders the empty-state call to action instead. All 10 had
+  passed in English. **A control at the product level, not just on the tests:** deleting the Ctrl+S
+  branch from `ViewDrawer.tsx`, rebuilding and repackaging turned that test red; restoring it turned it
+  green. Gates: lint 0 errors / 2 pre-existing warnings, both typechecks 0, **348/348**, e2e **10/10**
+  against the AppImage, and 10/10 against the packaged build in each of `LANGUAGE=en` and `LANGUAGE=pt`.
+  New: HYG-23 (the `process.env.CI` branch is dead in packaged builds), HYG-24 (the export blob's
+  synchronous revoke), and a note that e2e is Linux-only by choice. **Being released as `v0.6.2-beta`,**
+  and this tag is the new `e2e` job's **first execution on Actions** — a red run there means the
+  workflow, not the specs, is the untested part.
+
+- **Previous focus (2026-10-18) — test-suite audit after the v0.6.0-beta "CI fixes". The suite was green
   partly because it had been made so; the three skips are now real tests again (`348/348`, zero skipped).**
   **e2e was never in CI at all** — `git log --all -S "playwright" -- .github/` is empty — so the four
   commits skipping tests *"to prevent CI breakage"* prevented a local `npm test` failure, not a CI one.

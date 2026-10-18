@@ -22,6 +22,12 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
+  // Playwright's default is 30s for the whole test, and the per-expectation timeouts in the
+  // specs draw from that same budget rather than adding to it. Every unlock derives a key
+  // with argon2id at 2^18 KiB — 256 MiB and a few hundred ms on a fast machine — and the
+  // round trip does five or six of them, so a 2-vCPU CI runner is routinely several times
+  // slower. This is the setting that stops the first red run from being a runner, not a bug.
+  timeout: 120_000,
   reporter: 'list',
   // Electron specs launch the packaged app; there is no web server to start and no
   // baseURL to navigate to — the window comes from app.firstWindow().

@@ -1,5 +1,69 @@
 # Changelog — Clavis
 
+## v0.6.2-beta (2026-10-18)
+
+The e2e suite now runs, and it is a gate. **No user-facing behaviour change** — no product
+code was modified in this round, except that nothing was found needing it. What changed is
+that `tests/e2e` is trustworthy enough to block a release.
+
+### Added
+
+- **`tests/e2e` is in CI for the first time.** It was never in a workflow, in any commit, on any
+  branch (`git log --all -S "playwright" -- .github/` is empty) — which is why the four commits
+  whose message says *"skip e2e to prevent CI breakage"* prevented nothing. New `e2e` job on
+  every push and pull request: `electron-forge package` (~9s, no squashfs or deb step) under
+  `xvfb-run`, with a **`language: [en, pt]` matrix** because every selector in the suite is a
+  two-locale pattern and only one of them would otherwise ever be exercised. It is its own job
+  because `build` is gated on `refs/tags/v` and never runs on a pull request at all.
+- **The release binary is exercised before it is published.** The Linux `build` job now runs the
+  same suite against the AppImage after `npm run make` and before `upload-artifact`, and
+  `release` needs `build`, so a release cannot ship an artifact the flow test has not driven.
+- **`tests/e2e/clavis.spec.ts` rewritten — 10 stale tests into 8 real ones, plus a 10th.**
+  The old file launched the source tree with `args: ['.']`, which cannot render the app at all:
+  `main/index.ts:41` calls `loadURL('http://localhost:3000')` when `app.isPackaged` is false and
+  no npm script starts that server. Measured before any change — the window came up as
+  `Cannot GET /`. The replacement drives the packaged build and covers Escape, Enter, Ctrl+S,
+  the delete confirmation's focus trap, unsaved-changes handling, and an export → delete →
+  import → unlock round trip. "Discard and leave" is now covered end to end; it is the
+  destructive button in the unsaved-changes dialog and had no end-to-end test.
+- New `tests/e2e/launch.ts` (isolated launcher, shared bilingual name matching, download
+  capture, native-dialog stub) and `tests/e2e/artifact.ts`, which locates either an AppImage or
+  the `electron-forge package` output. `npm run package` added.
+
+### Fixed
+
+- **A test reported as passing was reading the developer's real drawers.**
+  `appimage-validation.spec.ts` launched with `args: [appImage]` and no `--user-data-dir`. Every
+  e2e launch now goes through `launch.ts`, which **asserts** the isolation — it compares
+  `app.getPath('userData')` against the temporary directory and refuses to run if they differ —
+  rather than requesting it in a comment.
+- **Three of the never-run tests asserted things that are not true.** One required a `Ctrl+N`
+  shortcut; the only keyboard shortcut in the whole of `src/` is Ctrl+S. Three others "tested"
+  import by clicking the button and confirming the word "Clavis" was still on screen, which is
+  true before the click, after it, and on a failure. They are replaced by the round trip.
+- **`tests/e2e` had no timeout budget of its own.** Playwright's 30s default covers a whole
+  test and the per-expectation timeouts draw from it rather than adding to it. Each unlock
+  derives a key with argon2id at 256 MiB, so this is the setting that stops the first red CI run
+  from being the runner rather than a bug. Now 120s, with `timeout-minutes` on both jobs so a
+  hung Electron cannot hold a release for the six-hour default.
+
+### Known issues still open
+
+- **The password policy is still defined in two places** (`validation.ts` accepts 8 characters,
+  `store.ts` requires 12 plus four character classes), and `ipc-handlers.ts` still classifies a
+  Zod failure by sniffing `e.message`. The store is authoritative, so the app is safe, but the
+  two rule sets can drift. HYG-22.
+- **`atomicWrite` renames the live file to `.prev` before the replacement lands**, so a crash
+  between the two renames leaves no `.clavis` at all. `.prev` files are also never cleaned up.
+- **Four assertions that no longer assert** (HYG-21): a test that claims to prove `countCodePoints`
+  allocates nothing passes if it is reverted to `[...value].length`; `password_too_weak` is
+  unreachable yet two tests still assert it while `wrong_password` appears zero times in `tests/`.
+- **The e2e gate is Linux-only**, and the `e2e` job is new: **this release is its first execution
+  on Actions.** The specs were verified locally in three configurations (AppImage, packaged build
+  under `LANGUAGE=en`, packaged build under `LANGUAGE=pt` — 10/10 in each) and a product-level
+  mutation confirmed the gate fails on a real regression, but the workflow itself had never run
+  before this tag. If it goes red, the workflow is the untested part, not the specs.
+
 ## v0.6.1-beta (2026-10-18)
 
 A test-suite audit round. **No user-facing behaviour change** — the app is byte-for-byte

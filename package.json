@@ -1,7 +1,7 @@
 {
   "name": "clavis",
   "productName": "clavis",
-  "version": "0.6.1-beta",
+  "version": "0.6.2-beta",
   "description": "Cross-platform encrypted notes application for storing banking info, PINs, passwords, and safe codes.",
   "main": "dist/main/index.js",
   "author": "Marcelo Salvador",
@@ -21,6 +21,7 @@
     "build:renderer": "vite build",
     "build": "npm run clean && npm run build:main && npm run build:preload && npm run build:renderer",
     "make": "electron-forge make",
+    "package": "electron-forge package",
     "release": "npm run clean && npm run build && npm run make",
     "start": "electron .",
     "test": "vitest run",
