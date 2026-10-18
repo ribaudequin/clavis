@@ -757,6 +757,10 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
   to the constant), HYG-14 (no rescue path — a product decision, not a bug), and one thing found while
   publishing: **releases are not marked prerelease**, so `pre: false` on every beta and `check-update`
   treats a beta as the latest stable. Not a regression — the workflow never passed `prerelease:`.
+  **[corrected 2026-10-18 — this was already wrong. `release.yml:143` computes `prerelease:` from the tag
+  name (`contains(ref_name, 'beta')`), restored by `28f1928` whose subject literally reads "prerelease
+  flag". `v0.6.1-beta` published with `isPrerelease: true`, confirmed via `gh release view`. This note
+  sat "open" for a day because it was never re-read against the file.]**
 
 - **Previous (2026-10-16) — the P3.31 testing sweep and a 7-step defect sweep, both landed on `main` with no release.**
   `184 -> 277` tests across 20 files, every new test negative-controlled; `lint`, `typecheck` and `typecheck:test` all 0.
