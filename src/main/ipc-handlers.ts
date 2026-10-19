@@ -99,6 +99,7 @@ const UNLOCK_ERRORS: Record<UnlockFailureReason, { code: ErrorCode; message: str
   invalid_id: { code: ErrorCode.VALIDATION_ERROR, message: 'Invalid drawer ID' },
   read_failed: { code: ErrorCode.FILE_NOT_FOUND, message: 'Failed to read the drawer file' },
   parse_failed: { code: ErrorCode.INVALID_JSON, message: 'The drawer file is corrupt' },
+  corrupt_metadata: { code: ErrorCode.INVALID_JSON, message: 'The drawer metadata is corrupt' },
   kdf_out_of_bounds: { code: ErrorCode.VALIDATION_ERROR, message: 'Drawer key derivation parameters are out of bounds' },
   kdf_backend_unavailable: { code: ErrorCode.KDF_UNAVAILABLE, message: 'This drawer requires a KDF backend this build does not include' },
   too_large: { code: ErrorCode.CONTENT_TOO_LARGE, message: 'Drawer content exceeds the maximum size' },

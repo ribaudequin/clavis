@@ -59,6 +59,10 @@ The counter resets after 2 minutes of inactivity and is cleared on a successful 
 - **Import uses a single-use token whitelist** (`allowedImportPaths`). The token is minted from the native file dialog, expires after **5 minutes**, and is **deleted before the file is read** — a token cannot be replayed.
 - **Symlinks are rejected** on import via `fs.lstat` / `isSymbolicLink()`.
 - **Import cannot overwrite** an existing drawer: an import of an already-present ID fails with `DrawerAlreadyExistsError`. Duplicate *titles* are permitted; the UI warns about them.
+- **Crypto fields are shape-checked** (`EncryptedDrawerSchema`, used on import, list and unlock): `salt`, `iv` and `authTag` are exactly 32 hex characters (16 bytes), and `encryptedData` is even-length hex. An empty ciphertext is valid — empty content encrypts to an empty string.
+- **Metadata is schema-validated** on import, list and unlock: `title`, `iconData`, `createdAt` and `updatedAt` are typed and bounded. `iconData` must parse as a JSON array of at most 64 strings, each at most 64 characters.
+- **Corrupt metadata does not count as a guess.** Unlock returns `INVALID_JSON` (`corrupt_metadata`) and the attempt is not added to the unlock rate limiter.
+- **`listDrawers()` skips a file whose internal `id` does not match its filename**, so it never lists an entry that `getDrawerFilePath()` cannot open.
 
 ### Content and file limits
 

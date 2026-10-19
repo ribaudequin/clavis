@@ -42,23 +42,60 @@ export const DeleteDrawerSchema = z.object({
   id: z.string().uuid('Invalid drawer ID'),
 });
 
+// SEC-05 — Every hex field Clavis writes has a fixed width, and decrypt() builds a
+// Buffer from whatever it is given: a 2-byte IV reaches createDecipheriv and throws,
+// which used to be indistinguishable from a wrong password. Salt, IV and tag are all
+// 16 bytes (32 hex characters); the ciphertext is any even-length hex, including the
+// empty string an empty drawer encrypts to. Hex is accepted in either case.
+const SIXTEEN_BYTE_HEX_RE = /^(?:[0-9a-f]{2}){16}$/i;
+const EVEN_LENGTH_HEX_RE = /^(?:[0-9a-f]{2})*$/i;
+
+const ICON_DATA_MAX_ENTRIES = 64;
+const ICON_DATA_ENTRY_MAX_LENGTH = 64;
+
+// SEC-07 — HomeScreen's renderIcon() parses iconData and maps every element to a DOM
+// node, so an unbounded array is a renderer freeze. The real value is nine "rgb(...)"
+// entries; the caps leave room for older or larger palettes without admitting millions.
+function isBoundedIconData(value: string): boolean {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return false;
+  }
+  return (
+    Array.isArray(parsed) &&
+    parsed.length <= ICON_DATA_MAX_ENTRIES &&
+    parsed.every(
+      (entry) => typeof entry === 'string' && entry.length <= ICON_DATA_ENTRY_MAX_LENGTH
+    )
+  );
+}
+
 export const EncryptedDrawerSchema = z.object({
   id: z.string().uuid('Invalid drawer id'),
   title: z.string().min(1).max(255),
-  iconData: z.string().max(4096),
+  iconData: z
+    .string()
+    .max(4096)
+    .refine(isBoundedIconData, 'iconData must be a JSON array of bounded strings'),
   createdAt: z.number().int().nonnegative(),
   updatedAt: z.number().int().nonnegative(),
-  encryptedData: z.string(),
-  salt: z.string(),
-  iv: z.string(),
-  authTag: z.string(),
+  encryptedData: z.string().regex(EVEN_LENGTH_HEX_RE, 'Ciphertext must be even-length hex'),
+  salt: z.string().regex(SIXTEEN_BYTE_HEX_RE, 'Salt must be 32 hex characters'),
+  iv: z.string().regex(SIXTEEN_BYTE_HEX_RE, 'IV must be 32 hex characters'),
+  authTag: z.string().regex(SIXTEEN_BYTE_HEX_RE, 'Auth tag must be 32 hex characters'),
   keyDerivation: z.object({
-    algorithm: z.enum(['argon2id', 'scrypt']),
+    // Legacy drawers predate this field. storedKdfParams() treats a missing value as
+    // "whatever backend this build supports", which is the only behaviour they had.
+    algorithm: z.enum(['argon2id', 'scrypt']).optional(),
     iterations: z.number().int().positive(),
     memory: z.number().int().positive(),
     parallelism: z.number().int().positive(),
   }),
 });
+
+export type EncryptedDrawerMetadata = z.infer<typeof EncryptedDrawerSchema>;
 
 export const ExportDrawerSchema = z.object({
   id: z.string().uuid('Invalid drawer ID'),

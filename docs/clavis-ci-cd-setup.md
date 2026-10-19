@@ -3,6 +3,8 @@
 > Reference doc for the CI/CD setup **implemented on 2026-09-03**. Describes the single Electron Forge build system consolidated from the previous dual (Forge + electron-builder) setup, and the GitHub Actions workflow that builds all targets remotely on native runners.
 >
 > **Updated 2026-10-02:** Forge downgraded to **6.4.2** (supply-chain, 30 CVEs), config moved from `forge.config.mts` to `package.json` → `config.forge`, `.rpm` target dropped, and a `quality` job (lint + typecheck + typecheck:test + test) now gates the build.
+>
+> **Updated 2026-10-19:** actions bumped to their Node 24 majors (`checkout@v5`, `setup-node@v5`, `upload-artifact@v6`, `download-artifact@v7`, `action-gh-release@v3`) and CI `node-version` moved from 22 to 24; the `e2e` job is documented below.
 
 ## Context
 
@@ -46,16 +48,18 @@ One maker per platform, with `platforms` gating each to its OS:
 
 ## Workflow — `.github/workflows/release.yml`
 
-Three jobs:
+Four jobs (actions run on the Node 24 runtime; CI uses `node-version: 24`):
 
 1. **quality** (`ubuntu-latest`, every push and PR): `npm ci` → `npm run lint` → `npm run typecheck` → `npm run typecheck:test` → `npm test`.
-2. **build** (`needs: quality`, gated to `v*` tags) — matrix over `ubuntu-latest`, `windows-latest`, `macos-latest`:
-   - checkout, setup Node 22 (cached), `npm ci` (Windows uses `--ignore-scripts` to keep the argon2 prebuilds)
+2. **e2e** (`needs: quality`, `ubuntu-latest`, every push and PR) — `language: [en, pt]` matrix: `npm ci` → `npm run build` → `npm run package` → `xvfb-run -a npm run test:e2e` against `out/clavis-linux-x64/clavis`.
+3. **build** (`needs: [quality, e2e]`, gated to `v*` tags) — matrix over `ubuntu-latest`, `windows-latest`, `macos-latest`:
+   - checkout, setup Node 24 (cached), `npm ci` (Windows uses `--ignore-scripts` to keep the argon2 prebuilds)
    - **Windows only:** copy `electron-winstaller/vendor/7z-x64.exe` → `7z.exe` (forge#3892)
    - **Linux only:** `apt-get install dpkg-dev fakeroot build-essential g++ make python3 python3-dev squashfs-tools`
    - `npm run build` → `npm run make` (optionally passing cert secrets for Windows signing)
    - uploads artefacts as `clavis-<os>-<ref>` (`out/make/**/*.{deb,AppImage,dmg,exe,zip,nupkg}`)
-3. **release** — on `v*` tags, `ubuntu-latest`: downloads all artefacts (merged) and publishes a GitHub Release via `softprops/action-gh-release@v2` with auto-generated notes.
+   - **Linux only:** runs the e2e suite against the packaged AppImage before upload
+4. **release** — on `v*` tags, `ubuntu-latest`: downloads all artefacts (merged) and publishes a GitHub Release via `softprops/action-gh-release@v3` with auto-generated notes.
 
 ## Release
 
@@ -74,7 +78,7 @@ Watch progress at `https://github.com/ribaudequin/clavis/actions`. The Release a
 - **Windows argon2:** the old `scripts/afterPack.js` ELF-stripping hack is **no longer needed** because Win32 builds now run on the native `windows-latest` runner (argon2 is compiled as PE32+ natively), not cross-compiled via Linux/Wine. It is kept in `scripts/backup/` for reference.
 - **AppImage:** `squashfs-tools` is installed explicitly on the Linux runner.
 - **Forge version:** pinned to **6.4.2** across all `@electron-forge/*` packages (7.11.2 pulled 30 CVEs via `tar`, `extract-zip`, `image-size`, `tmp`). Forge 6.4.2 has **no NSIS maker** and cannot read `.mts` config files.
-- **Workflow trigger:** `quality` runs on every push and PR; `build` and `release` only on tags `v*`.
+- **Workflow trigger:** `quality` and `e2e` run on every push and PR; `build` and `release` only on tags `v*`.
 
 ## Old local build scripts
 

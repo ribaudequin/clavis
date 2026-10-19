@@ -295,10 +295,12 @@ describe('store module', () => {
         iconData: '[]',
         createdAt: 1,
         updatedAt: 1,
-        encryptedData: 'e',
-        salt: 's',
-        iv: 'i',
-        authTag: 'a',
+        // Valid crypto shapes on purpose: this test is about the KDF bounds, so an
+        // invalid field here would make every case fail at the schema instead.
+        encryptedData: '00',
+        salt: '00'.repeat(16),
+        iv: '00'.repeat(16),
+        authTag: '00'.repeat(16),
       };
 
       const legacy = { ...base, id: '123e4567-e89b-12d3-a456-426614174010', keyDerivation: { algorithm: 'argon2id', iterations: 3, memory: 2 ** 16, parallelism: 1 } };

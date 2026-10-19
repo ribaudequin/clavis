@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import { encrypt, decrypt, MAX_DECRYPTED_SIZE, DEFAULT_MEMORY_COST, MIN_MEMORY_COST, MAX_MEMORY_COST, MIN_TIME_COST, MAX_TIME_COST, MIN_PARALLELISM, MAX_PARALLELISM, DEFAULT_TIME_COST, DEFAULT_PARALLELISM, deriveKey, ContentTooLargeError, KdfBackendUnavailableError, type KDFParams } from './encryption.js';
 import { logger } from './logger.js';
 import { EncryptedDrawer, DrawerListItem } from '../shared/types.js';
-import { EncryptedDrawerSchema } from './validation.js';
+import { EncryptedDrawerSchema, type EncryptedDrawerMetadata } from './validation.js';
 import { isPasswordCompliant, describePasswordPolicy } from './password-policy.js';
 
 const DRAWER_EXT = '.clavis';
@@ -75,6 +75,7 @@ export type UnlockFailureReason =
   | 'invalid_id'
   | 'read_failed'
   | 'parse_failed'
+  | 'corrupt_metadata'
   | 'kdf_out_of_bounds'
   | 'kdf_backend_unavailable'
   | 'too_large'
@@ -292,11 +293,31 @@ export async function listDrawers(): Promise<DrawerListItem[]> {
           continue;
         }
         const content = await fs.readFile(filePath, 'utf8');
-        const drawer: EncryptedDrawer = JSON.parse(content);
+        // SEC-07 — Nothing from the file reaches the renderer unvalidated: a title that
+        // is not a string crashes React, an unbounded iconData freezes it, and the
+        // schema is also what enforces the SEC-05 crypto-field widths on this path.
+        const parsed = EncryptedDrawerSchema.safeParse(JSON.parse(content));
+        if (!parsed.success) {
+          logger.error('listDrawers skipped invalid metadata', {
+            file,
+            reason: parsed.error.issues[0]?.message ?? 'invalid drawer metadata',
+          });
+          continue;
+        }
+        // The filename is what getDrawerFilePath() will look for. An internal id that
+        // disagrees would list an entry no unlock or delete call can reach.
+        const fileId = path.basename(file, DRAWER_EXT);
+        if (parsed.data.id !== fileId) {
+          logger.error('listDrawers skipped drawer whose id does not match its filename', {
+            file,
+            id: parsed.data.id,
+          });
+          continue;
+        }
         drawers.push({
-          id: drawer.id,
-          title: drawer.title,
-          iconData: drawer.iconData,
+          id: parsed.data.id,
+          title: parsed.data.title,
+          iconData: parsed.data.iconData,
         });
       } catch (e) {
         logger.error('listDrawers read failed', { file, error: e instanceof Error ? e.message : String(e) });
@@ -379,7 +400,14 @@ async function dummyDerive(passwordBuffer: Buffer): Promise<void> {
 // means "whatever this build supports", which is the only behaviour they ever had. A
 // value this app wrote is one of the two, so anything else is treated the same as
 // missing rather than passed through.
-function storedKdfParams(drawer: EncryptedDrawer): KDFParams | undefined {
+interface StoredKeyDerivation {
+  algorithm?: string;
+  iterations: number;
+  memory: number;
+  parallelism: number;
+}
+
+function storedKdfParams(drawer: { keyDerivation?: StoredKeyDerivation | null }): KDFParams | undefined {
   if (!drawer.keyDerivation) return undefined;
   const algorithm = drawer.keyDerivation.algorithm;
   return {
@@ -433,9 +461,22 @@ export async function unlockDrawer(
     return { ok: false, reason: 'read_failed' };
   }
 
-  let drawer: EncryptedDrawer;
+  let drawer: EncryptedDrawerMetadata;
   try {
-    drawer = JSON.parse(content);
+    const parsed = EncryptedDrawerSchema.safeParse(JSON.parse(content));
+    if (!parsed.success) {
+      // SEC-05/SEC-07 — Validate before touching keyDerivation or any crypto field.
+      // A malformed IV, title or iconData is damage to the file, not a guess at the
+      // password, so it must not walk the user into the rate limiter.
+      await dummyDerive(passwordBuffer);
+      passwordBuffer.fill(0);
+      logger.warn('Unlock failed: drawer metadata is corrupt', {
+        id,
+        reason: parsed.error.issues[0]?.message ?? 'invalid drawer metadata',
+      });
+      return { ok: false, reason: 'corrupt_metadata' };
+    }
+    drawer = parsed.data;
   } catch (e) {
     await dummyDerive(passwordBuffer);
     passwordBuffer.fill(0);
@@ -690,14 +731,9 @@ export async function importDrawerRaw(fileContent: string): Promise<boolean> {
       return false;
     }
 
-    // VALID-01: validate required encrypted fields
-    if (!drawer.encryptedData || typeof drawer.encryptedData !== 'string' ||
-        !drawer.salt || typeof drawer.salt !== 'string' ||
-        !drawer.iv || typeof drawer.iv !== 'string' ||
-        !drawer.authTag || typeof drawer.authTag !== 'string') {
-      logger.warn('importDrawerRaw: missing or invalid encrypted fields', { id: drawer.id });
-      return false;
-    }
+    // VALID-01 — EncryptedDrawerSchema has already checked every crypto field for type,
+    // width and hex shape. encryptedData is deliberately allowed to be empty: empty
+    // content encrypts to an empty ciphertext, which is what every empty drawer stores.
 
     // SAV-01 — The file-size cap above is measured in characters, so it admits a
     // payload of up to twice MAX_DECRYPTED_SIZE *bytes*. Such a drawer imports

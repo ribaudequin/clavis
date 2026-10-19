@@ -426,12 +426,27 @@ describe('IPC handlers', () => {
       }
     });
 
+    it('reports corrupt metadata as INVALID_JSON, not as a password failure', async () => {
+      // SEC-05 — A damaged IV/title/icon is not a guess at the password.
+      vi.mocked(store.unlockDrawer).mockResolvedValue({ ok: false, reason: 'corrupt_metadata' });
+
+      const handler = getHandler(CHANNELS.UNLOCK_DRAWER);
+      const result = await handler({}, VALID_UUID, 'correct-password123');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.INVALID_JSON);
+        expect(result.error.message).toBe('The drawer metadata is corrupt');
+      }
+    });
+
     it('maps every unlock failure reason to its own code and message', async () => {
       const handler = getHandler(CHANNELS.UNLOCK_DRAWER);
       const reasons = [
         'invalid_id',
         'read_failed',
         'parse_failed',
+        'corrupt_metadata',
         'kdf_out_of_bounds',
         'kdf_backend_unavailable',
         'too_large',
@@ -446,7 +461,7 @@ describe('IPC handlers', () => {
         envelopes.push(`${result.error.code}:${result.error.message}`);
       }
 
-      // Seven causes, seven distinguishable answers: a collapsed mapping is what made
+      // Eight causes, eight distinguishable answers: a collapsed mapping is what made
       // an oversized drawer indistinguishable from a wrong password.
       expect(new Set(envelopes).size).toBe(reasons.length);
     });
@@ -483,6 +498,7 @@ describe('IPC handlers', () => {
     // is no reset hook, so ids are what keep these tests independent.
     const PASSWORD_ID = '123e4567-e89b-12d3-a456-426614174050';
     const SIZE_ID = '123e4567-e89b-12d3-a456-426614174051';
+    const CORRUPT_ID = '123e4567-e89b-12d3-a456-426614174052';
 
     /**
      * Observes whether a handler call has settled, without awaiting it — a call
@@ -541,6 +557,24 @@ describe('IPC handlers', () => {
       // id starts from zero rather than inheriting the failures above.
       vi.mocked(store.unlockDrawer).mockResolvedValue({ ok: false, reason: 'wrong_password' });
       const firstGuess = watch(handler({}, SIZE_ID, 'wrong-password'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(firstGuess.settled()).toBe(true);
+    });
+
+    it('never counts corrupt metadata against the limiter', async () => {
+      // SEC-05 — The failure happened in the schema, before any key was derived or
+      // any password was tried, so it is not a guess and must not be counted.
+      vi.mocked(store.unlockDrawer).mockResolvedValue({ ok: false, reason: 'corrupt_metadata' });
+      const handler = getHandler(CHANNELS.UNLOCK_DRAWER);
+
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const settled = watch(handler({}, CORRUPT_ID, 'correct-password123'));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(settled.settled()).toBe(true);
+      }
+
+      vi.mocked(store.unlockDrawer).mockResolvedValue({ ok: false, reason: 'wrong_password' });
+      const firstGuess = watch(handler({}, CORRUPT_ID, 'wrong-password'));
       await vi.advanceTimersByTimeAsync(0);
       expect(firstGuess.settled()).toBe(true);
     });

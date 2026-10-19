@@ -135,7 +135,7 @@ Windows and macOS targets are built in CI on native runners — no Wine cross-co
 
 ### Prerequisites (local Linux)
 
-- Node.js 20+ (CI uses Node 22) and npm 10+ — see `BUILD_MANUAL.md`
+- Node.js 22+ (CI uses Node 24) and npm 10+ — see `BUILD_MANUAL.md`
 - `dpkg-dev` and `fakeroot` for the `.deb`
 - `squashfs-tools` for the AppImage
 

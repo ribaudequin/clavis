@@ -1,5 +1,47 @@
 # Changelog — Clavis
 
+## v0.6.5-beta (2026-10-19)
+
+**Corrupt drawer metadata is now a named failure instead of a wrong password, and CI runs on the
+Node 24 action runtime.**
+
+### Fixed
+
+- **SEC-07 — malformed or oversized metadata reached the renderer.** `listDrawers()` now validates
+  every file with the same schema used at import and skips invalid entries (logging the reason),
+  including files whose internal `id` disagrees with the filename. An object `title` or an
+  `iconData` array with a million entries can no longer be forwarded to `renderIcon()`/React.
+- **SEC-05 — a damaged crypto field was reported as a wrong password.** `salt`/`iv`/`authTag` must
+  now be 32 hex characters and `encryptedData` must be even-length hex (empty is valid); the schema
+  also bounds `iconData` to a JSON array of at most 64 strings. `unlockDrawer()` returns the new
+  `corrupt_metadata` reason **before** touching `keyDerivation` or any crypto field. It maps to
+  `INVALID_JSON` and is deliberately excluded from the rate limiter, so eight damaged-file attempts
+  do not park on a timer. `keyDerivation.algorithm` stays optional so legacy drawers still validate.
+- **The derived key could survive a decrypt failure.** `createDecipheriv`/`setAuthTag` moved inside
+  the zeroing path, so a malformed IV no longer throws with the key still in memory.
+
+### Changed
+
+- **CI runs on Node 24.** GitHub retired the Node 20 action runtime on 2026-09-23 and now forces
+  actions onto Node 24, which produced a deprecation annotation on every run. Bumped to the Node 24
+  majors: `actions/checkout@v5`, `actions/setup-node@v5`, `actions/upload-artifact@v6`,
+  `actions/download-artifact@v7`, `softprops/action-gh-release@v3`. The CI `node-version` moved from
+  22 to 24 to match the development machine. Each action tag was verified to declare
+  `using: node24`. This project never used Node 24 in CI — it started at 20 and was bumped 20→22 on
+  2026-09-03 because Electron 44 requires ≥22.12; the security-motivated downgrade in this repo was
+  `@electron-forge` 7.11.2→6.4.2, which is unaffected.
+- `README.md`, `BUILD_MANUAL.md` and `docs/clavis-ci-cd-setup.md` now state the real floor
+  (Node 22+) and the current CI version (24). The CI reference doc also gained the `e2e` job it had
+  been missing.
+
+### Verified
+
+- `lint` 0 errors / 2 pre-existing warnings · `typecheck` 0 · `typecheck:test` 0 · **400/400**
+  vitest across 41 files, including 12 new metadata tests and 2 new IPC tests · `build` OK ·
+  `package` OK · e2e **10/10** against `out/clavis-linux-x64` on Node v24.21.0. The workflow YAML
+  parses and all five action tags resolve remotely; the first CI run on this commit is the
+  remaining gate.
+
 ## v0.6.4-beta (2026-10-19)
 
 **SEC-01 was only half-fixed, and the test that was supposed to prove it is what exposed that.**

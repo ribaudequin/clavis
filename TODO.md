@@ -9,7 +9,7 @@
 - [ ] **QA-03/QA-04 (P0):** exclude `tests/e2e/**` from Vitest; fix Playwright config/`testDir` and the `test:e2e` script.
 - [ ] **SEC-03 (P1):** one shared password-policy module; typed weak-password failure; remove the dead `"8 characters"` IPC branch.
 - [ ] **SEC-04 (P1):** verify the current password (decrypt existing ciphertext) before `saveDrawer` overwrites it.
-- [ ] **SEC-05/SEC-07 (P1):** validate crypto field lengths and the full drawer metadata schema at import/list/unlock.
+- [x] **SEC-05/SEC-07 (P1):** validate crypto field lengths and the full drawer metadata schema at import/list/unlock — DONE 2026-10-19. `salt`/`iv`/`authTag` must be 32 hex chars, `encryptedData` even-length hex; `iconData` bounded to 64 strings; `listDrawers`/`unlockDrawer` validate with the same schema and skip/return `corrupt_metadata` (`INVALID_JSON`, no rate-limit increment); filename/id mismatch is skipped; `decrypt()` zeroes the key when `createDecipheriv`/`setAuthTag` throw.
 - [ ] **SEC-09 (P1):** single-instance lock (`app.requestSingleInstanceLock`).
 - [ ] **REL-02 (P1):** a cancelled unlock still opens the drawer — invalidate pending attempts on close.
 - [ ] **P2:** dynamic focus trap (UX-01), i18n strength labels (UX-02), debounced counters (UX-07), key zeroing on error paths (SEC-06), caught IPC rejections (REL-03), timer cleanup (REL-04), repair or delete stale e2e specs (QA-05), dev-dependency advisories (QA-06), passphrase policy review (SEC-08).
@@ -822,6 +822,18 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
       the transfer, so a Chromium bump turning the race real would surface as a download timeout
       pointing at the test harness rather than at this line. Move the revoke into the download's
       completion, or document why it is safe.
+- [x] **HYG-26 — CI still declared Node 20-era action runtimes — CLOSED 2026-10-19.** GitHub retired
+      the Node 20 action runtime on 2026-09-23; every run now emits a deprecation annotation for
+      `actions/checkout@v4` and `actions/setup-node@v4`. Bumped to the Node 24 majors —
+      `checkout@v5`, `setup-node@v5`, `upload-artifact@v6`, `download-artifact@v7`,
+      `softprops/action-gh-release@v3` (each verified to declare `using: node24`) — and the CI
+      `node-version` from 22 to 24, which is what the dev machine already runs (v24.21.0) with
+      lint/typecheck/400 tests/build/package/e2e green. **History corrected:** this project never used
+      Node 24 in CI; the workflow started at 20 and was bumped 20→22 on 2026-09-03 because Electron 44
+      requires ≥22.12. The security-motivated downgrade here was `@electron-forge` 7.11.2→6.4.2, not
+      Node. `README.md`, `BUILD_MANUAL.md` and `docs/clavis-ci-cd-setup.md` synced. Verified locally:
+      YAML parses, all 5 action tags resolve remotely, zero stale `@v2`/`@v4` refs. Not yet exercised
+      on GitHub — the first push is the real gate.
 - [ ] **e2e does not run on Windows or macOS.** The gate is Linux-only (`xvfb` + AppImage), and
       `artifact.ts` knows how to locate the win32/darwin packager output, so the suite could run on all
       three — at the cost of minutes per push and the Windows focus quirks this app has already been
@@ -831,7 +843,10 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
 
 
 ## Progress
-- **Current focus (2026-10-19, release) — v0.6.4-beta: SEC-01 was only half-fixed, and writing the
+- **Current focus (2026-10-19, SEC-05/SEC-07) — metadata is validated at import, list and unlock, and corrupt metadata no longer counts as a password guess.** `EncryptedDrawerSchema` now enforces the crypto field widths (`salt`/`iv`/`authTag` = 32 hex chars, `encryptedData` even-length hex, empty allowed) and bounds `iconData` to a JSON array of ≤64 strings; `keyDerivation.algorithm` became optional so legacy drawers still validate. `listDrawers()` skips invalid files and files whose internal id disagrees with the filename; `unlockDrawer()` returns the new `corrupt_metadata` (`INVALID_JSON`, never rate-limited) before touching any crypto field. `decrypt()` now zeroes the derived key when `createDecipheriv`/`setAuthTag` throw. `importDrawerRaw()` keeps returning false for malformed metadata and now accepts an empty ciphertext, which is what an empty drawer actually stores.
+  **Tests:** new `tests/sec05-sec07-metadata.test.ts` (12 tests: 2-byte IV, odd-length ciphertext, uppercase/empty acceptance, object title, 1M-entry iconData, filename/id mismatch, corrupt metadata reasons) and 2 IPC tests (INVALID_JSON mapping; 8 corrupt attempts never park on a limiter timer). One existing store fixture was moved from invalid placeholders (`'s'`, `'i'`, `'a'`, `'e'`) to valid hex so it still tests KDF bounds instead of schema rejection.
+  **Gates:** lint 0 errors / 2 pre-existing warnings · both typechecks 0 · **400/400** vitest across 41 files · `build` OK · e2e **10/10** against the packaged build (`npm run package` → `out/clavis-linux-x64`).
+- **Previous (2026-10-19, release) — v0.6.4-beta: SEC-01 was only half-fixed, and writing the
   test that was supposed to prove it is what exposed that. HYG-21 sub-items 1, 2 and 4 closed too.**
   **The recorded backend was written and never read.** `store.ts` put `keyDerivation.algorithm` in
   every drawer; `decrypt()` chose a backend from runtime availability instead. Measured, not
@@ -1087,9 +1102,9 @@ DECISÃO 2026-09-26: merge de `test/downgrade-forge-6.4.2` → `main` (fast-forw
 - [x] SEC-02 legacy passwords savable
 - [x] REL-01 atomic writes
 --- Audit 2026-10-17 — pendentes (pós-SEC-01/02/REL-01) ---
-- [ ] SEC-07 — Zod import validation (top-5 #5)
-- [ ] SEC-04 — save proves password before overwrite
-- [ ] SEC-05 — malformed crypto metadata not rate-limited
+- [x] SEC-07 — Zod import validation (top-5 #5) — closed 2026-10-19 (schema applied at import/list/unlock)
+- [x] SEC-04 — save proves password before overwrite — closed in the 2026-10-19 SEC-01 session
+- [x] SEC-05 — malformed crypto metadata not rate-limited — closed 2026-10-19 (`corrupt_metadata` → `INVALID_JSON`)
 - [ ] SEC-08 — composition rules / strong passphrases
 - [ ] SEC-09 — concurrent save lock
 - [ ] REL-02 — verificar

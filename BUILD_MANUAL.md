@@ -14,7 +14,7 @@ Artefacts land in `out/make/<maker>/x64/` (Forge default `directories.output`, g
 
 ## Prerequisites
 
-- Node.js 20+ (LTS recommended) — CI uses Node 22
+- Node.js 22+ (LTS recommended) — CI uses Node 24
 - npm 10+
 - Linux local builds: `dpkg-dev` + `fakeroot` for `.deb`, `squashfs-tools` for AppImage
 - CI does the Windows/macOS builds (native runners) — no Wine needed

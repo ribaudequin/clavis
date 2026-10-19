@@ -196,10 +196,12 @@ export async function decrypt(
 
   const key = await deriveKey(password, salt, kdfParams);
 
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-  decipher.setAuthTag(authTag);
-
   try {
+    // Both calls can throw on malformed metadata, so they belong inside the same
+    // zeroing path as final(): otherwise a bad IV leaks the derived key in memory.
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    decipher.setAuthTag(authTag);
+
     const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
     if (decrypted.length > MAX_DECRYPTED_SIZE) {
       logger.error('Decrypted content exceeds maximum size', { size: decrypted.length });
