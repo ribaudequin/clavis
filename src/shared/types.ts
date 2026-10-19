@@ -11,6 +11,10 @@ export enum ErrorCode {
   // WRITE_FAILED renders "The operation could not be completed." and throws away
   // the only message that tells the user why their drawer will not open.
   CONTENT_TOO_LARGE = 'CONTENT_TOO_LARGE',
+  // SEC-01 — A drawer encrypted with argon2id cannot be read on a build whose native
+  // argon2 module failed to load. Reporting that as DECRYPT_FAILED would tell the user
+  // their correct password is wrong and feed the unlock rate limiter.
+  KDF_UNAVAILABLE = 'KDF_UNAVAILABLE',
 }
 
 export interface AppError {

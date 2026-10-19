@@ -100,6 +100,7 @@ const UNLOCK_ERRORS: Record<UnlockFailureReason, { code: ErrorCode; message: str
   read_failed: { code: ErrorCode.FILE_NOT_FOUND, message: 'Failed to read the drawer file' },
   parse_failed: { code: ErrorCode.INVALID_JSON, message: 'The drawer file is corrupt' },
   kdf_out_of_bounds: { code: ErrorCode.VALIDATION_ERROR, message: 'Drawer key derivation parameters are out of bounds' },
+  kdf_backend_unavailable: { code: ErrorCode.KDF_UNAVAILABLE, message: 'This drawer requires a KDF backend this build does not include' },
   too_large: { code: ErrorCode.CONTENT_TOO_LARGE, message: 'Drawer content exceeds the maximum size' },
   wrong_password: { code: ErrorCode.DECRYPT_FAILED, message: 'Incorrect password or drawer not found' },
 };
@@ -113,6 +114,7 @@ const SAVE_ERRORS: Record<SaveFailureReason, { code: ErrorCode; message: string 
   invalid_id: { code: ErrorCode.VALIDATION_ERROR, message: 'Invalid drawer ID' },
   wrong_password: { code: ErrorCode.WRONG_PASSWORD, message: 'Password is incorrect' },
   kdf_out_of_bounds: { code: ErrorCode.VALIDATION_ERROR, message: 'Drawer key derivation parameters are out of bounds' },
+  kdf_backend_unavailable: { code: ErrorCode.KDF_UNAVAILABLE, message: 'This drawer requires a KDF backend this build does not include' },
   content_too_large: { code: ErrorCode.CONTENT_TOO_LARGE, message: 'Content exceeds the maximum size' },
   too_large: { code: ErrorCode.CONTENT_TOO_LARGE, message: 'Drawer file exceeds the maximum size' },
   write_failed: { code: ErrorCode.WRITE_FAILED, message: 'Failed to save drawer' },

@@ -723,20 +723,39 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
       packaged + `LANGUAGE=pt` 10/10. The Portuguese leg found a bug the English leg could not: four
       tests asserted `getByRole('list')` in the state where `HomeScreen` renders a call to action
       instead of a `<ul role="list">` (`HomeScreen.tsx:254-267`).
-- [ ] **HYG-21 — assertions that no longer assert.** Found by mutation, 2026-10-18.
-      **Sub-item (3) CLOSED 2026-10-18 with HYG-22:** `password_too_weak` was unreachable, so it was
-      deleted from `SaveFailureReason` and `SAVE_ERRORS` rather than left asserted; `wrong_password` is
-      now in the reason list, and `ErrorCode.WRONG_PASSWORD` has coverage for the first time (it
-      appeared **zero** times in `tests/` before).
-      Still open: (1) `tests/store-limit.allocation.test.ts` claims to prove `countCodePoints` allocates
-      no 10 M array, but does only `expect(countCodePoints(v)).toBe(MAX)` + `expect(typeof x).toBe('number')` —
-      it still passes if `countCodePoints` is reverted to `[...value].length`, the exact regression it
-      names. (2) `tests/sec01-kdf-metadata.test.ts` — test 1 is a tautology, test 2 is titled
-      "encoded in drawer metadata" but never touches `store`, and `expect(enc.algorithm).toBe('argon2id')`
-      fails on precisely the cross-build targets where the scrypt fallback exists. (4) `tests/ViewDrawer.test.tsx`
-      mocks `countCodePoints` by **reimplementing** it instead of importing it, and
-      `store-limit.allocation.test.ts` carries two leftover `@ts-ignore` from the five commits that fought
-      the import extension instead of fixing it.
+- [x] **HYG-21 — assertions that no longer assert — CLOSED 2026-10-19 (sub-items 1, 2 and 4; 3 closed 2026-10-18).**
+      **(1)** `tests/store-limit.allocation.test.ts` rewritten. The two `@ts-ignore` are gone, and the
+      allocation claim is now observable: `vi.spyOn(String.prototype, Symbol.iterator)` stays at
+      **zero calls** for the astral string and for the 10 M ceiling, while `[...value].length` calls it
+      **once**. Negative control: reverting `countCodePoints` to the spread form fails **3** tests.
+      The vacuous `TextEncoder` test became an explicit "accepted cost" test instead of pretending to
+      assert storage.
+      **(4)** `tests/ViewDrawer.test.tsx` no longer reimplements `countCodePoints` in the mock factory:
+      it spreads the real module via `importOriginal` and overrides only the two ceilings. A new test
+      imports the actual module and asserts the iterator is never touched. Negative control: the spread
+      mutation fails the new test.
+      **(2)** `tests/sec01-kdf-metadata.test.ts` rewritten — and writing it honestly **reopened SEC-01**.
+      The metadata half worked (`store.ts` wrote `encrypted.algorithm`), but `deriveKey()` never
+      received it: it chose the backend from runtime availability. Measured: a hand-built scrypt
+      drawer with the correct password returned `wrong_password` on this argon2 build. The scrypt
+      fallback was also broken at the default cost — `2^18` KiB maps to `N = 2^16`, needing 64 MiB
+      against Node's 32 MiB default `maxmem`, so `createDrawer` threw
+      `ERR_CRYPTO_INVALID_SCRYPT_PARAMS` on any build without argon2.
+      **Owner decision: honour the recorded backend.** `KDFParams` gained `algorithm`; `deriveKey()`
+      uses it and throws `KdfBackendUnavailableError` when `argon2id` is requested but absent;
+      `store.ts` passes the stored value on unlock **and** on save, and rewrites the label from the
+      backend that actually re-encrypted; scrypt now gets an explicit `maxmem`. New
+      `ErrorCode.KDF_UNAVAILABLE` (pt/en) so a correct password is no longer reported as wrong. Legacy
+      files without `algorithm` keep the old availability behaviour.
+      **Regression proof:** four tests in the file, including a fixture built with **`crypto.scrypt`
+      directly** and a reference-key equality check. That fixture is load-bearing: an earlier version
+      built the drawer with `encrypt()`, and the "ignore `algorithm`" mutation left the suite **5/5
+      green**, because both sides then used the same wrong KDF and agreed with each other. Mutation
+      controls now fail as intended: ignore `algorithm` → 3 red; remove `maxmem` → 1 red; re-encrypt
+      with defaults on save → 1 red.
+      Gates: **386/386** vitest across 40 files · lint 0 errors / 2 pre-existing warnings · both
+      typechecks 0 · `build` OK · e2e **10/10** against a freshly packaged build. `SECURITY.md`
+      corrected: it previously claimed decryption used the recorded backend, which was false until now.
 - [x] **HYG-22 — SEC-03 never landed, in either half — CLOSED 2026-10-18.** See
       `PLANO-PASSWORD-POLICY-2026-10-18.md`. All three defects fixed, plus two found on the way.
       **(a) One policy, one module.** New `src/main/password-policy.ts` owns the constant, the four
@@ -1035,7 +1054,11 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
 DECISÃO 2026-09-26: merge de `test/downgrade-forge-6.4.2` → `main` (fast-forward) e bump para `0.3.7-alpha`; tag `v0.3.6-alpha` mantida em 7.11.2 (`e1fb38b`). `main` agora tem `config.forge` no `package.json` (make corrigido). Artefactos de sessão (`SESSION_REPORT_2026-09-24.md`, `desktop-engineer-report.json`) removidos do repo e adicionados ao `.gitignore`.
 - [x] Validação visual do `clavis-0.3.7-alpha-x64.AppImage` gerado pelo GitHub Actions — smoke test OK (2026-09-26).
 - [x] `docs/MILESTONES.md` criado — milestones técnicos `v0.4.0-beta` e `v1.0`. Sessão fechada 2026-09-29.
-[x] SEC-01 KDF fallback metadata (audit 2026-10-17)[x] SEC-02 legacy passwords savable[x] REL-01 atomic writes
+- [x] SEC-01 KDF fallback metadata (audit 2026-10-17) — **reopened and re-closed 2026-10-19**: the
+  metadata was written but never read by `deriveKey`; now the stored `algorithm` is honoured on unlock
+  and save, with `KDF_UNAVAILABLE` when the required backend is absent (see HYG-21 above).
+- [x] SEC-02 legacy passwords savable
+- [x] REL-01 atomic writes
 --- Audit 2026-10-17 — pendentes (pós-SEC-01/02/REL-01) ---
 - [ ] SEC-07 — Zod import validation (top-5 #5)
 - [ ] SEC-04 — save proves password before overwrite

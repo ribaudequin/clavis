@@ -56,9 +56,29 @@ export function getArgon2LoadError(): Error | null {
 }
 
 export interface KDFParams {
+  // SEC-01 — The backend recorded in the drawer's metadata. When present it wins over
+  // runtime availability: a drawer written by the scrypt fallback has to keep opening
+  // on a machine where argon2 did load, and an argon2id drawer must not silently be
+  // decrypted with a different KDF (which can only produce a wrong key).
+  algorithm?: 'argon2id' | 'scrypt';
   timeCost?: number;
   memoryCost?: number;
   parallelism?: number;
+}
+
+// Thrown when the file asks for a backend this build does not have, instead of falling
+// through to the other one. Falling through is what made a scrypt drawer report
+// "wrong_password" on an argon2 build: the password was right, the KDF was wrong.
+export class KdfBackendUnavailableError extends Error {
+  constructor(readonly algorithm: 'argon2id' | 'scrypt') {
+    super(`KDF backend "${algorithm}" is not available in this build`);
+    this.name = 'KdfBackendUnavailableError';
+  }
+}
+
+export function resolveKdfBackend(params?: KDFParams): 'argon2id' | 'scrypt' {
+  if (params?.algorithm) return params.algorithm;
+  return argon2 ? 'argon2id' : 'scrypt';
 }
 
 export async function deriveKey(password: string | Buffer, salt: Buffer, params?: KDFParams): Promise<Buffer> {
@@ -72,32 +92,42 @@ export async function deriveKey(password: string | Buffer, salt: Buffer, params?
   const timeCost = params?.timeCost ?? DEFAULT_TIME_COST;
   const memoryCost = params?.memoryCost ?? DEFAULT_MEMORY_COST;
   const parallelism = params?.parallelism ?? DEFAULT_PARALLELISM;
-  let hash: Buffer;
-  if (argon2) {
-    hash = await argon2.hash(passwordBuffer, {
-      type: argon2.argon2id,
-      timeCost,
-      memoryCost,
-      parallelism,
-      salt,
-      raw: true,
-    });
-    if (hash.length !== KEY_LENGTH) {
-      throw new Error(`Argon2 raw output length ${hash.length} != expected ${KEY_LENGTH}`);
+  const backend = resolveKdfBackend(params);
+  try {
+    let hash: Buffer;
+    if (backend === 'argon2id') {
+      if (!argon2) throw new KdfBackendUnavailableError('argon2id');
+      hash = await argon2.hash(passwordBuffer, {
+        type: argon2.argon2id,
+        timeCost,
+        memoryCost,
+        parallelism,
+        salt,
+        raw: true,
+      });
+      if (hash.length !== KEY_LENGTH) {
+        throw new Error(`Argon2 raw output length ${hash.length} != expected ${KEY_LENGTH}`);
+      }
+    } else {
+      // Fallback: Node's scrypt (pure JS/OpenSSL, no native .node required).
+      // Maps argon2 memoryCost to scrypt cost for comparable hardness.
+      // scrypt N must be power of two; clamp between 2^14 and 2^17
+      const logN = Math.min(17, Math.max(14, Math.round(Math.log2(memoryCost / 4))));
+      const N = 2 ** logN;
+      const r = 8;
+      // Node's default maxmem is 32 MiB, but the default memoryCost (2^18) maps to
+      // N = 2^16, which needs 128 * N * r = 64 MiB. Without an explicit maxmem the
+      // fallback threw ERR_CRYPTO_INVALID_SCRYPT_PARAMS before deriving anything.
+      const maxmem = 128 * N * r * 2;
+      hash = (await scryptAsync(passwordBuffer, salt, KEY_LENGTH, { N, r, p: parallelism, maxmem })) as Buffer;
     }
-  } else {
-    // Fallback: Node's scrypt (pure JS/OpenSSL, no native .node required).
-    // Maps argon2 memoryCost to scrypt cost for comparable hardness.
-    // scrypt N must be power of two; clamp between 2^14 and 2^17
-    const logN = Math.min(17, Math.max(14, Math.round(Math.log2(memoryCost / 4))));
-    const N = 2 ** logN;
-    hash = (await scryptAsync(passwordBuffer, salt, KEY_LENGTH, { N, r: 8, p: parallelism })) as Buffer;
+    const duration = Date.now() - start;
+    logger.debug('Key derived', { duration, backend });
+    return hash;
+  } finally {
+    // P0.7 — Zero password buffer from memory, including when derivation throws.
+    passwordBuffer.fill(0);
   }
-  const duration = Date.now() - start;
-  logger.debug('Key derived', { duration, backend: argon2 ? 'argon2' : 'scrypt' });
-  // P0.7 — Zero password buffer from memory
-  passwordBuffer.fill(0);
-  return hash;
 }
 
 export function generateSalt(): Buffer {
@@ -144,7 +174,10 @@ export async function encrypt(plainText: string, password: string | Buffer, para
     salt: salt.toString('hex'),
     iv: iv.toString('hex'),
     authTag: authTag.toString('hex'),
-    algorithm: argon2 ? 'argon2id' : 'scrypt',
+    // Report the backend that actually derived the key, not the one availability
+    // suggests: saving a legacy scrypt drawer on an argon2 build must not rewrite its
+    // metadata as argon2id.
+    algorithm: resolveKdfBackend(params),
   };
 }
 

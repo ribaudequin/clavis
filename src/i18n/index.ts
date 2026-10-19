@@ -95,6 +95,7 @@ export const translations: Record<string, TranslationDict> = {
     'error.wrong_password': 'Palavra-passe incorreta.',
     'error.validation_error': 'A data introduzida não é válida.',
     'error.content_too_large': 'Esta gaveta é demasiado grande para a aplicação abrir ou guardar.',
+    'error.kdf_unavailable': 'Esta gaveta usa Argon2, que não está incluído nesta versão da aplicação.',
   },
   'en': {
     'app.title': 'Clavis',
@@ -186,6 +187,7 @@ export const translations: Record<string, TranslationDict> = {
     'error.wrong_password': 'Incorrect password.',
     'error.validation_error': 'The supplied data is not valid.',
     'error.content_too_large': 'This drawer is too large for the app to open or save.',
+    'error.kdf_unavailable': 'This drawer uses Argon2, which is not included in this build.',
   },
 };
 
@@ -233,6 +235,7 @@ const ERROR_MESSAGE_KEYS: Record<ErrorCode, string> = {
   [ErrorCode.INVALID_JSON]: 'error.invalid_json',
   [ErrorCode.VALIDATION_ERROR]: 'error.validation_error',
   [ErrorCode.CONTENT_TOO_LARGE]: 'error.content_too_large',
+  [ErrorCode.KDF_UNAVAILABLE]: 'error.kdf_unavailable',
 };
 
 export function tError(error: AppError): string {

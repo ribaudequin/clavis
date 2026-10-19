@@ -411,6 +411,21 @@ describe('IPC handlers', () => {
       }
     });
 
+    it('reports a drawer needing an absent KDF backend as KDF_UNAVAILABLE, not as a wrong password', async () => {
+      // SEC-01 — The password was correct and was never the problem: the file needs
+      // argon2 and this build did not load it. DECRYPT_FAILED would both lie to the
+      // user and count the attempt against the unlock rate limiter.
+      vi.mocked(store.unlockDrawer).mockResolvedValue({ ok: false, reason: 'kdf_backend_unavailable' });
+
+      const handler = getHandler(CHANNELS.UNLOCK_DRAWER);
+      const result = await handler({}, VALID_UUID, 'correct-password123');
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.KDF_UNAVAILABLE);
+      }
+    });
+
     it('maps every unlock failure reason to its own code and message', async () => {
       const handler = getHandler(CHANNELS.UNLOCK_DRAWER);
       const reasons = [
@@ -418,6 +433,7 @@ describe('IPC handlers', () => {
         'read_failed',
         'parse_failed',
         'kdf_out_of_bounds',
+        'kdf_backend_unavailable',
         'too_large',
         'wrong_password',
       ] as const;
@@ -430,8 +446,8 @@ describe('IPC handlers', () => {
         envelopes.push(`${result.error.code}:${result.error.message}`);
       }
 
-      // Six causes, six distinguishable answers: a collapsed mapping is what made an
-      // oversized drawer indistinguishable from a wrong password.
+      // Seven causes, seven distinguishable answers: a collapsed mapping is what made
+      // an oversized drawer indistinguishable from a wrong password.
       expect(new Set(envelopes).size).toBe(reasons.length);
     });
 
@@ -601,6 +617,7 @@ describe('IPC handlers', () => {
         'invalid_id',
         'wrong_password',
         'kdf_out_of_bounds',
+        'kdf_backend_unavailable',
         'content_too_large',
         'too_large',
         'write_failed',

@@ -12,19 +12,18 @@ vi.mock('../src/renderer/hooks/useModalKeyboard', () => ({ useModalKeyboard: () 
 // reachable with three-digit strings instead of ten-megabyte ones, and the two are given
 // *different* values so a swap between the unit the character counter reports and the
 // unit the byte counter reports cannot hide behind them being equal in the real module.
-vi.mock('../src/shared/limits', () => ({
-  MAX_CONTENT_CODE_POINTS: 2_000,
-  MAX_PLAINTEXT_BYTES: 1_000,
-  countCodePoints: (s: string) => {
-    let count = 0;
-    for (let i = 0; i < s.length; ) {
-      const cp = s.codePointAt(i) ?? 0;
-      count++;
-      i += cp > 0xffff ? 2 : 1;
-    }
-    return count;
-  },
-}));
+//
+// countCodePoints comes from the real module, not from a copy. Reimplementing it here
+// (HYG-21 sub-item 4) meant the tests verified the mock's arithmetic and the component
+// could regress to a grapheme counter with every assertion still green.
+vi.mock('../src/shared/limits', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/shared/limits')>();
+  return {
+    ...actual,
+    MAX_CONTENT_CODE_POINTS: 2_000,
+    MAX_PLAINTEXT_BYTES: 1_000,
+  };
+});
 import ViewDrawer from '../src/renderer/pages/ViewDrawer';
 import { Result } from '../src/shared/types';
 import { MAX_CONTENT_CODE_POINTS, MAX_PLAINTEXT_BYTES } from '../src/shared/limits';
@@ -222,6 +221,19 @@ describe('ViewDrawer', () => {
         codePoints: 2_000,
         bytes: 1_000,
       });
+    });
+
+    // The mock above spreads the real module, so this asserts the component is
+    // counting with the shipped function rather than a copy that drifted from it.
+    it('counts with the real countCodePoints, not a local reimplementation', async () => {
+      const actual = await vi.importActual<typeof import('../src/shared/limits')>('../src/shared/limits');
+      const iterator = vi.spyOn(String.prototype, Symbol.iterator);
+      try {
+        expect(actual.countCodePoints('a\u{1F600}b')).toBe(3);
+        expect(iterator).not.toHaveBeenCalled();
+      } finally {
+        iterator.mockRestore();
+      }
     });
 
     it('shows the character and byte counts for text whose two units disagree', () => {

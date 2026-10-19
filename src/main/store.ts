@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
-import { encrypt, decrypt, MAX_DECRYPTED_SIZE, DEFAULT_MEMORY_COST, MIN_MEMORY_COST, MAX_MEMORY_COST, MIN_TIME_COST, MAX_TIME_COST, MIN_PARALLELISM, MAX_PARALLELISM, DEFAULT_TIME_COST, DEFAULT_PARALLELISM, deriveKey, ContentTooLargeError } from './encryption.js';
+import { encrypt, decrypt, MAX_DECRYPTED_SIZE, DEFAULT_MEMORY_COST, MIN_MEMORY_COST, MAX_MEMORY_COST, MIN_TIME_COST, MAX_TIME_COST, MIN_PARALLELISM, MAX_PARALLELISM, DEFAULT_TIME_COST, DEFAULT_PARALLELISM, deriveKey, ContentTooLargeError, KdfBackendUnavailableError, type KDFParams } from './encryption.js';
 import { logger } from './logger.js';
 import { EncryptedDrawer, DrawerListItem } from '../shared/types.js';
 import { EncryptedDrawerSchema } from './validation.js';
@@ -76,6 +76,7 @@ export type UnlockFailureReason =
   | 'read_failed'
   | 'parse_failed'
   | 'kdf_out_of_bounds'
+  | 'kdf_backend_unavailable'
   | 'too_large'
   | 'wrong_password';
 
@@ -101,6 +102,7 @@ export type SaveFailureReason =
   | 'invalid_id'
   | 'wrong_password'
   | 'kdf_out_of_bounds'
+  | 'kdf_backend_unavailable'
   | 'content_too_large'
   | 'too_large'
   | 'write_failed';
@@ -372,6 +374,22 @@ async function dummyDerive(passwordBuffer: Buffer): Promise<void> {
   }
 }
 
+// SEC-01 — The backend stored in the file has to reach deriveKey, not just sit in the
+// metadata. Files created before the field existed carry no value; for those, undefined
+// means "whatever this build supports", which is the only behaviour they ever had. A
+// value this app wrote is one of the two, so anything else is treated the same as
+// missing rather than passed through.
+function storedKdfParams(drawer: EncryptedDrawer): KDFParams | undefined {
+  if (!drawer.keyDerivation) return undefined;
+  const algorithm = drawer.keyDerivation.algorithm;
+  return {
+    algorithm: algorithm === 'argon2id' || algorithm === 'scrypt' ? algorithm : undefined,
+    timeCost: drawer.keyDerivation.iterations,
+    memoryCost: drawer.keyDerivation.memory,
+    parallelism: drawer.keyDerivation.parallelism,
+  };
+}
+
 export async function unlockDrawer(
   id: string,
   password: string | Buffer
@@ -432,8 +450,9 @@ export async function unlockDrawer(
     // SEC-006 — Re-validate KDF params against security floor AND safety cap.
     // The floor (2^16) still accepts drawers created by older app versions; the
     // cap (2^20) prevents a crafted drawer from allocating enough memory to crash
-    // the native Argon2 binding. Legacy drawers (2^16) remain unlockable because
-    // decryption always uses the parameters stored in the file.
+    // the native Argon2 binding. SEC-01 — the stored backend travels with the cost
+    // parameters into deriveKey, so a scrypt drawer opens on an argon2 build and a
+    // drawer that needs argon2 fails loudly instead of being tried with scrypt.
     if (drawer.keyDerivation && !isKdfWithinBounds(drawer.keyDerivation)) {
       await dummyDerive(passwordBuffer);
       passwordBuffer.fill(0);
@@ -446,11 +465,7 @@ export async function unlockDrawer(
       return { ok: false, reason: 'kdf_out_of_bounds' };
     }
 
-    const kdfParams = drawer.keyDerivation ? {
-      timeCost: drawer.keyDerivation.iterations,
-      memoryCost: drawer.keyDerivation.memory,
-      parallelism: drawer.keyDerivation.parallelism,
-    } : undefined;
+    const kdfParams = storedKdfParams(drawer);
 
     // P0.12 — Size check before decrypt. AES-GCM ciphertext is exactly as long as
     // the plaintext (the 16-byte tag is returned separately, not appended), and
@@ -536,18 +551,21 @@ export async function saveDrawer(
     // stays consistent with the ciphertext. Using the process defaults here
     // would silently corrupt legacy drawers (metadata says 2^16, ciphertext
     // derived with 2^18) and make them impossible to unlock afterwards.
-    const kdfParams = drawer.keyDerivation
-      ? {
-          timeCost: drawer.keyDerivation.iterations,
-          memoryCost: drawer.keyDerivation.memory,
-          parallelism: drawer.keyDerivation.parallelism,
-        }
-      : undefined;
+    //
+    // SEC-01 — This includes the backend. Re-encrypting a scrypt drawer with argon2
+    // while leaving `algorithm: 'scrypt'` in the file produced a drawer that the
+    // metadata itself described incorrectly, and no build could open afterwards.
+    const kdfParams = storedKdfParams(drawer);
 
     // SEC-04 — Verify current password before overwriting ciphertext.
     try {
       await decrypt(drawer.encryptedData, drawer.salt, drawer.iv, drawer.authTag, passwordBuffer, kdfParams);
     } catch (e) {
+      if (e instanceof KdfBackendUnavailableError) {
+        passwordBuffer.fill(0);
+        logger.warn('Save refused: KDF backend unavailable', { id, backend: e.algorithm });
+        return { ok: false, reason: 'kdf_backend_unavailable' };
+      }
       passwordBuffer.fill(0);
       logger.warn('Save refused: wrong password', { id });
       return { ok: false, reason: 'wrong_password' };
@@ -564,6 +582,11 @@ export async function saveDrawer(
         logger.warn('Save failed: content exceeds max size', { id });
         return { ok: false, reason: 'content_too_large' };
       }
+      if (e instanceof KdfBackendUnavailableError) {
+        passwordBuffer.fill(0);
+        logger.warn('Save failed: KDF backend unavailable', { id, backend: e.algorithm });
+        return { ok: false, reason: 'kdf_backend_unavailable' };
+      }
       throw e;
     }
     const { encryptedData, salt, iv, authTag } = encrypted;
@@ -576,6 +599,13 @@ export async function saveDrawer(
       salt,
       iv,
       authTag,
+      // SEC-01 — Keep the recorded backend equal to the one that just derived the key.
+      // Spreading `...drawer` alone preserved the old label even when the KDF changed.
+      // Files predating the field have no keyDerivation at all; do not invent a
+      // partial one, or isKdfWithinBounds would start rejecting them on the next open.
+      keyDerivation: drawer.keyDerivation
+        ? { ...drawer.keyDerivation, algorithm: encrypted.algorithm }
+        : drawer.keyDerivation,
     };
 
     await atomicWrite(filePath, JSON.stringify(updatedDrawer, null, 2));
