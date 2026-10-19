@@ -1,5 +1,38 @@
 # Changelog — Clavis
 
+## v0.6.4-beta (2026-10-19)
+
+**SEC-01 was only half-fixed, and the test that was supposed to prove it is what exposed that.**
+A drawer recorded which KDF backend derived its key, but the value was never read back: decryption
+picked a backend from runtime availability instead of from the file.
+
+### Fixed
+
+- **SEC-01 — a drawer would not open on a build different from the one that created it.** A drawer
+  created with the scrypt fallback (a build where the native `argon2` module failed to load, most
+  often a cross-compiled Windows build) stored `algorithm: "scrypt"` and then refused to open on any
+  machine where `argon2` *did* load: the password was correct, the KDF was not, and the app reported
+  `wrong_password`. Measured, not inferred — a hand-built scrypt drawer with the right password
+  returned `{ ok: false, reason: 'wrong_password' }` on an argon2 build. Decryption and re-encryption
+  now use the backend recorded in `keyDerivation.algorithm`, so a scrypt drawer opens anywhere and a
+  save keeps the recorded backend instead of silently re-encrypting with a different one.
+- **A drawer that needs `argon2id` on a build without it now fails honestly.** It returns the new
+  `KDF_UNAVAILABLE` error instead of `WRONG_PASSWORD`, so a correct password is not reported as wrong
+  and the attempt does not count against the unlock rate limiter. Files created before the field
+  existed keep the previous behaviour.
+- **The scrypt fallback could not create a drawer at the default parameters.** `2^18 KiB` maps to
+  `N = 2^16`, which needs 64 MiB of memory, while Node's default `maxmem` is 32 MiB — so derivation
+  threw `ERR_CRYPTO_INVALID_SCRYPT_PARAMS`. An explicit `maxmem` is now passed.
+
+### Changed
+
+- **HYG-21 (assertions that no longer assert), sub-items 1, 2 and 4.** `countCodePoints` is now
+  observed through `String.prototype[Symbol.iterator]` (zero calls, where the spread form would call
+  it once), the `ViewDrawer` test spreads the real limits module instead of reimplementing it, and
+  the SEC-01 metadata test now goes through `store`. The cross-backend fixture is built with Node's
+  `crypto.scrypt` directly and checked against a reference key — building it with `encrypt()` on both
+  sides let one bug hide behind the other.
+
 ## v0.6.3-beta (2026-10-18)
 
 **The first round in a while that changes shipped behaviour rather than tests** — and it fixes
