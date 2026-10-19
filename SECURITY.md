@@ -128,7 +128,7 @@ Deliberately unsigned — there are no EV certificates and no Apple notarization
 
 ## Known Limitations
 
-Three items are documented honestly rather than presented as working controls.
+Four items are documented honestly rather than presented as working controls.
 
 ### 1. The KDF is not unconditionally Argon2id
 
@@ -149,6 +149,14 @@ Described in full under [Content-Security-Policy](#content-security-policy) abov
 Export never writes the destination file from the main process. The raw drawer JSON is returned over IPC (`ipc-handlers.ts`, `EXPORT_DRAWER`) and handed to Chromium as a `Blob`, which triggers an `<a download>` (`HomeScreen.tsx`); Chromium creates the file in the OS downloads folder with its own default permissions, and the `0o600` mode described under [Filesystem permissions](#filesystem-permissions) never reaches it. On Linux and macOS no restrictive mode is applied to it, so it lands with the creating process's default — commonly `0o644`, readable by other local accounts.
 
 **What this exposes is metadata, not content.** The drawer body is AES-256-GCM ciphertext, so a readable export still discloses nothing without the password. What it does disclose is the plaintext metadata listed under [Notes](#notes): the drawer title, the creation and update timestamps, and the icon colour data.
+
+### 4. The published artifacts cover two architectures, and only one of them has ever been run
+
+**Architectures.** Linux and Windows are published for **x86-64** (`.deb` amd64, `.AppImage` x64, `Setup.exe`, `.nupkg`, portable `.zip`). macOS is published as a single **arm64** `.dmg` — the CI runner is Apple Silicon, and the built binary is `Mach-O 64-bit arm64` (measured on the published `clavis.dmg`). **There is no Intel (x86-64) macOS build, no universal binary, and no arm64 build for Linux or Windows.** The `.dmg` file name carries no architecture, unlike the other two platforms' assets, so the gap is not visible from the release page.
+
+**What has been executed.** The **Linux** artifacts are exercised by the end-to-end suite on every push and on every release tag, against both the packager output and the AppImage, in two locales. The **Windows and macOS** artifacts are built and published, and **no test, no CI job and no user has run them** since the Electron 44 series began. The structural checks pass — the Windows binary is a valid PE32+ x86-64 executable, the macOS binary a valid Mach-O arm64 one, and the native Argon2 prebuild for each platform is present as a real PE DLL / Mach-O bundle — but "the file is the right shape" is not "the app runs".
+
+**Why that matters, concretely.** `encryption.ts` loads the native Argon2 module lazily and **falls back to Node's scrypt** if it cannot be loaded. The fallback is silent apart from a log warning, and a drawer that records `argon2id` then **fails to unlock** with `KDF_UNAVAILABLE` rather than being decrypted with a different KDF — a deliberate fail-closed choice (SEC-01). A platform where the native module does not load is therefore a platform where drawers created elsewhere cannot be opened, and **nothing has run the Windows or macOS builds to establish whether that is the case**.
 
 ## Vulnerability Response
 
