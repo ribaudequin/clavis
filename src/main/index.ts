@@ -4,8 +4,30 @@ import * as path from 'path';
 import { ensureDataDir } from './store.js';
 import { registerIpcHandlers, clearImportTimers } from './ipc-handlers.js';
 import { logger, initializeLogger } from './logger.js';
+import { acquireSingleInstanceLock } from './single-instance.js';
 
 let mainWindow: BrowserWindow | null = null;
+
+// SEC-09 — The logger is initialized here instead of inside the ready handler
+// because the "another instance is already running" line is written before the
+// app is ready, and electron-log writes to its own default location until
+// `initializeLogger()` points the file transport at the project's log file.
+// `app.getPath('logs')` carries no "must be called after ready" restriction in
+// the Electron API, and it was measured to return the same path before and
+// after ready on Electron 44 — so resolving it this early is safe.
+initializeLogger();
+
+// The lock has to be requested at module scope, before `app.whenReady()` and
+// before any window exists: two processes that both passed this point would
+// each create a window over the same `userData` directory, and `saveDrawer` is
+// a read-modify-write with no lock of its own, so the second write would
+// silently discard the first (SEC-09). Electron's own documented pattern is
+// the same shape — request the lock at startup, quit immediately if it is
+// refused, and let the primary instance carry on loading.
+const isPrimaryInstance = acquireSingleInstanceLock({
+  app,
+  getWindow: () => mainWindow,
+});
 
 
 function createWindow(): void {
@@ -66,26 +88,37 @@ function createWindow(): void {
   });
 }
 
-app.whenReady().then(async () => {
-  initializeLogger();
-  logger.info('Clavis started', { version: app.getVersion(), platform: process.platform, arch: process.arch });
-  // Non-fatal check: argon2 native may be unavailable on cross-built Windows artifacts
-  try {
-    const { isArgon2Available, getArgon2LoadError } = await import('./encryption.js');
-    if (!isArgon2Available()) {
-      const err = getArgon2LoadError();
-      logger.warn('Running with scrypt fallback — argon2 native unavailable', {
-        error: err?.message,
-      });
+if (!isPrimaryInstance) {
+  // Another instance already owns this `userData` directory. Say so in the
+  // project's log file and leave without touching a single drawer: the whole
+  // point of the lock is that this process never opens the store, never
+  // registers the IPC handlers and never creates a window.
+  logger.info('Another instance is already running — this one exits', {
+    version: app.getVersion(),
+    platform: process.platform,
+  });
+  app.quit();
+} else {
+  app.whenReady().then(async () => {
+    logger.info('Clavis started', { version: app.getVersion(), platform: process.platform, arch: process.arch });
+    // Non-fatal check: argon2 native may be unavailable on cross-built Windows artifacts
+    try {
+      const { isArgon2Available, getArgon2LoadError } = await import('./encryption.js');
+      if (!isArgon2Available()) {
+        const err = getArgon2LoadError();
+        logger.warn('Running with scrypt fallback — argon2 native unavailable', {
+          error: err?.message,
+        });
+      }
+    } catch (e) {
+      logger.error('Failed to check argon2 availability', { error: e instanceof Error ? e.message : String(e) });
     }
-  } catch (e) {
-    logger.error('Failed to check argon2 availability', { error: e instanceof Error ? e.message : String(e) });
-  }
-  await ensureDataDir();
-  Menu.setApplicationMenu(null);
-  registerIpcHandlers({ ipcMain, dialog });
-  createWindow();
-});
+    await ensureDataDir();
+    Menu.setApplicationMenu(null);
+    registerIpcHandlers({ ipcMain, dialog });
+    createWindow();
+  });
+}
 
 app.on('window-all-closed', () => {
   logger.info('Clavis shutdown', {});
@@ -97,5 +130,10 @@ app.on('will-quit', () => {
 });
 
 app.on('activate', () => {
+  // The process that lost the lock race quits as soon as it knows it lost it;
+  // without this guard a late `activate` (a macOS dock click) could still open
+  // a window in that process — a window with no IPC handlers behind it,
+  // because the startup sequence never ran there.
+  if (!isPrimaryInstance) return;
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });

@@ -10,7 +10,7 @@
 - [ ] **SEC-03 (P1):** one shared password-policy module; typed weak-password failure; remove the dead `"8 characters"` IPC branch.
 - [ ] **SEC-04 (P1):** verify the current password (decrypt existing ciphertext) before `saveDrawer` overwrites it.
 - [x] **SEC-05/SEC-07 (P1):** validate crypto field lengths and the full drawer metadata schema at import/list/unlock — DONE 2026-10-19. `salt`/`iv`/`authTag` must be 32 hex chars, `encryptedData` even-length hex; `iconData` bounded to 64 strings; `listDrawers`/`unlockDrawer` validate with the same schema and skip/return `corrupt_metadata` (`INVALID_JSON`, no rate-limit increment); filename/id mismatch is skipped; `decrypt()` zeroes the key when `createDecipheriv`/`setAuthTag` throw.
-- [ ] **SEC-09 (P1):** single-instance lock (`app.requestSingleInstanceLock`).
+- [x] **SEC-09 (P1):** single-instance lock (`app.requestSingleInstanceLock`) — code + unit + e2e all green, **not yet released**. `src/main/single-instance.ts` holds the decision, `src/main/index.ts` requests the lock at module scope before `app.whenReady()` and quits on refusal, `tests/single-instance.test.ts` has 9 unit tests, and `tests/e2e/single-instance.spec.ts` proves it on the packaged binary: the second instance on the same profile exits 0 in ~450ms while the primary stays alive, and a control on a private profile must keep running.
 - [ ] **REL-02 (P1):** a cancelled unlock still opens the drawer — invalidate pending attempts on close.
 - [ ] **P2:** dynamic focus trap (UX-01), i18n strength labels (UX-02), debounced counters (UX-07), key zeroing on error paths (SEC-06), caught IPC rejections (REL-03), timer cleanup (REL-04), repair or delete stale e2e specs (QA-05), dev-dependency advisories (QA-06), passphrase policy review (SEC-08).
 
@@ -210,7 +210,7 @@
 - [x] **P2.21 — Loading spinner (`ViewDrawer`)** — `msg.saving` já existia; agora renderiza um `animate-spin` SVG apenas quando `saving` é `true`, evitando flash em saves rápidos (`t('btn.save_and_back')` preservado quando `!saving`). Verificado: `tests/ViewDrawer.test.tsx` 12/12 (era 11), incluindo `keyDown` `Ctrl+S` (C6-N16, mesmo passe). `184/184` testes.
 - [x] P2.22 — Dynamic i18n messages in `ipc-handlers.ts` (`v0.4.0-beta`)
 - [x] P2.23 — Typecheck the test suite → `tsconfig.test.json` + `typecheck:test` script + CI `quality` step — **DONE 2026-10-02** (surfaced `registers all expected channels` already failing on the working tree: the `check-update` handler was missing from the expected list)
-- [x] P2.24 — Typecheck `src/renderer` + the `*.tsx` tests — **DONE 2026-10-04** (21 → **0** errors, 8 files, all edits type-level only). `tsconfig.test.json` extended (no new config, no new npm script, **no CI edit** — `quality` already ran `typecheck:test`): `include` += `src/renderer/**/*.ts`, `src/renderer/**/*.tsx`, `src/types/**/*`, `tests/**/*.tsx`; **`"src/renderer"` removed from `exclude`** (`exclude` silently beats `include` — the reason a first measurement falsely reported 0). Fixes: (a) `src/types/svgr.d.ts` += `declare module '*.svg?react'` mirroring `vite-plugin-svgr/client.d.ts` — the old `*.svg` block can't match the `?react` query; `types: ["vite/client"]` is unusable (`typeRoots` → TS2688). (b) `useFocusTrap`/`useModalKeyboard` params → `RefObject<HTMLElement | null>` (React 19 `useRef<T>(null)`); fixed in the hooks, no casts at the 8 call sites. (c) `CreditsModal` return type → `React.JSX.Element | null` (`lazy()` still accepts it). (d) `ToastProvider` − `reverseOrderFamilies` (react-hot-toast 2.6.0 dropped it; **completely inert** — 0 package matches, `reverseOrder` defaults `false`). (e) `HomeScreen.tsx` − phantom `SkeletonLoader` default import (no default export invented). (f) `HomeScreen.test.tsx` `restartApp` → `Promise<Result<void>>` + the 2 members the stub lacked (`getAppVersion`, `checkUpdate`); the missing-property error was **masked** by the inner one. (g) `ViewDrawer.test.tsx` 9 stubs + the `vi.fn` annotated `Promise<Result<void>>` so `ok` stays literal `true`. Gates: `typecheck` 0, `typecheck:test` 0, `lint` 0 problems, `86/86`, `build` OK. `--listFiles`: 13 renderer sources + 4 `.tsx` tests in the program, `tests/e2e` still out.
+- [x] P2.24 — Typecheck `src/renderer` + the `*.tsx` tests — **DONE 2026-10-04** (21 → **0** errors, 8 files, all edits type-level only). `tsconfig.test.json` extended (no new config, no new npm script, **no CI edit** — `quality` already ran `typecheck:test`): `include` += `src/renderer/**/*.ts`, `src/renderer/**/*.tsx`, `src/types/**/*`, `tests/**/*.tsx`; **`"src/renderer"` removed from `exclude`** (`exclude` silently beats `include` — the reason a first measurement falsely reported 0). Fixes: (a) `src/types/svgr.d.ts` += `declare module '*.svg?react'` mirroring `vite-plugin-svgr/client.d.ts` — the old `*.svg` block can't match the `?react` query; `types: ["vite/client"]` is unusable (`typeRoots` → TS2688). (b) `useFocusTrap`/`useModalKeyboard` params → `RefObject<HTMLElement | null>` (React 19 `useRef<T>(null)`); fixed in the hooks, no casts at the 8 call sites. (c) `CreditsModal` return type → `React.JSX.Element | null` (`lazy()` still accepts it). (d) `ToastProvider` − `reverseOrderFamilies` (react-hot-toast 2.6.0 dropped it; **completely inert** — 0 package matches, `reverseOrder` defaults `false`). (e) `HomeScreen.tsx` − phantom `SkeletonLoader` default import (no default export invented). (f) `HomeScreen.test.tsx` `restartApp` → `Promise<Result<void>>` + the 2 members the stub lacked (`getAppVersion`, `checkUpdate`); the missing-property error was **masked** by the inner one. (g) `ViewDrawer.test.tsx` 9 stubs + the `vi.fn` annotated `Promise<Result<void>>` so `ok` stays literal `true`. Gates: `typecheck` 0, `typecheck:test` 0, `lint` 0 problems, `86/86`, `build` OK. `--listFiles`: 13 renderer sources + 4 `.tsx` tests in the program, `tests/e2e` still out. **⚠️ The "`tests/e2e` still out" half of that sentence was wrong** — `tsconfig.test.json` has `include: ["tests/**/*.ts", …]` and `exclude: ["node_modules","dist","out"]`, so the Playwright specs have been inside the `typecheck:test` program all along. Re-measured 2026-10-19 while adding the SEC-09 e2e spec: `--listFiles` lists the 6 files under `tests/e2e/`, and a deliberate `const x: number = "str"` planted in that directory is reported as TS2322 by `npm run typecheck:test`. The claim survived for weeks in this file and in `MEMORY.md`, and it misled a session into believing the e2e specs were untyped and needed a separate manual `tsc`.
 - [x] **P2.25 — PROVEN end-to-end at `v0.4.4-beta`** — DONE 2026-10-05. `v0.4.4-beta` published (tag `0508a47`, run `37331376460`, 4 jobs green, 6 assets), so `releases/latest` moved to `v0.4.4-beta`. Proof is an **A/B on the *published* `clavis-0.4.3-beta` AppImage** (130,071,032 bytes from GitHub Releases, driven with Playwright `_electron`, `app.getVersion()` asserted `0.4.3-beta` so it can't be confused with a local build):
   - **Negative control** (run while `latest` was still `v0.4.3-beta`): `BUTTON_SHOWN=false` — the as-latest case correctly stays silent, so the later positive cannot be a false positive.
   - **After the release**: `BUTTON_SHOWN=true`, `BUTTON_TEXT="Nova versão disponível: v0.4.4-beta"`, `href=.../releases/latest`, screenshot of the green button captured.
@@ -843,7 +843,29 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
 
 
 ## Progress
-- **Current focus (2026-10-19, v0.6.5-beta released) — SEC-05/SEC-07 shipped, and CI runs on the Node 24 action runtime.**
+- **Current focus (2026-10-19) — SEC-09 is coded and proven end to end; it needs a release.**
+  The single-instance lock is requested at module scope in `src/main/index.ts` (before `app.whenReady()`, so the loser never
+  creates a window, never registers the IPC handlers and never touches the store), the decision lives in
+  `src/main/single-instance.ts`, and there are two proof layers: 9 unit tests (`tests/single-instance.test.ts`) and 2
+  end-to-end tests (`tests/e2e/single-instance.spec.ts`) against the **packaged** artifact.
+  **The e2e proof is the interesting part.** The second instance is a plain `child_process.spawn` — Playwright's
+  `_electron.launch` cannot be used, because it waits for a window and the whole point of the refusal is that there is none.
+  It must share the first instance's `--user-data-dir`, because that is where Chromium's `SingletonLock` lives, and it must
+  exit **0** by itself while the primary keeps answering. The second test is the negative control: the same spawn on a
+  private profile must **not** exit, which is what stops the first test from passing for a broken spawn or a crash.
+  **Four mutations, all measured** (the artifact was repackaged for each — `npm run build:main` alone is invisible to the
+  e2e suite, the code lives in the asar): removing the lock call and removing `app.quit()` from the losing branch each break
+  the first test on a 30s timeout; making the loser still reach `whenReady()` breaks it on the startup-line count; and **a lock
+  taken on a machine-wide path instead of the profile's leaves the first test GREEN and breaks only the control** — the
+  control is not redundant.
+  **Gates:** lint 0 errors / 2 pre-existing warnings · both typechecks 0 · **409/409** vitest across 42 files · e2e **12/12**
+  against `out/clavis-linux-x64` (10 existing + 2 new) and **20/20** for the new spec over 10 repeats, no flake.
+  **Not verified:** the Windows/macOS lock semantics (the lock is Chromium's `ProcessSingleton`, which differs per platform).
+  **The AppImage was built afterwards and is now the artifact that was measured:** `npm run make` → `clavis-0.6.6-beta-x64.AppImage`
+  (136 MB), e2e **12/12** in both locales against it, and the asar inside carries the lock with the package whitelist still
+  holding (`/dist`, `/icons`, `/node_modules`, `/package.json` only). The AppImage is not a cosmetic variant: it takes a
+  different spawn shape — its own path must also be `argv[1]` — so it exercises a path the packager output never touches.
+- **Previous (2026-10-19, v0.6.5-beta released) — SEC-05/SEC-07 shipped, and CI runs on the Node 24 action runtime.**
   `main` pushed alone first (run `39256677933`: `quality` + both `e2e` legs green, `build`/`release`
   skipped), then tagged (run `39257105778`: **7 jobs green**, 6 artifacts). `/releases/latest`
   answers `v0.6.5-beta`, `prerelease: false`. The Node 20 deprecation annotation is gone; the only
@@ -1113,7 +1135,7 @@ DECISÃO 2026-09-26: merge de `test/downgrade-forge-6.4.2` → `main` (fast-forw
 - [x] SEC-04 — save proves password before overwrite — closed in the 2026-10-19 SEC-01 session
 - [x] SEC-05 — malformed crypto metadata not rate-limited — closed 2026-10-19 (`corrupt_metadata` → `INVALID_JSON`)
 - [ ] SEC-08 — composition rules / strong passphrases
-- [ ] SEC-09 — concurrent save lock
+- [x] SEC-09 — single-instance lock — closed 2026-10-19 (lock at module scope; unit tests green; e2e proof on the packaged binary, with a negative control — unreleased)
 - [ ] REL-02 — verificar
 - [ ] UX-01 / UX-02 / UX-07
 [x] Sessão encerrada — SEC-01/02/03/07 + REL-01 + SEC-04 + AppImage

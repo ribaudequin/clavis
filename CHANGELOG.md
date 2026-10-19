@@ -1,5 +1,48 @@
 # Changelog — Clavis
 
+## v0.6.6-beta (2026-10-19)
+
+**Two Clavis processes could open the same data directory, and the second one silently discarded
+the first one's save.**
+
+### Fixed
+
+- **SEC-09 — no single-instance lock.** `saveDrawer` is a read-modify-write with no lock of its
+  own, so two processes on the same `userData` directory would both load a drawer and the last
+  write would win, discarding the other change. The main process now takes Chromium's
+  single-instance lock (`app.requestSingleInstanceLock()`) at startup, **before** `app.whenReady()`:
+  a second process on the same profile writes the refusal to the log file and quits without
+  creating a window, registering the IPC handlers or touching the drawer store, while the
+  instance holding the lock is brought forward (a minimized window is restored and focused).
+  The lock is per data directory, so a second instance with a different profile is an
+  independent application and is unaffected.
+  The decision lives in `src/main/single-instance.ts`; `src/main/index.ts` only wires it up.
+
+### Changed
+
+- `SECURITY.md` now documents the single-instance lock under *Process and window hardening*.
+  Two stale claims in the same file were corrected while it was open: the password policy was
+  still described as a minimum of 8 characters (it is 12 plus four character classes, and a
+  create-time rule only), and the "renderer and main process disagree on password length" note
+  no longer describes anything — both sides now apply the same rule.
+
+### Verified
+
+- `lint` 0 errors / 2 pre-existing warnings · `typecheck` 0 · `typecheck:test` 0 · **409/409**
+  vitest across 42 files, including 9 new unit tests for the lock · `build` OK · `package` OK ·
+  e2e **12/12** against `out/clavis-linux-x64` (10 existing + 2 new).
+- The same **12/12** against the **AppImage** (`clavis-0.6.6-beta-x64.AppImage`, 136 MB), in
+  both locales. The AppImage is the artifact users download, and it takes a different spawn shape
+  (its own path has to be passed as `argv[1]` as well as the executable), so the release artifact
+  is now the one that was measured. The asar inside it carries the lock, and the package
+  whitelist still holds — `/dist`, `/icons`, `/node_modules`, `/package.json` and nothing else.
+- The end-to-end proof runs against the **packaged** binary: a second instance on the same
+  profile exits by itself (code 0, ~450 ms) while the primary keeps running, and a negative
+  control on a private profile must keep running. Four mutations were measured — removing the
+  lock call, removing the quit, letting the loser reach `whenReady()`, and taking the lock on a
+  machine-wide path instead of the profile's. The last one leaves the first test green and
+  breaks only the control.
+
 ## v0.6.5-beta (2026-10-19)
 
 **Corrupt drawer metadata is now a named failure instead of a wrong password, and CI runs on the

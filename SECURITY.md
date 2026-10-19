@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-The current release (**`0.4.6-beta`**) is the supported version. Older releases are **best-effort** — fixes are not backported.
+The current release (**`0.6.5-beta`**) is the supported version. Older releases are **best-effort** — fixes are not backported.
 
 The one guarantee that does hold across versions: **drawer files created in the v0.3–v0.4 range remain unlockable**, because decryption uses the KDF parameters stored inside each file rather than the parameters compiled into the running binary. A drawer written with the legacy 2^16 KiB Argon2id memory cost still opens in a current build. Since SEC-01 the same is true of the recorded backend: a scrypt drawer opens on an argon2 build, and an argon2id drawer on a build without the native module fails as `KDF_UNAVAILABLE` rather than being decrypted with the wrong KDF.
 
@@ -36,8 +36,8 @@ KDF parameters are validated against explicit bounds (`encryption.ts`, enforced 
 
 ### Passwords
 
-- Minimum **8 characters**, maximum **128**, for drawer creation and save.
-- **Zod validation runs in the main process only.** The renderer's minimum-length check is a plain `password.length < 8` test counting UTF-16 code units, while the main process enforces a minimum of 8 **bytes** on the UTF-8 buffer. For some non-ASCII input the two disagree: a password the UI accepts can be rejected by the main process. The renderer check is a length test, not a Zod schema.
+- **A new drawer requires at least 12 characters, with an upper-case letter, a lower-case letter, a digit and a symbol** (maximum 128). The rule lives in one module (`password-policy.ts`) and is enforced in the main process twice: by `CreateDrawerSchema` and by the store. The renderer applies the same rule to the create form so the user sees the reason before submitting.
+- **The rule is a create-time rule, deliberately.** There is no change-password channel, so a save can only re-use the password that already opens the drawer, and drawers created before the 12-character rule still open with 8-character passwords. `SaveDrawerSchema` and `UnlockDrawerSchema` therefore carry sanity bounds only (1–128 characters, no composition rule): enforcing the policy there would strand exactly those users, who could unlock a drawer and then not save it.
 - Passwords are **irreversible**. There is no recovery path, by design.
 
 ### Unlock rate limiting
@@ -78,6 +78,10 @@ The counter resets after 2 minutes of inactivity and is cleared on a successful 
 
 - Renderer runs with **`sandbox: true`, `nodeIntegration: false`, `contextIsolation: true`**. The preload script exposes only the declared API surface.
 - **Navigation is blocked**: `will-navigate` and `will-attach-webview` are both prevented. `setWindowOpenHandler` denies all window creation, forwarding only `https://` URLs to the system browser.
+- **Only one process may run against a data directory.** The main process takes Chromium's single-instance lock (`app.requestSingleInstanceLock()`) at startup, before the app is ready. A second process on the same profile writes the refusal to the log file and quits **without** creating a window, registering the IPC handlers or touching the drawer store; the instance that holds the lock is brought forward instead, restoring a minimized window and focusing it.
+  - **Why it is a control and not a nicety:** `saveDrawer` is a read-modify-write with no lock of its own. Without the process lock, two instances on the same profile would both load a drawer, and the last write would silently discard the other's content.
+  - **The lock is per data directory**, not per executable: a second instance started with a *different* profile is an independent application and is not affected. On Linux the lock files (`SingletonLock`, `SingletonSocket`) live inside the `userData` directory.
+  - The refusal path is verified end to end against the packaged build: a second instance on the same profile exits by itself, the primary instance keeps running, and the refused process never reaches `app.whenReady()`.
 
 ### Filesystem permissions
 
@@ -145,10 +149,6 @@ Described in full under [Content-Security-Policy](#content-security-policy) abov
 Export never writes the destination file from the main process. The raw drawer JSON is returned over IPC (`ipc-handlers.ts`, `EXPORT_DRAWER`) and handed to Chromium as a `Blob`, which triggers an `<a download>` (`HomeScreen.tsx`); Chromium creates the file in the OS downloads folder with its own default permissions, and the `0o600` mode described under [Filesystem permissions](#filesystem-permissions) never reaches it. On Linux and macOS no restrictive mode is applied to it, so it lands with the creating process's default — commonly `0o644`, readable by other local accounts.
 
 **What this exposes is metadata, not content.** The drawer body is AES-256-GCM ciphertext, so a readable export still discloses nothing without the password. What it does disclose is the plaintext metadata listed under [Notes](#notes): the drawer title, the creation and update timestamps, and the icon colour data.
-
-### Password length check mismatch
-
-Also described above under [Passwords](#passwords). The renderer's UTF-16 length test and the main process's UTF-8 byte test can disagree on non-ASCII input.
 
 ## Vulnerability Response
 
