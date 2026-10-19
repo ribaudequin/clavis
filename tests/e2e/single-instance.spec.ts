@@ -104,11 +104,42 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIM
  * losing process never opens a window, and Playwright's Electron launcher waits for one.
  */
 function spawnInstance(target: Target, userDataDir: string): SpawnedInstance {
-  // The AppImage has to be argv[1] as well as the executable: it is a self-extracting
-  // archive with its own argv handling, and Electron lives inside it. The packager output
-  // is already a plain Electron binary, and passing its own path as argv[1] makes
-  // Electron try to load a directory as an application. Both shapes were measured.
+  // `--no-sandbox` first, exactly where Playwright puts it. This is not a shortcut: it is
+  // what makes the spawned process comparable to the first one.
+  //
+  // Playwright's Electron launcher builds its arguments as
+  // `['--inspect=0', '--remote-debugging-port=0', ...args]` and then, on Linux,
+  // `unshift`s `--no-sandbox` in front of them when `chromiumSandbox` is off (the
+  // default) — `playwright-core/lib/coreBundle.js`, the Electron launcher's `launch()`.
+  // The first instance therefore always runs unsandboxed, and a raw `spawn` that does
+  // not repeat the flag is not running the same program.
+  //
+  // The difference is invisible on a development machine and fatal on a CI runner. The
+  // runner has AppArmor's `kernel.apparmor_restrict_unprivileged_userns` set, so the
+  // unprivileged user namespace Chromium would normally use is refused; Chromium then
+  // insists on the SUID sandbox, finds `chrome-sandbox` in the packaged output owned by
+  // the runner user with mode 755 instead of 4755, and aborts:
+  //
+  //   FATAL:sandbox/linux/suid/client/setuid_sandbox_host.cc:166] The SUID sandbox
+  //   helper binary was found, but is not configured correctly.
+  //
+  // The process dies of SIGTRAP before it can refuse anything, which is what the first
+  // CI run of this file showed: the two new tests failed with `signal SIGTRAP` and the
+  // ten pre-existing tests — all launched by Playwright — passed. The refusal of the
+  // lock was never even reached.
+  //
+  // The application itself is unaffected: this flag is a test-harness concession that
+  // Playwright already makes for the instance it launches, and a user running the
+  // installed app gets Chromium's own sandbox.
   const args = [
+    '--no-sandbox',
+    // The AppImage has to be argv[1] as well as the executable: it is a self-extracting
+    // archive with its own argv handling, and Electron lives inside it. The packager
+    // output is already a plain Electron binary, and passing its own path as argv[1]
+    // makes Electron try to load a directory as an application. Both shapes were
+    // measured. The order here is the one Playwright produces for the same artifact
+    // (`--no-sandbox` first, then the AppImage path), and the CI `build` job runs the
+    // whole suite against the AppImage through Playwright.
     ...(target.passAsArgument ? [target.executablePath] : []),
     `--user-data-dir=${userDataDir}`,
   ];
