@@ -36,6 +36,10 @@ current interface cannot reach that state anyway.**
   the drawer opens** — that is what makes "the drawer did not open" mean something.
   **Mutation-verified:** reverting the counter and the guard fails the first test and
   leaves the control green.
+- **CI, in the order the discipline requires:** `main` pushed alone (run `39303981628` —
+  `quality` + both `e2e` legs green, `build`/`release` skipped), then tagged (run
+  `39304464489` — **7 jobs green**, 6 artifacts). `/releases/latest` answers `v0.6.7-beta`,
+  `prerelease: false`.
 
 ## v0.6.6-beta (2026-10-19)
 
