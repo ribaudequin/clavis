@@ -1,5 +1,42 @@
 # Changelog — Clavis
 
+## v0.6.7-beta (2026-10-19)
+
+**A cancelled unlock no longer opens the drawer — and the measurement behind it says the
+current interface cannot reach that state anyway.**
+
+### Fixed
+
+- **REL-02 — a cancelled unlock still opened the drawer.** The unlock prompt and the unlock
+  are two different clocks: the prompt can be dismissed while the main process is still
+  deriving the key (the rate limiter sleeps *before* the derivation, up to 30 s), and the
+  result then arrives long after the user closed it — and it opened the drawer anyway. The
+  renderer now gives each unlock attempt a number, the cancel side invalidates it, and a
+  result whose attempt is no longer current is dropped instead of opening a drawer the user
+  refused. The same guard covers the failure paths, so a cancelled attempt's error cannot
+  land on whichever drawer the user opened next.
+- **This is a safety net, and the measurement says so.** While the unlock runs the password
+  input is `disabled`, the focus moves to `<body>`, and the Escape listener is on the modal
+  **container** — so a real keypress cannot dismiss the prompt, and no user can reach the
+  state the defect is about today. Measured in the packaged app: the dialog stays on screen
+  after an Escape press during an unlock. The consequence is filed separately as **UX-08**:
+  under the rate limiter the prompt is frozen for up to 30 s with no way out, and it should
+  show a countdown and be dismissible — which is what this fix makes safe.
+
+### Verified
+
+- `lint` 0 errors / 2 pre-existing warnings · `typecheck` 0 · `typecheck:test` 0 · **415/415**
+  vitest across 43 files, including 6 new tests for the cancelled unlock · `build` OK ·
+  `package` OK · e2e **14/14** against `out/clavis-linux-x64` and **14/14** against the
+  AppImage, in both locales.
+- The end-to-end proof builds its window out of the application's own rate limiter — five
+  wrong passwords, the 5 s tier, sleeping before the derivation — and dismisses the prompt
+  with a keydown dispatched on the container that owns the listener, which the spec states
+  plainly as a simulation. **A control runs the identical flow without the dismissal, and
+  the drawer opens** — that is what makes "the drawer did not open" mean something.
+  **Mutation-verified:** reverting the counter and the guard fails the first test and
+  leaves the control green.
+
 ## v0.6.6-beta (2026-10-19)
 
 **Two Clavis processes could open the same data directory, and the second one silently discarded

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { DrawerListItem, EncryptedDrawer, ElectronAPI, ErrorCode } from '../../shared/types';
 import { SkeletonLoaders } from '../components/SkeletonLoader';
 import { t, tError } from '../../i18n';
@@ -38,6 +38,14 @@ function HomeScreen(): React.JSX.Element {
   const [importing, setImporting] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmDeleteTitle, setConfirmDeleteTitle] = useState('');
+
+  // A pending unlock outlives the modal that asked for it: the main process keeps
+  // deriving the key after the prompt is gone (the rate limiter can sleep up to
+  // 30 s before the derivation even starts), so the result arrives long after the
+  // user dismissed the prompt. The counter lets the cancel side invalidate the
+  // attempt, and the resolution is then dropped instead of opening a drawer the
+  // user explicitly refused.
+  const unlockAttempt = useRef(0);
 
   const api = (): ElectronAPI => window.electronAPI;
 
@@ -159,8 +167,14 @@ function HomeScreen(): React.JSX.Element {
 
   async function handleUnlockSubmit(password: string): Promise<void> {
     if (!unlockDrawerId) return;
+    const drawerId = unlockDrawerId;
+    const attempt = ++unlockAttempt.current;
     try {
-      const result = await api().unlockDrawer(unlockDrawerId, password);
+      const result = await api().unlockDrawer(drawerId, password);
+      // Stale attempt: the prompt was dismissed (or a newer attempt started) while
+      // this promise was in flight, so there is nothing left to open and no error
+      // to report — the drawer may not even be the one on screen any more.
+      if (attempt !== unlockAttempt.current) return;
       if (!result.ok) {
         setUnlockError(tError(result.error));
         return;
@@ -171,17 +185,21 @@ function HomeScreen(): React.JSX.Element {
       }
       setUnlockDrawerId(null);
       setViewState({
-        drawerId: unlockDrawerId,
+        drawerId,
         password,
         title: result.data.title,
         content: result.data.content,
       });
     } catch {
+      if (attempt !== unlockAttempt.current) return;
       setUnlockError(tError({ code: ErrorCode.DECRYPT_FAILED, message: 'Failed to unlock drawer' }));
     }
   }
 
   function closeUnlockModal(): void {
+    // The invalidation belongs to the cancel side: the pending promise cannot be
+    // aborted, so the attempt is marked stale here and its result is discarded.
+    unlockAttempt.current++;
     setUnlockDrawerId(null);
     setUnlockError(null);
   }
