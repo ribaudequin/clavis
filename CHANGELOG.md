@@ -33,6 +33,19 @@ picked a backend from runtime availability instead of from the file.
   `crypto.scrypt` directly and checked against a reference key — building it with `encrypt()` on both
   sides let one bug hide behind the other.
 
+### Verified
+
+- Locally, before tagging: the AppImage built from these commits passed e2e **10/10** with
+  `LANGUAGE=en` and **10/10** with `LANGUAGE=pt`, and its `app.asar` was inspected to confirm the fix
+  is actually inside the artifact — `KdfBackendUnavailableError`, `kdf_backend_unavailable`,
+  `KDF_UNAVAILABLE` and the scrypt `maxmem` are all present, the archive still contains only
+  `dist/`, `icons/`, `node_modules/` and `package.json`, and `argon2.glibc.node` is unpacked.
+- `main` pushed alone first, so the tag could not publish an unproven commit: run `39239211155` —
+  `quality`, `e2e (en)` and `e2e (pt)` green, `build`/`release` **skipped**. Then the tag: run
+  `39239619463`, **7 jobs green**, 6 artifacts, AppImage 123 MB.
+- The release page is the part a user can observe: **`v0.6.4-beta` carries the `Latest` badge and
+  `prerelease: false`**, and `GET /repos/ribaudequin/clavis/releases/latest` answers it.
+
 ## v0.6.3-beta (2026-10-18)
 
 **The first round in a while that changes shipped behaviour rather than tests** — and it fixes

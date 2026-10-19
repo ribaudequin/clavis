@@ -831,7 +831,34 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
 
 
 ## Progress
-- **Current focus (2026-10-18, release) — v0.6.3-beta: `beta` stops being a prerelease, and the
+- **Current focus (2026-10-19, release) — v0.6.4-beta: SEC-01 was only half-fixed, and writing the
+  test that was supposed to prove it is what exposed that. HYG-21 sub-items 1, 2 and 4 closed too.**
+  **The recorded backend was written and never read.** `store.ts` put `keyDerivation.algorithm` in
+  every drawer; `decrypt()` chose a backend from runtime availability instead. Measured, not
+  inferred: a hand-built scrypt drawer with the correct password returned `{ ok: false, reason:
+  'wrong_password' }` on an argon2 build. Owner decision: honour the stored backend. `KDFParams`
+  gained `algorithm`, `deriveKey()` uses it and throws `KdfBackendUnavailableError` when `argon2id`
+  is requested but absent, `store.ts` forwards it on unlock and re-encrypts with it on save (and
+  rewrites the label), and scrypt now gets an explicit `maxmem`. New `ErrorCode.KDF_UNAVAILABLE`
+  (pt/en) so a correct password is never reported as wrong.
+  **The scrypt fallback had a second defect:** `2^18 KiB` maps to `N = 2^16`, needing 64 MiB against
+  Node's 32 MiB default `maxmem`, so a build without argon2 could not create a drawer at all.
+  **The lesson, ninth time: a green mutation is not a control.** The first cross-backend fixture
+  built the scrypt drawer with `encrypt()`; mutating `deriveKey` to ignore `algorithm` left the file
+  **5/5 green**, because both sides then used the same wrong KDF and agreed with each other. Rebuilt
+  with `crypto.scrypt` directly and a reference-key equality check, the mutation fails **3** tests.
+  Also measured: `vi.mock('argon2')` does **not** intercept the `require('argon2')` in
+  `encryption.ts`, so the absent-backend path is covered through the typed error and the
+  `KDF_UNAVAILABLE` mapping rather than by simulating absence.
+  **Gates:** lint 0 errors / 2 pre-existing warnings, both typechecks 0, **386/386** across 40 files,
+  build OK, e2e **10/10** in both locales against the locally built AppImage.
+  **Released.** `main` pushed alone first (run `39239211155` — `quality` + both `e2e` legs green,
+  `build`/`release` skipped), then the tag (run `39239619463` — **7 jobs green**, 6 artifacts).
+  `v0.6.4-beta` carries the `Latest` badge, `prerelease: false`, and `/releases/latest` answers it.
+  The artifact was checked before tagging: the asar contains the fix's symbols and still only
+  `dist/`, `icons/`, `node_modules/`, `package.json`.
+
+- **Previous focus (2026-10-18, release) — v0.6.3-beta: `beta` stops being a prerelease, and the
   shipped app stops containing the project directory. HYG-25 closed too.**
   **The user's report was the whole brief, and it was exactly right.** "A última foi a v0.5.1-beta"
   was not a memory lapse: `/releases/latest` really did still answer `v0.5.1-beta`, because
