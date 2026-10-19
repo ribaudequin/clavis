@@ -10,7 +10,7 @@
 - [ ] **SEC-03 (P1):** one shared password-policy module; typed weak-password failure; remove the dead `"8 characters"` IPC branch.
 - [ ] **SEC-04 (P1):** verify the current password (decrypt existing ciphertext) before `saveDrawer` overwrites it.
 - [x] **SEC-05/SEC-07 (P1):** validate crypto field lengths and the full drawer metadata schema at import/list/unlock — DONE 2026-10-19. `salt`/`iv`/`authTag` must be 32 hex chars, `encryptedData` even-length hex; `iconData` bounded to 64 strings; `listDrawers`/`unlockDrawer` validate with the same schema and skip/return `corrupt_metadata` (`INVALID_JSON`, no rate-limit increment); filename/id mismatch is skipped; `decrypt()` zeroes the key when `createDecipheriv`/`setAuthTag` throw.
-- [x] **SEC-09 (P1):** single-instance lock (`app.requestSingleInstanceLock`) — code + unit + e2e all green, **not yet released**. `src/main/single-instance.ts` holds the decision, `src/main/index.ts` requests the lock at module scope before `app.whenReady()` and quits on refusal, `tests/single-instance.test.ts` has 9 unit tests, and `tests/e2e/single-instance.spec.ts` proves it on the packaged binary: the second instance on the same profile exits 0 in ~450ms while the primary stays alive, and a control on a private profile must keep running.
+- [x] **SEC-09 (P1):** single-instance lock (`app.requestSingleInstanceLock`) — **released as `v0.6.6-beta`** (tag run `39294150563`, 7 jobs green, 6 artifacts). `src/main/single-instance.ts` holds the decision, `src/main/index.ts` requests the lock at module scope before `app.whenReady()` and quits on refusal, `tests/single-instance.test.ts` has 9 unit tests, and `tests/e2e/single-instance.spec.ts` proves it on the packaged binary: the second instance on the same profile exits 0 in ~450ms while the primary stays alive, and a control on a private profile must keep running.
 - [ ] **REL-02 (P1):** a cancelled unlock still opens the drawer — invalidate pending attempts on close.
 - [ ] **P2:** dynamic focus trap (UX-01), i18n strength labels (UX-02), debounced counters (UX-07), key zeroing on error paths (SEC-06), caught IPC rejections (REL-03), timer cleanup (REL-04), repair or delete stale e2e specs (QA-05), dev-dependency advisories (QA-06), passphrase policy review (SEC-08).
 
@@ -843,7 +843,19 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
 
 
 ## Progress
-- **Current focus (2026-10-19) — SEC-09 is coded and proven end to end; it needs a release.**
+- **Current focus (2026-10-19, v0.6.6-beta released) — SEC-09 shipped: the app takes a single-instance lock.**
+  `main` pushed alone first (run `39292417218` — **it failed**, see below), then the fix (`9a4f4ab`, run `39293681716`:
+  `quality` + both `e2e` legs green, `build`/`release` skipped), then tagged `v0.6.6-beta` (run `39294150563`: **7 jobs
+  green**, 6 artifacts). `/releases/latest` answers `v0.6.6-beta`, `prerelease: false`. The only annotations left are the
+  two pre-existing lint warnings and GitHub's `ubuntu-latest` → Ubuntu 26 migration notice.
+  **The failed run was worth having.** The two new e2e tests died of `SIGTRAP` before ever reaching the lock: the spawned
+  second instance was not launched the way Playwright launches the first one, so on the CI runner (whose AppArmor policy
+  refuses unprivileged user namespaces) Chromium insisted on the SUID sandbox, found `chrome-sandbox` owned by the runner
+  user with mode 755 instead of 4755, and aborted. **The lock was never the problem, and the ten pre-existing e2e tests
+  passed** — that asymmetry is what identified it as the new test's problem. Reproduced locally with `unshare --user`
+  before changing anything, then fixed by passing `--no-sandbox`, exactly where Playwright puts it. **A suite that only ever
+  runs where it was developed is a suite that has not been tested.**
+- **Previous (2026-10-19) — SEC-09 is coded and proven end to end; it needs a release.**
   The single-instance lock is requested at module scope in `src/main/index.ts` (before `app.whenReady()`, so the loser never
   creates a window, never registers the IPC handlers and never touches the store), the decision lives in
   `src/main/single-instance.ts`, and there are two proof layers: 9 unit tests (`tests/single-instance.test.ts`) and 2
@@ -1135,7 +1147,7 @@ DECISÃO 2026-09-26: merge de `test/downgrade-forge-6.4.2` → `main` (fast-forw
 - [x] SEC-04 — save proves password before overwrite — closed in the 2026-10-19 SEC-01 session
 - [x] SEC-05 — malformed crypto metadata not rate-limited — closed 2026-10-19 (`corrupt_metadata` → `INVALID_JSON`)
 - [ ] SEC-08 — composition rules / strong passphrases
-- [x] SEC-09 — single-instance lock — closed 2026-10-19 (lock at module scope; unit tests green; e2e proof on the packaged binary, with a negative control — unreleased)
+- [x] SEC-09 — single-instance lock — closed 2026-10-19 (lock at module scope; unit tests green; e2e proof on the packaged binary, with a negative control) — **released as `v0.6.6-beta`**
 - [ ] REL-02 — verificar
 - [ ] UX-01 / UX-02 / UX-07
 [x] Sessão encerrada — SEC-01/02/03/07 + REL-01 + SEC-04 + AppImage

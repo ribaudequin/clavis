@@ -42,6 +42,15 @@ the first one's save.**
   lock call, removing the quit, letting the loser reach `whenReady()`, and taking the lock on a
   machine-wide path instead of the profile's. The last one leaves the first test green and
   breaks only the control.
+- **CI, in the order the discipline requires.** `main` was pushed alone first (run `39292417218`)
+  and **it failed** — the two new e2e tests died of `SIGTRAP` before reaching the lock, because
+  the spawned instance was not launched the way Playwright launches the first one (Chromium's
+  SUID sandbox, which the CI runner's AppArmor policy makes mandatory). The failure was
+  reproduced locally with `unshare --user` before anything was changed, fixed in `9a4f4ab`
+  (`--no-sandbox`, where Playwright puts it), and `main` was pushed again (run `39293681716`:
+  `quality` + both `e2e` legs green, `build`/`release` skipped). Only then was the tag cut (run
+  `39294150563`: **7 jobs green**, 6 artifacts). `/releases/latest` answers `v0.6.6-beta`,
+  `prerelease: false`.
 
 ## v0.6.5-beta (2026-10-19)
 
