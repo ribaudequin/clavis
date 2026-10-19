@@ -38,9 +38,12 @@ Node 24 action runtime.**
 
 - `lint` 0 errors / 2 pre-existing warnings · `typecheck` 0 · `typecheck:test` 0 · **400/400**
   vitest across 41 files, including 12 new metadata tests and 2 new IPC tests · `build` OK ·
-  `package` OK · e2e **10/10** against `out/clavis-linux-x64` on Node v24.21.0. The workflow YAML
-  parses and all five action tags resolve remotely; the first CI run on this commit is the
-  remaining gate.
+  `package` OK · e2e **10/10** against `out/clavis-linux-x64` on Node v24.21.0.
+- **CI, in the order the discipline requires:** `main` pushed alone (run `39256677933` —
+  `quality` + both `e2e` legs green, `build`/`release` skipped), then tagged (run `39257105778` —
+  **7 jobs green**, 6 artifacts). The Node 20 deprecation annotation is gone; the only remaining
+  annotations are the two pre-existing `no-explicit-any` warnings and GitHub's Ubuntu 26 migration
+  notice. `/releases/latest` answers `v0.6.5-beta`, `prerelease: false`.
 
 ## v0.6.4-beta (2026-10-19)
 
