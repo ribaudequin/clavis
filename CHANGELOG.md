@@ -61,6 +61,17 @@
   common-password blocklist. `README.md`, `PLANO.md` and `docs/user-guide.md` were still carrying
   an 8-character minimum that had not been true since HYG-22, and now carry the real rule.
 
+- **CI, in the order the discipline requires:** `main` pushed alone (run `39452501307` —
+  `quality` + both `e2e` legs green, `build`/`release` skipped), then tagged (run
+  `39453099582` — **7 jobs green**, 6 artifacts). `/releases/latest` answers `v0.6.8-beta`,
+  `prerelease: false`.
+- **The icon fix, verified on the published artefacts rather than on a local build.** The
+  published `clavis-win32-x64-0.6.8-beta.zip` carries the Clavis icon in `clavis.exe` — all nine
+  PNG sizes of `icons/clavis.ico` present byte-for-byte, and the Squirrel `Setup.exe` the same —
+  and the published `clavis.dmg`'s `clavis.app/Contents/Resources/electron.icns` is byte-identical
+  to `icons/clavis.icns` (md5 `4778df33…`). Before this release the executable carried
+  Electron's default.
+
 ### Verified
 
 - `lint` 0 errors / 2 pre-existing warnings · `typecheck` 0 · `typecheck:test` 0 · **478/478** vitest
