@@ -51,7 +51,7 @@ modules:
       - type: file
         path: ../icons/linux/256x256.png
       - type: file
-        path: ../icons/linux/512x512.png
+        path: ../icons/clavis.png
       - type: file
         path: ../flatpak/com.github.marcelosalvador.Clavis.desktop
       # E2E interactive tests reference (P3.2 complete — 2026-09-12)

@@ -58,6 +58,7 @@ function buildStub(): ElectronAPI {
       },
     }),
     unlockDrawer: unlockDrawer as unknown as ElectronAPI['unlockDrawer'],
+    getUnlockDelay: async (): Promise<number> => 0,
     saveDrawer: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
     deleteDrawer: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
     exportDrawer: async (): Promise<Result<string>> => ({ ok: true, data: '' }),

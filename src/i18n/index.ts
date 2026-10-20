@@ -31,15 +31,31 @@ export const translations: Record<string, TranslationDict> = {
     'msg.error_delete': 'Erro ao eliminar:',
     'msg.error_delete_failed': 'Não foi possível eliminar a gaveta.',
     'msg.error_import': 'Erro ao importar:',
+    // UX-08 — The too-many-failed-attempts wait: the message that is seen
+    // counting down and the static sentence a screen reader announces once.
+    // Both exist because the number changes every second, and a live region
+    // that announced it every second would be hostile.
+    'msg.unlock_wait': 'Demasiadas tentativas falhadas — a próxima tentativa começa em {seconds} s.',
+    'msg.unlock_wait_hint': 'Demasiadas tentativas falhadas. A próxima tentativa começa em breve.',
     'msg.title_empty': 'O título não pode estar vazio.',
     'msg.title_duplicate': 'Já existe uma gaveta com este nome. Quer criar outra mesmo assim?',
     'msg.password_mismatch': 'As palavras-passe não coincidem.',
-    'msg.password_too_short': 'A palavra-passe deve ter pelo menos 12 caracteres, incluindo maiúscula, minúscula, número e símbolo.',
+    // SEC-08 — Both branches of the rule, because the floor is 12 and the
+    // passphrase path is 20: a sentence that names only the first branch is
+    // half the policy, and the user is the one who has to read it.
+    'msg.password_too_short': 'A palavra-passe deve ter pelo menos 12 caracteres, incluindo maiúscula, minúscula, número e símbolo, ou pelo menos 20 caracteres.',
     'msg.drawer_created': 'Gaveta criada com sucesso.',
     'msg.error_create': 'Erro ao criar a gaveta.',
     'msg.error_save': 'Erro ao guardar:',
     'label.password': 'Palavra-passe',
     'label.confirm_password': 'Confirmar palavra-passe',
+    // UX-02 — The strength meter's labels. They join the pt-PT catalogue here,
+    // which puts them under the quarantine scan: none of them may say "senha".
+    'label.strength_too_short': 'Muito curta',
+    'label.strength_too_simple': 'Muito simples',
+    'label.strength_good': 'Boa',
+    'label.strength_strong': 'Forte',
+    'label.strength_excellent': 'Excelente',
     'label.title': 'Título',
     'label.content': 'Conteúdo',
     'label.credits_title': 'Créditos e apoio',
@@ -87,7 +103,7 @@ export const translations: Record<string, TranslationDict> = {
     'btn.save_and_leave': 'Guardar e sair',
     'btn.discard_and_leave': 'Descartar e sair',
     'error.invalid_id': 'Identificador de gaveta inválido.',
-    'error.password_too_short': 'A palavra-passe deve ter pelo menos 12 caracteres, incluindo maiúscula, minúscula, número e símbolo.',
+    'error.password_too_short': 'A palavra-passe deve ter pelo menos 12 caracteres, incluindo maiúscula, minúscula, número e símbolo, ou pelo menos 20 caracteres.',
     'error.decrypt_failed': 'Palavra-passe incorreta ou gaveta não encontrada.',
     'error.write_failed': 'Não foi possível concluir a operação.',
     'error.file_not_found': 'Não foi possível encontrar a gaveta.',
@@ -123,15 +139,31 @@ export const translations: Record<string, TranslationDict> = {
     'msg.error_delete': 'Error deleting:',
     'msg.error_delete_failed': 'Could not delete the drawer.',
     'msg.error_import': 'Error importing:',
+    // UX-08 — The too-many-failed-attempts wait: the message that is seen
+    // counting down and the static sentence a screen reader announces once.
+    // Both exist because the number changes every second, and a live region
+    // that announced it every second would be hostile.
+    'msg.unlock_wait': 'Too many failed attempts — the next attempt starts in {seconds} s.',
+    'msg.unlock_wait_hint': 'Too many failed attempts. The next attempt starts shortly.',
     'msg.title_empty': 'Title cannot be empty.',
     'msg.title_duplicate': 'A drawer with this name already exists. Do you want to create another one anyway?',
     'msg.password_mismatch': 'Passwords do not match.',
-    'msg.password_too_short': 'Password must be at least 12 characters with uppercase, lowercase, digit, symbol.',
+    // SEC-08 — Both branches of the rule, because the floor is 12 and the
+    // passphrase path is 20: a sentence that names only the first branch is
+    // half the policy, and the user is the one who has to read it.
+    'msg.password_too_short': 'The password must be at least 12 characters with uppercase, lowercase, digit, symbol, or at least 20 characters.',
     'msg.drawer_created': 'Drawer created successfully.',
     'msg.error_create': 'Error creating drawer.',
     'msg.error_save': 'Error saving drawer:',
     'label.password': 'Password',
     'label.confirm_password': 'Confirm Password',
+    // UX-02 — The strength meter's labels, which the component used to hardcode
+    // in Portuguese while every other string in it went through t().
+    'label.strength_too_short': 'Too short',
+    'label.strength_too_simple': 'Too simple',
+    'label.strength_good': 'Good',
+    'label.strength_strong': 'Strong',
+    'label.strength_excellent': 'Excellent',
     'label.title': 'Title',
     'label.content': 'Content',
     'label.credits_title': 'Credits & support',
@@ -179,7 +211,7 @@ export const translations: Record<string, TranslationDict> = {
     'btn.save_and_leave': 'Save and leave',
     'btn.discard_and_leave': 'Discard and leave',
     'error.invalid_id': 'Invalid drawer identifier.',
-    'error.password_too_short': 'The password must be at least 12 characters with uppercase, lowercase, digit, symbol.',
+    'error.password_too_short': 'The password must be at least 12 characters with uppercase, lowercase, digit, symbol, or at least 20 characters.',
     'error.decrypt_failed': 'Incorrect password or drawer not found.',
     'error.write_failed': 'The operation could not be completed.',
     'error.file_not_found': 'The drawer could not be found.',

@@ -339,12 +339,13 @@ if (viewState) {
 
      {unlockDrawerId && (
        <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center bg-black/50" />}>
-         <PasswordModal
-           drawerTitle={unlockDrawerTitle}
-           onClose={closeUnlockModal}
-           onSubmit={handleUnlockSubmit}
-           error={unlockError}
-         />
+          <PasswordModal
+            drawerId={unlockDrawerId}
+            drawerTitle={unlockDrawerTitle}
+            onClose={closeUnlockModal}
+            onSubmit={handleUnlockSubmit}
+            error={unlockError}
+          />
        </Suspense>
      )}
 

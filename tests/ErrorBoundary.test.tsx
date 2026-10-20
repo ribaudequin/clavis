@@ -48,6 +48,7 @@ function buildBridge(): ElectronAPI {
       },
     }),
     unlockDrawer: async (): Promise<Result<{ title: string; content: string; iconData: string } | null>> => ({ ok: true, data: null }),
+    getUnlockDelay: async (): Promise<number> => 0,
     saveDrawer: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
     deleteDrawer: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
     exportDrawer: async (): Promise<Result<string>> => ({ ok: true, data: '' }),

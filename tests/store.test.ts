@@ -19,7 +19,7 @@ import {
   FileTooLargeError,
 } from '../src/main/store';
 import { encrypt, MAX_DECRYPTED_SIZE } from '../src/main/encryption';
-import { describePasswordPolicy } from '../src/main/password-policy';
+import { describePasswordPolicy } from '../src/shared/password-policy';
 import { logger } from '../src/main/logger';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

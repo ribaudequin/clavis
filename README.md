@@ -83,7 +83,7 @@ Each release publishes 6 files:
 ### Creating a New Drawer
 
 1. Click the **"New Drawer"** button in the header
-2. Enter drawer title, password, and confirm password (minimum 8 characters, maximum 128)
+2. Enter drawer title, password, and confirm password (**at least 20 characters of any mix, or at least 12 characters with an upper-case letter, a lower-case letter, a digit and a symbol** — maximum 128)
 3. The drawer appears in your list with its own icon
 
 ### Accessing a Drawer

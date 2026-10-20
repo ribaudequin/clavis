@@ -16,6 +16,16 @@
 // is what makes "the modal was dismissed while the unlock was in flight"
 // reproducible.
 //
+// The dismissal below is a REAL user action, and it can be one now. While the
+// unlock is in flight the modal moves the focus to the Cancel button, so the
+// keypress lands on a control that is enabled and inside the dialog — which is
+// what it takes for the Escape listener (on the modal container) to fire at
+// all. It used to be a `fireEvent.keyDown` on the *disabled* password input:
+// jsdom honours that and a real browser does not, because the browser moves
+// the focus to <body> when the input is disabled, and a keydown on <body>
+// travels upward and never reaches a descendant. That is the very trap
+// UX-08 closes, and it is why this file could not reach the state it is about.
+//
 // Every path the guard has to cover gets its own test: a stale success, a stale
 // failure, a stale "drawer not found" and a stale crash. A guard that only
 // covers the happy path would leave the other three invisible to this file.
@@ -86,6 +96,10 @@ function buildStub(): Window['electronAPI'] {
       unlockCalls.push({ id, password });
       return unlockDeferred.promise;
     },
+    // UX-08 — the modal asks the main process how long the next attempt would
+    // wait before it submits. No wait here: this file is about the dismissal,
+    // not about the countdown.
+    getUnlockDelay: async (): Promise<number> => 0,
     saveDrawer: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
     deleteDrawer: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
     exportDrawer: async (): Promise<Result<string>> => ({ ok: true, data: '' }),
@@ -118,6 +132,9 @@ async function openPasswordModal(drawerTitle: string): Promise<HTMLInputElement>
 async function submitPassword(input: HTMLInputElement, password: string): Promise<void> {
   fireEvent.change(input, { target: { value: password } });
   fireEvent.click(screen.getByRole('button', { name: t('btn.open') }));
+  // The modal asks the main process for the delay before it submits, so the
+  // submit lands a couple of microtasks after the click.
+  await act(async () => {});
 }
 
 async function resolveUnlock(result: UnlockResult): Promise<void> {
@@ -136,6 +153,21 @@ async function rejectUnlock(reason: unknown): Promise<void> {
   await act(async () => {});
 }
 
+/**
+ * The dismissal a user makes: an Escape press on the element that holds the focus.
+ *
+ * It used to be a keydown on the *disabled* password input, which jsdom honours
+ * and a real browser does not — the browser moves the focus to <body> when the
+ * input is disabled, and a keydown on <body> travels upward and never reaches
+ * the container that owns the Escape listener. UX-08 moved the focus to the
+ * Cancel button while the unlock runs, so the press lands where a user's would.
+ */
+function pressEscape(): void {
+  const focused = document.activeElement as HTMLElement | null;
+  if (!focused) throw new Error('Nothing holds the focus, so there is no keypress to make.');
+  fireEvent.keyDown(focused, { key: 'Escape' });
+}
+
 // The shared shape of the stale-result tests: an unlock is started on the first
 // drawer, dismissed with Escape, and another drawer is opened so a fresh prompt
 // is on screen when the abandoned promise settles.
@@ -146,7 +178,7 @@ async function cancelAnUnlockAndOpenAnotherDrawer(): Promise<HTMLInputElement> {
   await submitPassword(input, PASSWORD);
   expect(unlockCalls).toHaveLength(1);
 
-  fireEvent.keyDown(input, { key: 'Escape' });
+  pressEscape();
   expect(screen.queryByLabelText(t('label.password'))).toBeNull();
 
   return openPasswordModal(SECOND_DRAWER.title);
@@ -160,7 +192,7 @@ describe('REL-02 — a cancelled unlock does not unlock', () => {
     await submitPassword(input, PASSWORD);
     expect(unlockCalls).toHaveLength(1);
 
-    fireEvent.keyDown(input, { key: 'Escape' });
+    pressEscape();
     expect(screen.queryByLabelText(t('label.password'))).toBeNull();
 
     await resolveUnlock({

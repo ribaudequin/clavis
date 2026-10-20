@@ -25,6 +25,7 @@ import {
   UnlockDrawerSchema,
   SaveDrawerSchema,
   DeleteDrawerSchema,
+  DrawerIdSchema,
   ExportDrawerSchema,
   ImportDrawerSchema,
 } from './validation.js';
@@ -87,6 +88,16 @@ export interface IpcDeps {
     handle: (channel: Channel, listener: IpcListener) => void;
   };
   dialog: Pick<Dialog, 'showOpenDialog'>;
+  /**
+   * The unlock delay policy, injected so a test can replace it without reaching
+   * into module state.
+   *
+   * It is a seam rather than a module-level import because the policy has to have
+   * exactly one owner (getUnlockDelay below) and *two* readers: the unlock path
+   * that applies the wait, and the read-only query that tells the renderer how
+   * long the wait is. Both read it through here, so they cannot drift.
+   */
+  getUnlockDelay?: (id: string) => number;
 }
 
 // SAV-02 — The six ways an unlock can fail used to share one message and one
@@ -134,6 +145,8 @@ function isPasswordPolicyIssue(issue: z.core.$ZodIssue): boolean {
 
 export function registerIpcHandlers(deps: IpcDeps): void {
   const { ipcMain, dialog } = deps;
+  // The policy has one owner; this is the only way either reader gets to it.
+  const unlockDelayFor = deps.getUnlockDelay ?? getUnlockDelay;
 
   ipcMain.handle(CHANNELS.LIST_DRAWERS, async (): Promise<Result<DrawerListItem[]>> => {
     try {
@@ -207,7 +220,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
       const validated = UnlockDrawerSchema.parse({ id, password });
 
       // P0.6 — Rate limiting
-      const delay = getUnlockDelay(validated.id);
+      const delay = unlockDelayFor(validated.id);
       if (delay > 0) {
         logger.warn('Unlock rate-limited', { id, delayMs: delay });
         await new Promise((resolve) => setTimeout(resolve, delay));
@@ -261,6 +274,37 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           // details: undefined (ERR-01 fixed),
         },
       };
+    }
+  });
+
+  // UX-08 — How long the *next* attempt on this drawer would wait.
+  //
+  // A read-only query, and the answer comes from the same function the unlock path
+  // calls, so the countdown the renderer shows and the wait the user actually
+  // suffers cannot be two different numbers (the project has already been bitten by
+  // a policy written twice — PLANO-PASSWORD-POLICY, HYG-22).
+  //
+  // The answer is exact, and the reason is worth stating: between this query and the
+  // attempt it describes, nothing can move the counter. The only writer is a failed
+  // attempt, and the attempt in question is the one about to be made.
+  //
+  // It is a query, not a decision. The unlock path still computes the delay itself
+  // at attempt time — if it started trusting this answer, a stale query would become
+  // a wrong wait.
+  ipcMain.handle(CHANNELS.GET_UNLOCK_DELAY, async (_e, id: string): Promise<number> => {
+    try {
+      const validated = DrawerIdSchema.parse({ id });
+      return unlockDelayFor(validated.id);
+    } catch (e) {
+      // An id that is not a drawer's has no delay to report, and the unlock path
+      // validates the same id on its own — so the honest answer here is "no wait",
+      // not a refusal the renderer would have to turn into an error. Refusing would
+      // also make this channel a way to probe the limiter's state for ids that are
+      // not drawers.
+      logger.warn('get-unlock-delay: invalid drawer ID', {
+        issues: e instanceof z.ZodError ? e.issues.length : 0,
+      });
+      return 0;
     }
   });
 

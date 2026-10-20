@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { MAX_CONTENT_CODE_POINTS } from '../shared/limits.js';
-import { isPasswordCompliant, describePasswordPolicy } from './password-policy.js';
+import { isPasswordCompliant, describePasswordPolicy } from '../shared/password-policy.js';
 
 // The policy is a refine, not a .min()/.regex chain: a violation has to arrive at the
 // IPC layer as a Zod issue on `password` that can be classified by path, and a chain of
@@ -39,6 +39,14 @@ export const SaveDrawerSchema = z.object({
 });
 
 export const DeleteDrawerSchema = z.object({
+  id: z.string().uuid('Invalid drawer ID'),
+});
+
+// UX-08 — The delay query needs the drawer id and nothing else. It repeats
+// DeleteDrawerSchema's shape on purpose: that schema belongs to the delete path,
+// and a schema named after the operation that uses it is worth more here than a
+// shared constant would be.
+export const DrawerIdSchema = z.object({
   id: z.string().uuid('Invalid drawer ID'),
 });
 

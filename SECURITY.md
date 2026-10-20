@@ -36,8 +36,13 @@ KDF parameters are validated against explicit bounds (`encryption.ts`, enforced 
 
 ### Passwords
 
-- **A new drawer requires at least 12 characters, with an upper-case letter, a lower-case letter, a digit and a symbol** (maximum 128). The rule lives in one module (`password-policy.ts`) and is enforced in the main process twice: by `CreateDrawerSchema` and by the store. The renderer applies the same rule to the create form so the user sees the reason before submitting.
-- **The rule is a create-time rule, deliberately.** There is no change-password channel, so a save can only re-use the password that already opens the drawer, and drawers created before the 12-character rule still open with 8-character passwords. `SaveDrawerSchema` and `UnlockDrawerSchema` therefore carry sanity bounds only (1–128 characters, no composition rule): enforcing the policy there would strand exactly those users, who could unlock a drawer and then not save it.
+- **A new drawer password is accepted on either of two branches: at least 20 characters of any mix, or at least 12 characters with an upper-case letter, a lower-case letter, a digit and a symbol** (maximum 128). They are alternatives, not a sequence — the second is the short path, the first is the passphrase path. **The floor is 12, not 20:** a 19-character mixed password is accepted, and nothing in Clavis requires 20 characters as such.
+- **Length is counted in code points**, not in UTF-16 code units, so an astral character counts once: ten emoji are ten characters, not the twenty `String.length` would report. The schema's own 128-character maximum is measured the same way (Zod folds surrogate pairs), so the policy's minimum and the schema's maximum are in the same unit.
+- **Length is checked before shape, and that order is the point.** Users answer a composition rule in predictable ways. A user with a 30-character passphrase who is *required* to comply applies a **deterministic transformation** to it — `correct horse battery staple1!` — and that transformation is one an attacker's rules dictionary already enumerates. So the compliance step does not add entropy; it collapses a large set of possible secrets onto a much smaller one. The length branch exists so that the secret the user actually meant to keep is not thrown away.
+- **What the rule is not: an entropy check.** It constrains length, and below 20 characters it also constrains shape. `Passw0rd!!!1` satisfies the composition branch today and has almost no guess resistance, and Clavis ships **no common-password blocklist**, so nothing stops a user from choosing a password a dictionary already contains. See [Known Limitations](#5-the-password-policy-constrains-length-and-shape-not-entropy).
+- **One module owns the rule** (`src/shared/password-policy.ts`). The main process enforces it twice — by `CreateDrawerSchema` and by the store — and the renderer **calls the same module**, so the create form and the schema cannot disagree: the user sees the reason before submitting, and the main process is what decides.
+- **The rule is a create-time rule, deliberately.** There is no change-password channel, so a save can only re-use the password that already opens the drawer, and drawers created under an older rule still open with the passwords they were created with. `SaveDrawerSchema` and `UnlockDrawerSchema` therefore carry sanity bounds only (1–128 characters, no composition rule): enforcing the policy there would strand exactly those users, who could unlock a drawer and then not save it.
+- **The policy is not stored in the `.clavis` file** — the file records the drawer's `keyDerivation` parameters, not the rule that was applied to it — so there is no migration and no format change, and no drawer written by any version is affected. Almost every password the previous policy accepted is still accepted; the one exception is a password that carried an astral character, because the previous rule counted UTF-16 units and this one counts code points. A drawer created with such a password still opens and still saves, because the rule is create-time only.
 - Passwords are **irreversible**. There is no recovery path, by design.
 
 ### Unlock rate limiting
@@ -128,7 +133,7 @@ Deliberately unsigned — there are no EV certificates and no Apple notarization
 
 ## Known Limitations
 
-Four items are documented honestly rather than presented as working controls.
+Five items are documented honestly rather than presented as working controls.
 
 ### 1. The KDF is not unconditionally Argon2id
 
@@ -157,6 +162,20 @@ Export never writes the destination file from the main process. The raw drawer J
 **What has been executed.** The **Linux** artifacts are exercised by the end-to-end suite on every push and on every release tag, against both the packager output and the AppImage, in two locales. The **Windows and macOS** artifacts are built and published, and **no test, no CI job and no user has run them** since the Electron 44 series began. The structural checks pass — the Windows binary is a valid PE32+ x86-64 executable, the macOS binary a valid Mach-O arm64 one, and the native Argon2 prebuild for each platform is present as a real PE DLL / Mach-O bundle — but "the file is the right shape" is not "the app runs".
 
 **Why that matters, concretely.** `encryption.ts` loads the native Argon2 module lazily and **falls back to Node's scrypt** if it cannot be loaded. The fallback is silent apart from a log warning, and a drawer that records `argon2id` then **fails to unlock** with `KDF_UNAVAILABLE` rather than being decrypted with a different KDF — a deliberate fail-closed choice (SEC-01). A platform where the native module does not load is therefore a platform where drawers created elsewhere cannot be opened, and **nothing has run the Windows or macOS builds to establish whether that is the case**.
+
+### 5. The password policy constrains length and shape, not entropy
+
+The create-time policy is a **length-and-shape gate**: it constrains length, and below 20 characters it also constrains shape. It is **not an entropy check**. `Passw0rd!!!1` satisfies the composition branch today and has almost no guess resistance — the composition rule was never an entropy check either, so the passphrase branch does not make the worst password worse; it makes an existing weakness visible.
+
+**Clavis ships no common-password blocklist.** There is no account, no server and no breach corpus to screen against, so a user can choose a password a dictionary already contains and nothing will stop them.
+
+**What this means for whoever holds an exported `.clavis` file.** The attacker's cost is the key derivation, not the guess, and the derivation is the project's own: Argon2id at **2^18 KiB (256 MiB)**, roughly half a second per attempt. That bounds the attacker's **rate**, not the **number** of guesses:
+
+- A dictionary hit costs one derivation.
+- A composition-compliant human password falls in roughly 2^20–2^30 candidates — minutes of CPU, or a few hundred dollars of rented memory.
+- A three-to-four word passphrase falls in roughly 2^33–2^44 — out of reach for that budget.
+
+**The passphrase branch — 20 characters or more — is worth 10–20 bits of effective entropy against a realistic attacker, and it is the only part of the policy that does anything for this threat model. The 12-character floor buys almost nothing.**
 
 ## Vulnerability Response
 

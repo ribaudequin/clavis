@@ -134,6 +134,64 @@ HOME=/tmp/clavis-test XDG_CONFIG_HOME=/tmp/clavis-test/config XDG_DATA_HOME=/tmp
 ```
 Expect `Clavis started` followed by `Drawers listed {count:N}` — the second line proves the renderer loaded and completed an IPC round-trip. `exit=124` just means `timeout` stopped it.
 
+### The app icon is missing from the Windows executable (or the macOS `.app`)
+
+**The three formats have to sit side by side with the same basename.**
+`config.forge.packagerConfig.icon` is one path, and electron-packager resolves the
+platform's format by **rewriting the extension in place** — `.png` becomes `.ico` on
+Windows and `.icns` on macOS, in the same directory. If the rewritten file is not
+there, the icon is skipped and the executable keeps Electron's default.
+
+So the layout is the fix, not the path:
+
+```
+icons/clavis.png     ← what packagerConfig.icon points at
+icons/clavis.ico     ← what the packager looks for on win32
+icons/clavis.icns    ← what the packager looks for on darwin
+```
+
+**And it fails SILENTLY.** Forge hardcodes `quiet: true` on the packager options, and
+electron-packager's `common.warning()` prints nothing when `quiet` is set — so the
+"Could not find icon" line never reaches the build log, local or on CI. The guard is
+`tests/packaging-icon.test.ts`, which calls the packager's own resolution and asserts
+that each platform's format resolves to a file that exists.
+
+To check a built executable by hand:
+
+```bash
+npm run package -- --platform=win32
+python3 - <<'EOF'
+import struct
+exe = open('out/clavis-win32-x64/clavis.exe','rb').read()
+ico = open('icons/clavis.ico','rb').read()
+count = struct.unpack_from('<H', ico, 4)[0]
+for i in range(count):
+    w,h,_,_,_,_,size,off = struct.unpack_from('<BBBBHHII', ico, 6+i*16)
+    blob = ico[off:off+size]
+    if blob[:8] == b'\x89PNG\r\n\x1a\n':
+        print(w or 256, 'presente' if exe.find(blob) != -1 else 'AUSENTE')
+EOF
+```
+
+The `.ico` is PNG-based, so each size is a PNG that can be searched for byte-for-byte
+in the executable. Nine sizes present means the icon is embedded.
+
+### Windows cross-build from Linux now needs Wine
+
+`electron-packager` needs Wine to run `rcedit`, which is what writes the icon (and the
+version metadata) into a Windows executable. It says so and refuses to continue:
+*"Wine is required to use the appCopyright, appVersion, buildVersion, icon, and
+win32metadata parameters for Windows targets."* That is not a regression — it is the
+price of a Windows build that carries the right icon. The CI is unaffected: it builds
+Windows on the native `windows-latest` runner, where `rcedit` runs natively.
+
+On Debian/Ubuntu the binary is `wine64`, which is not always on `PATH`
+(it lives in `/usr/lib/wine/`), and electron-packager looks for it by name:
+```bash
+mkdir -p /tmp/winebin && ln -sf /usr/lib/wine/wine64 /tmp/winebin/wine64
+PATH="/tmp/winebin:$PATH" npm run package -- --platform=win32
+```
+
 ### Windows `argon2` invalid Win32 application (legacy)
 Previously cross-built via Linux/Wine, fixed by `scripts/afterPack.js` (now in `scripts/backup/`). **No longer needed** — Windows builds run on the native `windows-latest` runner, so `argon2` is compiled as PE32+ natively.
 

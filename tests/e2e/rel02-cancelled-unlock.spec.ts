@@ -18,21 +18,22 @@
 //      5 → 5 s, 10 → 30 s) and the sleep is real — the handler writes the delay it
 //      applied into the log, and this file reads it from there.
 //
-//   2. The dismissal below is SYNTHETIC, and deliberately so.
-//      `useModalKeyboard` (src/renderer/hooks/useModalKeyboard.ts:26) attaches its
-//      Escape listener to the modal container — the element with `role="dialog"`.
-//      While an unlock is in flight the password input is disabled
-//      (src/renderer/components/PasswordModal.tsx:64), so the browser moves the
-//      focus to <body>; measured during an unlock:
+//   2. The dismissal below is a REAL user action, and it can be one now.
+//      While the unlock is in flight the modal moves the focus to the Cancel
+//      button, so the Escape press lands on a control that is enabled and
+//      inside the dialog — which is what it takes for the listener on the
+//      container (`useModalKeyboard.ts:26`) to fire at all. Before UX-08 the
+//      password input was disabled while the unlock ran
+//      (`PasswordModal.tsx:64`), the browser moved the focus to <body>, and a
+//      keydown on <body> propagates *upward* and never reaches a descendant.
+//      Measured during an unlock, before the fix:
 //        {"activeTag":"BODY","activeId":"","inputDisabled":true,"focusInsideModal":false}
-//      A keydown that lands on <body> propagates *upward* and never reaches a
-//      descendant of <body>, so a real Escape keypress cannot reach the listener
-//      while the unlock runs — no user can dismiss the prompt in that state today.
-//      The dispatch in `dismissPrompt` therefore goes to the element that owns the
-//      listener, and it is a simulation of "the prompt was closed while an unlock was
-//      pending", not a keypress a user can make. The dismissal mechanism is the
-//      detail; the subject of this test is what the application does with the result
-//      that arrives afterwards.
+//      and an Escape press left the dialog on screen. The dismissal was
+//      therefore a keydown dispatched on the element that owns the listener —
+//      a simulation of "the prompt was closed while an unlock was pending"
+//      that no user could perform. UX-08 closed that trap; the press below is
+//      the half of the proof that the dismissal a user actually makes reaches
+//      the same code path.
 //
 //   3. The control. "The drawer did not open" is also what a test that did not wait
 //      long enough would see. The second test runs the identical flow — the same five
@@ -248,22 +249,32 @@ async function submitCorrectPassword(
 }
 
 /**
- * Dismisses the unlock prompt the way the code expects to be dismissed.
+ * Dismisses the unlock prompt the way a user does: a real Escape press.
  *
- * This is NOT a keypress a user can make today, and the header says why: the Escape
- * listener is on the modal container, the focus is on <body> while the unlock runs,
- * and a keydown on <body> never travels down to a descendant. The event is
- * therefore dispatched on the container that owns the listener, which is a deliberate
- * simulation of "the prompt was closed while an unlock was pending".
+ * The focus has to be inside the modal, because the Escape listener lives on
+ * the container and a keydown that starts on <body> travels upward and never
+ * reaches it. The modal moves the focus to the Cancel button when the attempt
+ * starts, and the assertion below is what says that it really did — without it
+ * a dismissal that did nothing would look like a dismissal that worked.
  */
 async function dismissPrompt(window: Page): Promise<void> {
-  await window.evaluate(() => {
+  const focus = await window.evaluate(() => {
+    const active = document.activeElement;
     const dialog = document.querySelector('[role="dialog"]');
-    if (!dialog) throw new Error('The unlock prompt is not on screen.');
-    dialog.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
-    );
+    return {
+      tag: active?.tagName ?? '',
+      insideDialog: !!(active && dialog && dialog.contains(active)),
+    };
   });
+
+  expect(
+    focus.insideDialog,
+    `The focus was on <${focus.tag}> while the unlock was in flight, so an Escape ` +
+      'press could not reach the modal container. The dismissal below would be a ' +
+      'no-op, and the rest of this test would be about a prompt that is still open.'
+  ).toBe(true);
+
+  await window.keyboard.press('Escape');
 }
 
 function isTimeout(error: unknown): boolean {

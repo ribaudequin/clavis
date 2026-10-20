@@ -1,7 +1,7 @@
 {
   "name": "clavis",
   "productName": "clavis",
-  "version": "0.6.7-beta",
+  "version": "0.6.8-beta",
   "description": "Cross-platform encrypted notes application for storing banking info, PINs, passwords, and safe codes.",
   "main": "dist/main/index.js",
   "author": "Marcelo Salvador",
@@ -99,7 +99,7 @@
         "asar": {
           "unpack": "**/node_modules/argon2/**/*"
         },
-        "icon": "icons/linux/512x512.png",
+        "icon": "icons/clavis.png",
         "ignore": [
           "^\\/(?!dist($|\\/)|node_modules($|\\/)|package\\.json$|icons($|\\/)).+"
         ]
@@ -118,8 +118,8 @@
           ],
           "config": {
             "name": "clavis",
-            "iconUrl": "https://raw.githubusercontent.com/ribaudequin/clavis/main/icons/windows/clavis.ico",
-            "setupIcon": "icons/windows/clavis.ico"
+            "iconUrl": "https://raw.githubusercontent.com/ribaudequin/clavis/main/icons/clavis.ico",
+            "setupIcon": "icons/clavis.ico"
           }
         },
         {
@@ -138,7 +138,7 @@
           ],
           "config": {
             "options": {
-              "icon": "icons/linux/512x512.png",
+              "icon": "icons/clavis.png",
               "maintainer": "Marcelo Salvador",
               "homepage": "https://github.com/ribaudequin/clavis"
             }
@@ -151,7 +151,7 @@
           ],
           "config": {
             "options": {
-              "icon": "icons/linux/512x512.png",
+              "icon": "icons/clavis.png",
               "categories": [
                 "Utility"
               ]
@@ -165,7 +165,7 @@
           ],
           "config": {
             "name": "clavis",
-            "icon": "icons/mac/icon.icns",
+            "icon": "icons/clavis.icns",
             "format": "ULFO"
           }
         }

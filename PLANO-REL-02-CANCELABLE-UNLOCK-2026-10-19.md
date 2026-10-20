@@ -1,6 +1,15 @@
 # PLANO — the rest of REL-02: a cancellable, counted unlock wait
 
 **Date:** 2026-10-19
+**Status:** **DONE 2026-10-20** — both halves implemented and gated on the working tree (not
+committed, not tagged, not released; the owner's call). Section A (the `GET_UNLOCK_DELAY` channel),
+B (the cancellable, counted wait), C (REL-02's counter, unchanged and now reachable) and D (the
+tests, unit and e2e) are all in. Gates: lint 0 errors / 2 pre-existing warnings · both typechecks
+0 · **440/440** vitest across 44 files · `npm run make` OK · e2e **14/14** against
+`out/clavis-linux-x64` **and** **14/14** against the AppImage, in both locales, and the REL-02
+spec **20/20** over 10 repeats with no flake. Section E ("what does not change") held: the rate
+limiter's policy stayed in the main process with one owner, and the unlock result is still
+discarded rather than aborted.
 **Closes:** **UX-08**, and makes **REL-02**'s fix reachable rather than a safety net.
 **Owner decisions taken up front (2026-10-19):** cancelling is a **renderer-only** affair (the
 main process finishes its wait and its derivation and the result is discarded — no new IPC to

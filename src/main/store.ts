@@ -7,7 +7,7 @@ import { encrypt, decrypt, MAX_DECRYPTED_SIZE, DEFAULT_MEMORY_COST, MIN_MEMORY_C
 import { logger } from './logger.js';
 import { EncryptedDrawer, DrawerListItem } from '../shared/types.js';
 import { EncryptedDrawerSchema, type EncryptedDrawerMetadata } from './validation.js';
-import { isPasswordCompliant, describePasswordPolicy } from './password-policy.js';
+import { isPasswordCompliant, describePasswordPolicy } from '../shared/password-policy.js';
 
 const DRAWER_EXT = '.clavis';
 

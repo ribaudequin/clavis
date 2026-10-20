@@ -1,5 +1,85 @@
 # Changelog — Clavis
 
+## v0.6.8-beta (2026-10-20)
+
+**The password policy now accepts a passphrase — and the floor is still 12 characters, not 20.**
+**The unlock wait is now cancellable and counted, so the prompt is no longer a trap.**
+
+### Changed
+
+- **UX-08 — the unlock prompt could not be closed while the unlock was in flight.** The password
+  input was `disabled` for the duration, so the browser moved the focus to `<body>`, and the
+  Escape listener lives on the modal *container* — a keydown that starts on `<body>` travels upward
+  and never reaches a descendant. Under the rate limiter (3 failures → 1 s, 5 → 5 s, 10 → 30 s,
+  per drawer) the prompt was therefore frozen for up to 30 seconds with no way out, and the
+  attempt counter that REL-02 shipped had nothing to invalidate. The **Cancel button is no longer
+  disabled** during the wait and **the focus moves to it**, so a real Escape press reaches the
+  listener; the focus returns to the input when the attempt ends. The remaining seconds are shown,
+  counted down from a deadline, and the number is announced once rather than every second.
+- **SEC-08 — a 30-character passphrase was refused.** The create-time policy required an
+  upper-case letter, a lower-case letter, a digit and a symbol, and nothing else was accepted, so
+  a user who already had a passphrase had to apply a deterministic transformation to it —
+  `correct horse battery staple1!` — that an attacker's rules dictionary already enumerates. The
+  policy is now **two alternatives**: **at least 20 characters of any mix**, or **at least 12
+  characters with an upper-case letter, a lower-case letter, a digit and a symbol** (maximum 128).
+  **The floor is 12, not 20:** a 19-character mixed password is accepted, and the app does not
+  require 20 characters as such.
+- **Length is counted in code points**, not in UTF-16 code units, so an astral character counts
+  once. The policy's minimum and the schema's 128-character maximum are now measured in the same
+  unit, and ten emoji are ten characters rather than a twenty-character passphrase.
+- **One module owns the rule, and the renderer calls it.** `src/shared/password-policy.ts` owns
+  the two thresholds, the check, the wording and the strength meter's scoring. The main process
+  enforces it (`CreateDrawerSchema` and the store) and the renderer applies the same module to the
+  create form, so the form and the schema cannot disagree.
+- **The strength meter's labels are translated** (UX-02). They were hardcoded Portuguese in an
+  otherwise fully translated component, and they now go through `t()` in both catalogues.
+- **Nothing on disk changes.** The policy is not stored in the `.clavis` file — the file records
+  the drawer's `keyDerivation` parameters, not the rule that was applied to it — so there is no
+  migration, no format bump, and no drawer written by any version is affected. Almost every password
+  the previous policy accepted is still accepted — the one exception is a password carrying an
+  astral character, because the previous rule counted UTF-16 units and this one counts code
+  points, and such a drawer still opens and still saves. The rule stays create-time only: a save
+  can only re-use the password that already opens the drawer.
+- **The Windows executable carried Electron's default icon — and so did the macOS `.app`, and the
+  window icon everywhere.** The packager resolves the platform's icon format by rewriting the
+  extension of the configured path in place, and `config.forge.packagerConfig.icon` pointed at
+  `icons/linux/512x512.png`, whose `.ico` and `.icns` siblings did not exist. The packager skipped
+  the icon — **silently**, because Forge hardcodes `quiet: true` and electron-packager's
+  `common.warning()` prints nothing under it, so the "Could not find icon" line never reached the
+  build log, local or on CI. Separately, the window icon's runtime path
+  (`path.join(__dirname, '..', 'icons', …)`) resolved to `<app root>/dist/icons/…`, which no build
+  produces: the icons sit at `<app root>/icons`, a sibling of `dist`, so the path needed two levels
+  up. **Fixed by a layout** — the three formats now sit side by side with the same basename
+  (`icons/clavis.png`, `icons/clavis.ico`, `icons/clavis.icns`), which is what the extension rewrite
+  needs — and by the corrected runtime path. **New guard:** `tests/packaging-icon.test.ts` calls
+  the packager's own resolution and asserts that each platform's format resolves to a file that
+  exists, that the makers' local icons exist, and that the runtime path climbs the right number of
+  levels.
+- **The documentation now states the rule the code enforces.** `SECURITY.md` describes both
+  branches and the floor of 12, says why length is checked before shape, and adds a known
+  limitation for what the rule is *not*: a length-and-shape gate, not an entropy check, with no
+  common-password blocklist. `README.md`, `PLANO.md` and `docs/user-guide.md` were still carrying
+  an 8-character minimum that had not been true since HYG-22, and now carry the real rule.
+
+### Verified
+
+- `lint` 0 errors / 2 pre-existing warnings · `typecheck` 0 · `typecheck:test` 0 · **478/478** vitest
+  across 46 files · `npm run make` OK (deb + AppImage) · e2e **14/14** against
+  `out/clavis-linux-x64` **and** **14/14** against the AppImage, in **both** locales — the
+  packaged binary, not the source tree.
+- **The icon fix was proved on the real Windows executable, not asserted.** The Windows target was
+  cross-compiled with Wine: the fixed build embeds **all nine PNG sizes** of the Clavis icon in
+  `clavis.exe` (searched byte-for-byte — the `.ico` is PNG-based), and the **control build with
+  the old configuration embeds none of them**.
+- The e2e fixture password is now **22 characters and carries all four character classes**, so it
+  satisfies both branches of the policy instead of leaning on the composition branch alone.
+- **Mutations, measured** (the project's standing negative control): dropping the 20-character
+  branch → 9 tests red · dropping the 12+4 branch → 40 · dropping one required class → 9 ·
+  counting the length in UTF-16 units → 4 · the policy wording losing the 20-character path → 1
+  (**before this change: none** — the negative control the 2026-10-18 plan claimed and never had) ·
+  re-inlining the old rule in the renderer → 6 · re-inlining the new rule faithfully → 2, the
+  structural guards only · the meter scoring on its own → 4.
+
 ## v0.6.7-beta (2026-10-19)
 
 **A cancelled unlock no longer opens the drawer — and the measurement behind it says the

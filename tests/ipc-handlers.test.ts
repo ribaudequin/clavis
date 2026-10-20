@@ -55,6 +55,7 @@ vi.mock('fs/promises', () => {
 import { registerIpcHandlers, __resetAllowedImportPaths } from '../src/main/ipc-handlers';
 import type { IpcListener } from '../src/main/ipc-handlers';
 import * as store from '../src/main/store';
+import { logger } from '../src/main/logger';
 import * as fsPromises from 'fs/promises';
 import { app } from 'electron';
 import { MAX_CONTENT_CODE_POINTS } from '../src/shared/limits';
@@ -63,7 +64,7 @@ import { CHANNELS } from '../src/shared/channels';
 import type { Channel } from '../src/shared/channels';
 import { ErrorCode } from '../src/shared/types';
 import { CreateDrawerSchema } from '../src/main/validation';
-import { describePasswordPolicy } from '../src/main/password-policy';
+import { describePasswordPolicy } from '../src/shared/password-policy';
 import type { ElectronAPI, EncryptedDrawer } from '../src/shared/types';
 
 const VALID_UUID = '123e4567-e89b-12d3-a456-426614174000';
@@ -76,6 +77,7 @@ const API_BY_CHANNEL = {
   [CHANNELS.LIST_DRAWERS]: 'listDrawers',
   [CHANNELS.CREATE_DRAWER]: 'createDrawer',
   [CHANNELS.UNLOCK_DRAWER]: 'unlockDrawer',
+  [CHANNELS.GET_UNLOCK_DELAY]: 'getUnlockDelay',
   [CHANNELS.SAVE_DRAWER]: 'saveDrawer',
   [CHANNELS.DELETE_DRAWER]: 'deleteDrawer',
   [CHANNELS.EXPORT_DRAWER]: 'exportDrawer',
@@ -208,6 +210,20 @@ function getHandler<C extends Channel>(channel: C): Handler<C> {
   return h as unknown as Handler<C>;
 }
 
+/**
+ * Observes whether a handler call has settled, without awaiting it — a call
+ * parked on a rate-limit timer must be observable as *not* settled.
+ * `Handler<C>` is typed by the resolved value, so the promise is re-wrapped here
+ * exactly as the check-update timeout test does it.
+ */
+function watch<T>(result: T): { settled: () => boolean } {
+  const state = { done: false };
+  void Promise.resolve(result).then(() => {
+    state.done = true;
+  });
+  return { settled: () => state.done };
+}
+
 describe('IPC handlers', () => {
   describe('list-drawers', () => {
     it('returns ok with data on success', async () => {
@@ -333,16 +349,21 @@ describe('IPC handlers', () => {
       expect(store.createDrawer).not.toHaveBeenCalled();
     });
 
-    it('never classifies on message text: a store error carrying the old wording is still a write failure', async () => {
+    it('never classifies on message text: a store error carrying a policy-shaped wording is still a write failure', async () => {
       // The branch this suite used to pin did
       // `e.message.includes('Password must be at least 12 characters')` against the string
       // store.ts threw. Its own test compared two hardcoded copies of that sentence and
       // stayed green through any reword, while rewording the real string degraded the
       // create path to WRITE_FAILED / "Failed to create drawer" — the same cause reported
-      // as a different failure. The schema now classifies, so the wording is inert: this
-      // error text is exactly the one that used to trigger the match, and it must not.
+      // as a different failure. The schema now classifies, so the wording is inert.
+      //
+      // The literal below is deliberately arbitrary and is NOT the policy's wording: a
+      // copy of the real sentence here would only prove that the sentence had not
+      // changed — the live-to-live comparison that let a stale one survive — and it
+      // would rot the day the policy moved. It stays shaped like a policy message on
+      // purpose, so a handler that classified on the text would still be caught here.
       vi.mocked(store.createDrawer).mockRejectedValue(
-        new Error('Password must be at least 12 characters with upper, lower, digit, symbol')
+        new Error('Password must be at least 42 characters with upper, lower, digit, symbol')
       );
 
       const handler = getHandler(CHANNELS.CREATE_DRAWER);
@@ -500,20 +521,6 @@ describe('IPC handlers', () => {
     const SIZE_ID = '123e4567-e89b-12d3-a456-426614174051';
     const CORRUPT_ID = '123e4567-e89b-12d3-a456-426614174052';
 
-    /**
-     * Observes whether a handler call has settled, without awaiting it — a call
-     * parked on a rate-limit timer must be observable as *not* settled.
-     * `Handler<C>` is typed by the resolved value, so the promise is re-wrapped here
-     * exactly as the check-update timeout test does it.
-     */
-    function watch<T>(result: T): { settled: () => boolean } {
-      const state = { done: false };
-      void Promise.resolve(result).then(() => {
-        state.done = true;
-      });
-      return { settled: () => state.done };
-    }
-
     beforeEach(() => {
       vi.useFakeTimers();
     });
@@ -577,6 +584,194 @@ describe('IPC handlers', () => {
       const firstGuess = watch(handler({}, CORRUPT_ID, 'wrong-password'));
       await vi.advanceTimersByTimeAsync(0);
       expect(firstGuess.settled()).toBe(true);
+    });
+  });
+
+  // UX-08 — The read-only delay query.
+  //
+  // The countdown the renderer shows and the wait the user actually suffers are
+  // two numbers that must be one number, and the only way to keep them one
+  // number is to keep one owner: the module-private getUnlockDelay, read by the
+  // unlock path and by this channel. The project has already been bitten by a
+  // policy written twice (PLANO-PASSWORD-POLICY, HYG-22), so the tests below
+  // exist to catch the two ways that can break: the channel answering from its
+  // own copy of the ladder, and one of the two readers stopping at the seam.
+  describe('get-unlock-delay', () => {
+    // The limiter's state is module-private and there is no reset hook, so each
+    // scenario needs a drawer id of its own — these ids are the price of that,
+    // and they are why the file's ids are not reused here.
+    const NO_FAILURES_ID = '123e4567-e89b-12d3-a456-426614174060';
+    const TIER_1S_ID = '123e4567-e89b-12d3-a456-426614174061';
+    const TIER_5S_ID = '123e4567-e89b-12d3-a456-426614174062';
+    const TIER_30S_ID = '123e4567-e89b-12d3-a456-426614174063';
+    const AGREEMENT_ID = '123e4567-e89b-12d3-a456-426614174064';
+    const OWNER_ID = '123e4567-e89b-12d3-a456-426614174065';
+    const NON_PASSWORD_ID = '123e4567-e89b-12d3-a456-426614174066';
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /**
+     * Arms the real limiter: `failures` wrong passwords on `id`, with the clock
+     * pushed through whatever waits those attempts trigger on the way.
+     *
+     * The counter has exactly one writer — the unlock handler — so the only way
+     * to reach a tier is to fail the unlock that many times. The store is the
+     * only thing that can fail it, which is why the failures go through the
+     * channel that a user would have used.
+     */
+    async function armWithWrongPasswords(id: string, failures: number): Promise<void> {
+      vi.mocked(store.unlockDrawer).mockResolvedValue({ ok: false, reason: 'wrong_password' });
+      const unlock = getHandler(CHANNELS.UNLOCK_DRAWER);
+
+      for (let attempt = 0; attempt < failures; attempt++) {
+        const settled = watch(unlock({}, id, 'wrong-password'));
+        await vi.advanceTimersByTimeAsync(0);
+        if (!settled.settled()) {
+          // Parked on the limiter's own delay. Let the wait run out so the attempt
+          // can fail — and count — instead of hanging on the timer: the counter
+          // only moves when the attempt actually reaches the store.
+          await vi.advanceTimersByTimeAsync(30_000);
+          expect(settled.settled()).toBe(true);
+        }
+      }
+    }
+
+    /**
+     * The delayMs the unlock path logged for its most recent rate-limited
+     * attempt, read back out of the log instead of restated as a constant — the
+     * point of the agreement test is to compare two values the code produced,
+     * not two copies of a number the test wrote down.
+     */
+    function lastAppliedDelayMs(since = 0): number | undefined {
+      const calls = vi.mocked(logger.warn).mock.calls.slice(since);
+      for (let i = calls.length - 1; i >= 0; i--) {
+        const [message, context] = calls[i];
+        if (message === 'Unlock rate-limited') {
+          return (context as { delayMs?: number } | undefined)?.delayMs;
+        }
+      }
+      return undefined;
+    }
+
+    it('reports no wait for a drawer that has never failed', async () => {
+      const delay = getHandler(CHANNELS.GET_UNLOCK_DELAY);
+
+      expect(await delay({}, NO_FAILURES_ID)).toBe(0);
+      // A query never touches the store: asking how long the wait is cannot
+      // count as an attempt.
+      expect(store.unlockDrawer).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { id: TIER_1S_ID, failures: 3, expectedMs: 1_000 },
+      { id: TIER_5S_ID, failures: 5, expectedMs: 5_000 },
+      { id: TIER_30S_ID, failures: 10, expectedMs: 30_000 },
+    ])('reports the $expectedMs ms tier after $failures wrong passwords', async ({ id, failures, expectedMs }) => {
+      await armWithWrongPasswords(id, failures);
+
+      const delay = getHandler(CHANNELS.GET_UNLOCK_DELAY);
+      expect(await delay({}, id)).toBe(expectedMs);
+    });
+
+    it('agrees with the delay the unlock path actually applies', async () => {
+      await armWithWrongPasswords(AGREEMENT_ID, 5);
+
+      const delay = getHandler(CHANNELS.GET_UNLOCK_DELAY);
+      const unlock = getHandler(CHANNELS.UNLOCK_DRAWER);
+
+      const reported = await delay({}, AGREEMENT_ID);
+      expect(reported).toBe(5_000);
+
+      // Only the calls logged from here on belong to the attempt under test.
+      const loggedBefore = vi.mocked(logger.warn).mock.calls.length;
+      const attempt = watch(unlock({}, AGREEMENT_ID, 'wrong-password'));
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Parked: the wait is real, not a number the handler reported and ignored.
+      expect(attempt.settled()).toBe(false);
+      // And the wait it parked on is the one the channel announced.
+      expect(lastAppliedDelayMs(loggedBefore)).toBe(reported);
+
+      // The wait lasts exactly as long as it said it would — one millisecond
+      // short of it, the attempt is still waiting.
+      await vi.advanceTimersByTimeAsync(reported - 1);
+      expect(attempt.settled()).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(attempt.settled()).toBe(true);
+    });
+
+    it('is a query, not a decision: both readers go through the one policy', async () => {
+      // A delay nobody would ship (4242 ms): the value is a marker, not a
+      // policy. What matters is that the channel and the unlock path ask the
+      // same function for it — which is the only thing that keeps a policy
+      // written once.
+      const injected = vi.fn(() => 4242);
+      handlers.clear();
+      registerIpcHandlers({
+        ipcMain: { handle: (channel, listener) => { handlers.set(channel, listener); } },
+        dialog: { showOpenDialog: vi.fn() },
+        getUnlockDelay: injected,
+      });
+
+      const delay = getHandler(CHANNELS.GET_UNLOCK_DELAY);
+      const unlock = getHandler(CHANNELS.UNLOCK_DRAWER);
+
+      // The channel reads the policy...
+      expect(await delay({}, OWNER_ID)).toBe(4242);
+      expect(injected).toHaveBeenCalledWith(OWNER_ID);
+
+      // ...and so does the unlock path, which is the reader that decides.
+      vi.mocked(store.unlockDrawer).mockResolvedValue({ ok: false, reason: 'wrong_password' });
+      const callsBefore = injected.mock.calls.length;
+      const attempt = watch(unlock({}, OWNER_ID, 'wrong-password'));
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(injected.mock.calls.length).toBe(callsBefore + 1);
+      // Parked on the injected delay, not on the module-private policy: a copy
+      // of the ladder living in the renderer would show one number and the
+      // handler would wait another.
+      expect(attempt.settled()).toBe(false);
+      await vi.advanceTimersByTimeAsync(4242);
+      expect(attempt.settled()).toBe(true);
+
+      // Leave the harness as the file-level beforeEach left it.
+      handlers.clear();
+      registerIpcHandlers({
+        ipcMain: { handle: (channel, listener) => { handlers.set(channel, listener); } },
+        dialog: { showOpenDialog: vi.fn() },
+      });
+    });
+
+    it('answers 0 for an invalid drawer id, without throwing and without touching the store', async () => {
+      const delay = getHandler(CHANNELS.GET_UNLOCK_DELAY);
+
+      await expect(delay({}, 'not-a-uuid')).resolves.toBe(0);
+      expect(store.unlockDrawer).not.toHaveBeenCalled();
+    });
+
+    it('does not arm the limiter on a failure that was never a guess', async () => {
+      // The unlock path's own rule is covered by the block above; this is the
+      // channel agreeing with it. A drawer that cannot be opened at all must not
+      // be reported as one that needs a wait — that is the lockout SAV-02 and
+      // SEC-01 removed from the unlock side, and the countdown must not bring
+      // it back.
+      vi.mocked(store.unlockDrawer).mockResolvedValue({ ok: false, reason: 'too_large' });
+      const unlock = getHandler(CHANNELS.UNLOCK_DRAWER);
+
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const settled = watch(unlock({}, NON_PASSWORD_ID, 'correct-password123'));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(settled.settled()).toBe(true);
+      }
+
+      const delay = getHandler(CHANNELS.GET_UNLOCK_DELAY);
+      expect(await delay({}, NON_PASSWORD_ID)).toBe(0);
     });
   });
 
@@ -1258,6 +1453,7 @@ describe('IPC handlers', () => {
         CHANNELS.LIST_DRAWERS,
         CHANNELS.CREATE_DRAWER,
         CHANNELS.UNLOCK_DRAWER,
+        CHANNELS.GET_UNLOCK_DELAY,
         CHANNELS.SAVE_DRAWER,
         CHANNELS.DELETE_DRAWER,
         CHANNELS.EXPORT_DRAWER,

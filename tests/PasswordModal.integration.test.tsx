@@ -31,8 +31,18 @@ vi.mock('../src/renderer/hooks/useFocusTrap', () => ({ useFocusTrap: () => {} })
 import PasswordModal from '../src/renderer/components/PasswordModal';
 import { t } from '../src/i18n';
 
+const DRAWER_ID = '123e4567-e89b-12d3-a456-426614174000';
+
+// UX-08 — before the submit goes out, the modal asks the main process how long
+// the next attempt would wait. The answer here is "no wait", but the question
+// is always asked, so the submit lands a couple of microtasks after the click.
+// Every assertion below therefore waits for the microtasks with `act`, instead
+// of reading the call count in the same tick as the click.
 beforeEach(() => {
   capturedOptions.length = 0;
+  window.electronAPI = {
+    getUnlockDelay: async (): Promise<number> => 0,
+  } as unknown as Window['electronAPI'];
   cleanup();
 });
 afterEach(() => cleanup());
@@ -53,7 +63,7 @@ function visibilityToggle(): HTMLButtonElement {
 
 describe('PasswordModal — G1: no second Enter path registered', () => {
   it('never passes onEnter to useModalKeyboard', () => {
-    render(<PasswordModal drawerTitle="Test" onClose={() => {}} onSubmit={async () => {}} error={null} />);
+    render(<PasswordModal drawerId={DRAWER_ID} drawerTitle="Test" onClose={() => {}} onSubmit={async () => {}} error={null} />);
     expect(capturedOptions.length).toBeGreaterThan(0);
     for (const options of capturedOptions) {
       expect(Object.keys(options)).not.toContain('onEnter');
@@ -63,7 +73,7 @@ describe('PasswordModal — G1: no second Enter path registered', () => {
 
   it('still passes onEscape so Escape keeps closing the modal', () => {
     const onClose = vi.fn();
-    render(<PasswordModal drawerTitle="Test" onClose={onClose} onSubmit={async () => {}} error={null} />);
+    render(<PasswordModal drawerId={DRAWER_ID} drawerTitle="Test" onClose={onClose} onSubmit={async () => {}} error={null} />);
     expect(capturedOptions.some((options) => options.onEscape === onClose)).toBe(true);
     fireEvent.keyDown(screen.getByLabelText(t('label.password')), { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -73,7 +83,7 @@ describe('PasswordModal — G1: no second Enter path registered', () => {
 describe('PasswordModal — G2: Enter on a button does not submit', () => {
   it('does not submit when Enter is pressed on the visibility toggle', () => {
     const onSubmit = vi.fn(async () => {});
-    render(<PasswordModal drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />);
+    render(<PasswordModal drawerId={DRAWER_ID} drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />);
     const input = typePassword('secret');
     fireEvent.keyDown(visibilityToggle(), { key: 'Enter' });
     expect(onSubmit).not.toHaveBeenCalled();
@@ -82,7 +92,7 @@ describe('PasswordModal — G2: Enter on a button does not submit', () => {
 
   it('leaves the visibility toggle usable after Enter (no submit, click still toggles)', () => {
     const onSubmit = vi.fn(async () => {});
-    render(<PasswordModal drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />);
+    render(<PasswordModal drawerId={DRAWER_ID} drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />);
     const input = typePassword('secret');
     fireEvent.keyDown(visibilityToggle(), { key: 'Enter' });
     fireEvent.click(visibilityToggle());
@@ -92,7 +102,7 @@ describe('PasswordModal — G2: Enter on a button does not submit', () => {
 
   it('does not submit when Enter is pressed on the cancel button', () => {
     const onSubmit = vi.fn(async () => {});
-    render(<PasswordModal drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />);
+    render(<PasswordModal drawerId={DRAWER_ID} drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />);
     typePassword('secret');
     fireEvent.keyDown(screen.getByRole('button', { name: t('btn.cancel') }), { key: 'Enter' });
     expect(onSubmit).not.toHaveBeenCalled();
@@ -103,27 +113,29 @@ describe('PasswordModal — G3: the native path submits exactly once', () => {
   it('submits once when the form is submitted natively', async () => {
     const onSubmit = vi.fn(async () => {});
     const { container } = render(
-      <PasswordModal drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />
+      <PasswordModal drawerId={DRAWER_ID} drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />
     );
     typePassword('secret');
     const form = container.querySelector('form');
     expect(form).toBeTruthy();
     fireEvent.submit(form as HTMLFormElement);
+    await act(async () => {});
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit).toHaveBeenCalledWith('secret');
   });
 
   it('submits once when the submit button is clicked', async () => {
     const onSubmit = vi.fn(async () => {});
-    render(<PasswordModal drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />);
+    render(<PasswordModal drawerId={DRAWER_ID} drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />);
     typePassword('secret');
     fireEvent.click(submitButton());
+    await act(async () => {});
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
   it('does not submit through the hook when Enter is pressed on the password input', () => {
     const onSubmit = vi.fn(async () => {});
-    render(<PasswordModal drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />);
+    render(<PasswordModal drawerId={DRAWER_ID} drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />);
     const input = typePassword('secret');
     fireEvent.keyDown(input, { key: 'Enter' });
     fireEvent.keyPress(input, { key: 'Enter' });
@@ -133,7 +145,7 @@ describe('PasswordModal — G3: the native path submits exactly once', () => {
 });
 
 describe('PasswordModal — G4: the isLoading guard blocks a concurrent second submit', () => {
-  it('ignores a second submit while the first is still pending', () => {
+  it('ignores a second submit while the first is still pending', async () => {
     let release: () => void = () => {};
     const onSubmit = vi.fn(
       () =>
@@ -142,16 +154,18 @@ describe('PasswordModal — G4: the isLoading guard blocks a concurrent second s
         })
     );
     const { container } = render(
-      <PasswordModal drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />
+      <PasswordModal drawerId={DRAWER_ID} drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />
     );
     typePassword('secret');
     const form = container.querySelector('form') as HTMLFormElement;
 
     fireEvent.submit(form);
+    await act(async () => {});
     expect(onSubmit).toHaveBeenCalledTimes(1);
 
     fireEvent.submit(form);
     fireEvent.submit(form);
+    await act(async () => {});
     expect(onSubmit).toHaveBeenCalledTimes(1);
 
     release();
@@ -167,7 +181,7 @@ describe('PasswordModal — G6: the in-flight button says "decrypting", not "imp
           release = resolve;
         })
     );
-    render(<PasswordModal drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />);
+    render(<PasswordModal drawerId={DRAWER_ID} drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />);
     typePassword('secret');
     fireEvent.click(submitButton());
 
@@ -187,7 +201,7 @@ describe('PasswordModal — G5: empty and whitespace passwords never submit', ()
   it('does not submit an empty password', () => {
     const onSubmit = vi.fn(async () => {});
     const { container } = render(
-      <PasswordModal drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />
+      <PasswordModal drawerId={DRAWER_ID} drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />
     );
     const form = container.querySelector('form') as HTMLFormElement;
     typePassword('');
@@ -198,7 +212,7 @@ describe('PasswordModal — G5: empty and whitespace passwords never submit', ()
   it('does not submit a whitespace-only password', () => {
     const onSubmit = vi.fn(async () => {});
     const { container } = render(
-      <PasswordModal drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />
+      <PasswordModal drawerId={DRAWER_ID} drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />
     );
     const form = container.querySelector('form') as HTMLFormElement;
     typePassword('   ');

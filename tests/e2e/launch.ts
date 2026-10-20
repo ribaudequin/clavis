@@ -20,9 +20,13 @@ import { _electron as electron } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { resolveTarget } from './artifact';
 
-// The password policy is >= 12 characters with all four character classes, so an ordinary
-// word fails at create time. One constant, so the fixtures cannot drift apart between specs.
-export const E2E_PASSWORD = 'E2e-Smoke-Pass1!';
+// The password policy has two branches, and they are alternatives: >= 12 characters with all four
+// character classes, OR >= 20 characters of any mix. An ordinary word fails at create time on
+// both. This password is >= 20 characters AND carries all four classes, so it satisfies both
+// branches — the fixture must not depend on the composition branch alone, which is one tightening
+// of the policy away from refusing every drawer the suite creates. One constant, so the fixtures
+// cannot drift apart between specs.
+export const E2E_PASSWORD = 'E2e-Smoke-Passphrase1!';
 
 // Every user-facing string goes through t(), and the locale is NOT pinned at runtime.
 //

@@ -6,6 +6,7 @@ const api: ElectronAPI = {
   listDrawers: () => ipcRenderer.invoke(CHANNELS.LIST_DRAWERS),
   createDrawer: (title: string, password: string) => ipcRenderer.invoke(CHANNELS.CREATE_DRAWER, title, password),
   unlockDrawer: (id: string, password: string) => ipcRenderer.invoke(CHANNELS.UNLOCK_DRAWER, id, password),
+  getUnlockDelay: (id: string) => ipcRenderer.invoke(CHANNELS.GET_UNLOCK_DELAY, id),
   saveDrawer: (id: string, password: string, title: string, content: string) => ipcRenderer.invoke(CHANNELS.SAVE_DRAWER, id, password, title, content),
   deleteDrawer: (id: string) => ipcRenderer.invoke(CHANNELS.DELETE_DRAWER, id),
   exportDrawer: (id: string) => ipcRenderer.invoke(CHANNELS.EXPORT_DRAWER, id),

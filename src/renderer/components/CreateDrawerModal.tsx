@@ -4,6 +4,7 @@ import { useModalKeyboard } from '../hooks/useModalKeyboard';
 import { EyeOpenIcon, EyeClosedIcon } from '../components/EyeIcons';
 import { t, tError } from '../../i18n';
 import { toast } from 'react-hot-toast';
+import { isPasswordCompliant, scorePasswordStrength } from '../../shared/password-policy';
 
 interface CreateDrawerModalProps {
   onClose: () => void;
@@ -20,6 +21,46 @@ function findDuplicateTitle(title: string, existingTitles?: string[]): string | 
   const target = normalizeTitle(title);
   if (target === '') return null;
   return existingTitles.find((candidate) => normalizeTitle(candidate) === target) ?? null;
+}
+
+// SEC-08 — The meter and the gate read the SAME shared module, so the meter cannot
+// contradict the gate: the score is 0 for an empty password and 1 or 2 for exactly
+// the two states the app refuses, which makes "compliant ⇔ score ≥ 3" an invariant
+// of one function instead of a coincidence between two. The score used to be derived
+// here, from the component's own rules, and it disagreed with the gate in both
+// directions — a 27-character lowercase passphrase read as "fair" while a 12-character
+// mixed password read as "excellent".
+//
+// The COLOUR mapping stays in the renderer. The --strength-* values are CSS custom
+// properties, and DESIGN.md rule 5 keeps a colour that only a `style` prop can carry
+// in a token rather than in a Tailwind utility.
+const STRENGTH_COLORS: Readonly<Record<number, string | undefined>> = {
+  0: 'var(--border-default)',
+  1: 'var(--strength-weak)',
+  2: 'var(--strength-fair)',
+  3: 'var(--strength-good)',
+  4: 'var(--strength-strong)',
+  5: 'var(--strength-excellent)',
+};
+
+// UX-02 — The meter's labels are catalogue keys, not strings. They were hardcoded
+// Portuguese in a component whose every other string goes through t(), and the
+// English catalogue never had them, so the meter was the one place in the app that
+// could not be translated at all.
+const STRENGTH_LABEL_KEYS: Readonly<Record<number, string | undefined>> = {
+  1: 'label.strength_too_short',
+  2: 'label.strength_too_simple',
+  3: 'label.strength_good',
+  4: 'label.strength_strong',
+  5: 'label.strength_excellent',
+};
+
+function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
+  const score = scorePasswordStrength(pw);
+  const color = STRENGTH_COLORS[score] ?? 'var(--border-default)';
+  if (score === 0) return { score, label: '', color };
+  const labelKey = STRENGTH_LABEL_KEYS[score];
+  return { score, label: labelKey === undefined ? '' : t(labelKey), color };
 }
 
 function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerModalProps): React.JSX.Element {
@@ -48,20 +89,6 @@ function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerM
     }
   }, [duplicateTitle]);
 
-  function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
-    if (pw.length > 0 && pw.length < 12) return { score: 1, label: 'Muito curta (mín. 12, misto obrigatório)', color: 'var(--strength-weak)' };
-    if (pw.length === 0) return { score: 0, label: '', color: 'var(--border-default)' };
-    let score = 1;
-    if (pw.length >= 12) score++;
-    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
-    if (/[0-9]/.test(pw)) score++;
-    if (/[^A-Za-z0-9]/.test(pw)) score++;
-    const labels = ['', 'Fraca', 'Razoável', 'Boa', 'Forte', 'Excelente'];
-    const colors = ['var(--border-default)', 'var(--strength-weak)', 'var(--strength-fair)', 'var(--strength-good)', 'var(--strength-strong)', 'var(--strength-excellent)'];
-    const idx = Math.min(score, 5);
-    return { score, label: labels[idx], color: colors[idx] };
-  }
-
   async function createDrawer(): Promise<void> {
     setIsLoading(true);
     try {
@@ -89,7 +116,11 @@ function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerM
       toast.error(t('msg.password_mismatch'));
       return;
     }
-    if (password.length < 12 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+    // The gate is the shared predicate, not a second copy of the rule. The inline
+    // check it replaced had its own regexes and its own length, and it refused the
+    // long passphrases the main process accepts — the user was told "too short" for
+    // a 27-character passphrase. One module, one rule, two processes.
+    if (!isPasswordCompliant(password)) {
       toast.error(t('msg.password_too_short'));
       return;
     }
@@ -168,7 +199,7 @@ function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerM
                   {showPassword ? <EyeClosedIcon /> : <EyeOpenIcon />}
                 </button>
               </div>
-              {password.length > 0 && (
+              {strength.score > 0 && (
                 <div className="mt-2" aria-live="polite">
                   <div className="flex gap-1 mb-1">
                     {Array.from({ length: 5 }).map((_, i) => (
@@ -177,7 +208,7 @@ function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerM
                         className="flex-1 rounded"
                         style={{
                           height: '6px',
-                          backgroundColor: i < strength.score ? strength.color : 'var(--border-default)',
+                          backgroundColor: i < Math.min(strength.score, 5) ? strength.color : 'var(--border-default)',
                         }}
                       />
                     ))}

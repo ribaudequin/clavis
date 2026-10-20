@@ -1,7 +1,7 @@
 # Clavis User Guide
 
 ## Drawers
-- Create: title + password (≥12 chars, mixed).
+- Create: title + password (≥20 chars of any mix, or ≥12 chars with upper, lower, digit and symbol).
 - Unlock: same password.
 - Edit: content + save (10 M bytes / 10 M code points cap; byte limit governs save).
 - Import / Export: `.clavis` encrypted files.

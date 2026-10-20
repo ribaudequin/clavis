@@ -1,5 +1,17 @@
 # Clavis Build Targets Guide
 
+> **HISTORICAL SNAPSHOT — 2026-09-02. Superseded by `BUILD_MANUAL.md`.**
+> This file describes the build system as it was before 2026-09-03, when
+> electron-builder was removed and the single Electron Forge build took over
+> (`package.json` → `config.forge`). The `build` section it shows does not
+> exist in `package.json` any more, `npm run make:appimage` is gone, and the
+> icon paths it names are historical too: the app icon now lives in
+> `icons/clavis.png`, `icons/clavis.ico` and `icons/clavis.icns` — three
+> formats side by side with the same basename, because electron-packager
+> resolves the platform's format by rewriting the extension in place. Read
+> `BUILD_MANUAL.md` for the build as it is.
+
+
 ## Status Atual (Linux)
 
 ✅ **Linux .deb** — Gerado com sucesso (213MB)

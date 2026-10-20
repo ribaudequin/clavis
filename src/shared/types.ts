@@ -61,6 +61,15 @@ export interface ElectronAPI {
   listDrawers: () => Promise<Result<DrawerListItem[]>>;
   createDrawer: (title: string, password: string) => Promise<Result<EncryptedDrawer>>;
   unlockDrawer: (id: string, password: string) => Promise<Result<{ title: string; content: string; iconData: string } | null>>;
+  /**
+   * How long the *next* unlock attempt on this drawer would wait, in milliseconds.
+   *
+   * A read-only query, not a decision: the unlock path computes the delay itself at
+   * attempt time. The renderer asks so it can show the countdown, and the answer is
+   * exact because the only writer of the counter is a failed attempt — the attempt in
+   * question is the one about to be made.
+   */
+  getUnlockDelay: (id: string) => Promise<number>;
   saveDrawer: (id: string, password: string, title: string, content: string) => Promise<Result<void>>;
   deleteDrawer: (id: string) => Promise<Result<void>>;
   exportDrawer: (id: string) => Promise<Result<string>>;

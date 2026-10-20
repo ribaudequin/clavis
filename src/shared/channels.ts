@@ -2,6 +2,7 @@ export const CHANNELS = {
   LIST_DRAWERS: 'list-drawers',
   CREATE_DRAWER: 'create-drawer',
   UNLOCK_DRAWER: 'unlock-drawer',
+  GET_UNLOCK_DELAY: 'get-unlock-delay',
   SAVE_DRAWER: 'save-drawer',
   DELETE_DRAWER: 'delete-drawer',
   EXPORT_DRAWER: 'export-drawer',

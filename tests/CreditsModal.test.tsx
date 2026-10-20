@@ -94,6 +94,7 @@ function buildStub(): Window['electronAPI'] {
     listDrawers: async (): Promise<Result<DrawerListItem[]>> => ({ ok: true, data: [] }),
     createDrawer: async (): Promise<Result<EncryptedDrawer>> => ({ ok: true, data: { id: 'x', title: '', iconData: '', createdAt: 0, updatedAt: 0, encryptedData: '', salt: '', iv: '', authTag: '', keyDerivation: { algorithm: 'argon2id', iterations: 3, memory: 65536, parallelism: 1 } } }),
     unlockDrawer: async (): Promise<Result<{ title: string; content: string; iconData: string } | null>> => ({ ok: true, data: null }),
+    getUnlockDelay: async (): Promise<number> => 0,
     saveDrawer: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
     deleteDrawer: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
     exportDrawer: async (): Promise<Result<string>> => ({ ok: true, data: '' }),

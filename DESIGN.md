@@ -79,7 +79,7 @@ classes, because they are not `className`:
 - `react-hot-toast`'s `toastOptions` in `src/renderer/components/ToastProvider.tsx` — the whole
   visual style of every toast is a `style` object.
 - The password-strength meter's `backgroundColor`
-  (`src/renderer/components/CreateDrawerModal.tsx:52`, `:53`, `:60`, `:180`).
+  (`src/renderer/components/CreateDrawerModal.tsx:37-44`, `:60`, `:211`).
 
 These 15 properties replaced **18 hard-coded hex literals** — 9 in `ToastProvider.tsx`, 9 in
 `CreateDrawerModal.tsx`. The values are **structure, not restyling**: every one is byte-identical
@@ -422,7 +422,7 @@ one pixel.
 > pair. An editor collapsing them breaks every form in the app with no build error, no type error
 > and no failing test — the fields simply stop having a visible edge.
 
-The six elements that changed: `PasswordModal.tsx:66`, `CreateDrawerModal.tsx:141`, `:156`, `:200`
+The six elements that changed: `PasswordModal.tsx:66`, `CreateDrawerModal.tsx:172`, `:187`, `:231`
 (five inputs) and `ViewDrawer.tsx:111`, `:120` (an input and a textarea).
 
 **Scope: control boundaries, not every border.** The 3:1 requirement was applied only to edges that
@@ -525,6 +525,32 @@ action on open.**
 
 `window.focus()` is called alongside the element focus so the Electron window takes keyboard
 focus; without it the first keypress can be swallowed by the OS.
+
+**Focus during a pending action, not only on open.** `PasswordModal` is the one modal that can be
+in flight: the unlock takes up to 30 s under the rate limiter, and the prompt used to be frozen
+for that whole time. It was frozen because the password input is `disabled` while the unlock runs,
+so the browser moved the focus to `<body>` — and a keydown on `<body>` travels *upward* and never
+reaches the container that owns the Escape listener. Measured in the packaged app during an unlock:
+`{"activeTag":"BODY","inputDisabled":true,"focusInsideModal":false}`, and an Escape press left the
+dialog on screen.
+
+So the modal now **moves the focus to the Cancel button when the attempt starts** and **returns it
+to the input when the attempt ends**. Two rules, and they are the same rule 9 twice over: the
+focused control during a wait is the one that gets the user *out* of the wait, and a stray Enter on
+it cancels rather than commits.
+
+The return to the input has to happen in an **effect**, not in the `finally`: the input is disabled
+until the attempt ends, and focusing a disabled input is a no-op. An effect runs after React has
+committed the render that re-enables it.
+
+The Cancel button is **not disabled** during the wait. The guard against a second attempt is
+`if (isLoading …)` inside `handleSubmit`, not the button's `disabled` — and a button that cannot be
+pressed is not an escape route.
+
+**A pending wait is counted, and the number is announced once.** The countdown's live region
+carries a **static** sentence (`msg.unlock_wait_hint`) and the ticking number sits outside it in an
+`aria-hidden` span (`msg.unlock_wait`). A region that announced the remaining seconds every second
+would be hostile to a screen reader.
 
 **`CreditsModal` is where "on open" stops meaning the same thing as "on mount".** It is the one
 modal that takes `isOpen` as a prop, so its focus effect is keyed on that prop —
@@ -895,7 +921,7 @@ is fully conformant.
 | `danger.svg` (now `#f32929` only) | `red-50` (`#fff1f2`) | **4.62:1** | **Fixed 2026-10-13.** The second `fill:#131112` — an invisible near-black path painted over the red shape — has been removed from the asset. It was an export artefact, not a designed stroke: `#131112` measures 17.19:1 on `red-50`, which is why the icon was invisible. The file now carries a single path with `fill:#f32929`, the same colour as the discard-and-leave button it accompanies (`red-700` / `red-300`). |
 | `CreditsModal` focused nothing | ESC did not close it until the user clicked or tabbed into the panel | **Fixed 2026-10-16.** The modal now focuses its close button and calls `window.focus()` when `isOpen` goes true (`CreditsModal.tsx:92-96`) — the same rule the other four get. See [Modals](#modals). |
 | No `prefers-reduced-motion` support | 0 occurrences in `src/` | The `animate-in`/`animate-pulse` transitions do not degrade for users who have asked for reduced motion. |
-| Residual i18n leaks in the strength meter | `CreateDrawerModal.tsx:52` and `:59` hardcode `'Too short (min 8 chars)'`, `'Weak'`, `'Fair'`, `'Good'`, `'Strong'`, `'Excellent'` in English, while every other string goes through `t()`. The colours on those same lines are tokenised; the labels are not. | Part of the "not everything is tokenised yet" set. |
+| Residual i18n leaks in the strength meter | The meter's labels were hardcoded Portuguese — `'Muito curta (mín. 12, misto obrigatório)'`, `'Fraca'`, `'Razoável'`, `'Boa'`, `'Forte'`, `'Excelente'` — in a component where every other string goes through `t()`. The colours on those same lines were tokenised; the labels were not. | **Fixed 2026-10-20.** The labels go through `t()` in both catalogues (`src/i18n/index.ts`), and the meter's scoring moved into `src/shared/password-policy.ts` (`scorePasswordStrength()`), so the label can no longer disagree with the gate. This row was also wrong about the code it described: the labels were the Portuguese set above, not the English set it used to quote. |
 | **No dark mode** | — | `tailwind.config.cjs` sets `darkMode: 'class'` and the CSS is structured to allow it, but no `dark:` variant exists anywhere and no theme is defined. Deliberately deferred. Do not infer that adding `dark:` classes will work. |
 | `--border-input` has no dark-mode companion value | `#8a8a8a` is a static hex under `:root`, with no `.dark` or `@media (prefers-color-scheme)` override | Currently inert, because nothing in `src/renderer` uses a `dark:` variant (0 occurrences) — so the light value is the only value that can ever be read. It becomes a live gap the moment either of those two things changes. It also has no `prefers-color-scheme` story, so a user whose OS is dark and whose app is light gets the same 3.45:1 with no adaptation. |
 | `index.html`'s `<meta name="theme-color" content="#ffffff">` | — | Outside the CSS cascade, so it cannot be tokenised. Must be changed by hand. |

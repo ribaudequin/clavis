@@ -44,15 +44,29 @@ function createWindow(): void {
       preload: path.join(__dirname, 'preload.js'),
     },
     titleBarStyle: 'default',
+    // The window icon, from the same trio the packager uses: `icons/clavis.png`,
+    // `icons/clavis.ico` and `icons/clavis.icns` sit side by side with the same
+    // basename because the packager resolves the platform's format by rewriting
+    // the extension in place (see tests/packaging-icon.test.ts).
+    //
+    // TWO levels up, not one. The main process runs from `<app root>/dist/main`
+    // — in development and inside the packaged app alike — and the icons sit at
+    // `<app root>/icons`, a sibling of `dist`, because the packager's `ignore`
+    // rule keeps `icons` at the app root rather than under `dist`. One `..`
+    // resolved to `<app root>/dist/icons`, which does not exist: the path was
+    // wrong in development and in the packaged app, and the option was silently
+    // ignored, leaving the window with Electron's default icon. Measured, not
+    // assumed: a PNG loaded from inside the asar returns a 512×512 image, and
+    // the same load from the wrong path returns an empty one.
     icon: (() => {
       const platform = process.platform;
       if (platform === 'win32') {
-        return path.join(__dirname, '..', 'icons', 'windows', 'clavis.ico');
+        return path.join(__dirname, '..', '..', 'icons', 'clavis.ico');
       }
       if (platform === 'darwin') {
-        return path.join(__dirname, '..', 'icons', 'mac', 'icon.icns');
+        return path.join(__dirname, '..', '..', 'icons', 'clavis.icns');
       }
-      return path.join(__dirname, '..', 'icons', 'linux', '512x512.png');
+      return path.join(__dirname, '..', '..', 'icons', 'clavis.png');
     })(),
     resizable: true,
   });

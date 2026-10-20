@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { translations, t, resolveLocale, applyDocumentLanguage } from '../src/i18n';
+import { PASSWORD_MIN_LENGTH, PASSPHRASE_MIN_LENGTH } from '../src/shared/password-policy';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const LOCALES = ['pt-PT', 'en'] as const;
 const PARAMS = { version: 'v9.9.9-beta' };
@@ -64,6 +67,100 @@ describe('i18n dictionaries', () => {
     expect(withoutPlaceholder.length).toBeGreaterThan(60);
     for (const [key, value] of withoutPlaceholder) {
       expect(t(key, PARAMS)).toBe(value);
+    }
+  });
+});
+
+// SEC-08 — The rule has two branches, and the sentence the user reads is half the
+// rule if it names only one of them. The thresholds are read from the shared module
+// rather than restated here, because a test that carries its own numbers stops
+// being a guard the moment the constants move: it would still pass against a
+// sentence that had fallen behind the code.
+describe('the password policy message', () => {
+  it('names both thresholds in both catalogues, read from the shared policy', () => {
+    const expected = [String(PASSWORD_MIN_LENGTH), String(PASSPHRASE_MIN_LENGTH)].sort();
+    for (const locale of LOCALES) {
+      for (const key of ['msg.password_too_short', 'error.password_too_short']) {
+        const value = translations[locale][key];
+        // Every number the sentence carries is one of the two thresholds: a third
+        // one would be a threshold the code does not enforce — which is exactly
+        // what the stale 8-character rule looked like.
+        const numbers = (value.match(/\d+/g) ?? []).sort();
+        expect({ locale, key, numbers }).toEqual({ locale, key, numbers: expected });
+      }
+    }
+  });
+
+  it('states the same rule in both catalogues', () => {
+    // The two catalogues are not two wordings of one message: a translation that
+    // dropped the passphrase branch would leave an English user with a policy the
+    // app does not enforce.
+    const pt = translations['pt-PT']['msg.password_too_short'];
+    const en = translations['en']['msg.password_too_short'];
+    expect(pt).not.toBe(en);
+    for (const locale of LOCALES) {
+      expect(translations[locale]['msg.password_too_short']).toBe(
+        translations[locale]['error.password_too_short'],
+      );
+    }
+  });
+});
+
+// UX-02 — The strength meter's labels were hardcoded Portuguese in the component
+// while every other string in it went through t(), so the meter was the one place
+// in the app that could not be translated. The scan is the structural half of that:
+// the component must name its labels through catalogue keys, and must not carry the
+// label text itself. The count guard keeps the scan from passing on an empty
+// result if the pattern ever stops matching.
+describe('the strength meter labels', () => {
+  const source = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', 'renderer', 'components', 'CreateDrawerModal.tsx'),
+    'utf8',
+  );
+
+  it('are named through catalogue keys in the component', () => {
+    const labelKeys = source.match(/label\.strength_[a-z_]+/g) ?? [];
+    expect(labelKeys.length).toBeGreaterThanOrEqual(5);
+    expect(new Set(labelKeys).size).toBe(labelKeys.length);
+  });
+
+  it('are not carried as literals in the component', () => {
+    for (const literal of [
+      'Muito curta',
+      'Muito simples',
+      'Fraca',
+      'Razoável',
+      'Boa',
+      'Forte',
+      'Excelente',
+      'Too short',
+      'Too simple',
+      'Weak',
+      'Fair',
+      'Good',
+      'Strong',
+      'Excellent',
+    ]) {
+      const carried = new RegExp(`['"]${literal}['"]`).test(source);
+      expect({ literal, carried }).toEqual({ literal, carried: false });
+    }
+  });
+
+  it('exist in both catalogues', () => {
+    for (const key of [
+      'label.strength_too_short',
+      'label.strength_too_simple',
+      'label.strength_good',
+      'label.strength_strong',
+      'label.strength_excellent',
+    ]) {
+      for (const locale of LOCALES) {
+        expect({ locale, key, value: translations[locale][key] }).toEqual({
+          locale,
+          key,
+          value: expect.any(String),
+        });
+      }
     }
   });
 });

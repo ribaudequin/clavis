@@ -6,8 +6,9 @@
 // `build:renderer`, which is `vite build`). Measured on this box before rewriting anything —
 // the window came up as `Cannot GET /`, title "Error", zero `#root` — so all ten tests died at
 // their first locator. Stale selectors were the third reason, not the first: the passwords
-// ('testpassword') are rejected by the >= 12 character, four-class policy, and the placeholders
-// it matched were reworded in 0.6.0.
+// ('testpassword') are rejected by the password policy (>= 12 characters with all four character
+// classes, or >= 20 characters of any mix), and the placeholders it matched were reworded in
+// 0.6.0.
 //
 // Two of its tests encoded behaviour the product does not have, which is what a spec that
 // executes nowhere is for:
