@@ -71,6 +71,9 @@
   and the published `clavis.dmg`'s `clavis.app/Contents/Resources/electron.icns` is byte-identical
   to `icons/clavis.icns` (md5 `4778df33…`). Before this release the executable carried
   Electron's default.
+- **Confirmed by the owner on Windows 11**, on the same machine where the defect was found: the
+  published `clavis-win32-x64-0.6.8-beta.zip` now shows the Clavis icon. The automated check
+  proves the icon is embedded in the executable; the human confirms Windows renders it.
 
 ### Verified
 
