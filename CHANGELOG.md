@@ -1,5 +1,85 @@
 # Changelog — Clavis
 
+## v0.6.9-beta (2026-10-21)
+
+**Clavis now runs on all three platforms — and the macOS app is signed.**
+**The Windows and macOS builds had never been executed by anything.**
+
+### Changed
+
+- **The macOS `.app` is now signed.** The bundle was built unsigned — `config.forge.packagerConfig`
+  sets no `osxSign`, and `electron-packager` only signs when asked — while the packager renames
+  the executable and the bundle *before* the (absent) signing step, which invalidates Electron's
+  own signature. **On arm64 an invalid signature is a SIGKILL at launch**, so the published `.dmg`
+  could not run on Apple Silicon. It is now signed **ad-hoc** (`codesign --force --deep --sign -`),
+  which needs **no certificate, no Apple account and no money** — it is what Electron itself ships.
+  The signing is a local Forge plugin (`scripts/forge-plugin-adhoc-sign.js`) whose `postPackage`
+  hook signs every `.app` in the packaged output and **fails the build** if `codesign` fails,
+  because shipping a `.dmg` whose app cannot launch is the bug this exists to prevent.
+  `osxSign` is deliberately not used: `@electron/osx-sign` 1.3.3 treats `identity: null` as "no
+  identity passed", searches the keychain for a `Developer ID Application` certificate, finds none
+  and throws — **silently**, under Forge's `quiet: true`.
+  **The `.dmg` is still unnotarized**, because notarization needs the paid Apple Developer ID
+  certificate this project does not have, so the Gatekeeper quarantine warning remains exactly as
+  it was. **Windows is unchanged**: an unsigned `.exe` still runs, and there is no free,
+  publicly-trusted Authenticode certificate.
+- **The end-to-end suite now runs on Windows and macOS.** The `e2e` job was `ubuntu-latest` and
+  the `build` job's e2e step was Linux-only, so the published Windows and macOS artifacts had never
+  been executed by a single process — the argon2 win32 prebuild might have been failing silently
+  into the scrypt fallback, and the single-instance lock's platform-specific half was untested. A
+  new `e2e-cross` job runs the same suite on `windows-latest` and `macos-latest`, on tags and on a
+  manual `workflow_dispatch` (a tag cannot be iterated on, and a dispatch publishes nothing — the
+  `release` job is gated on the event being a push). The job is **informational**: it is in neither
+  `build`'s nor `release`'s `needs`, so a runner being unavailable cannot block a release.
+- **Something now asserts which KDF derived a drawer's key.** `encryption.ts` loads the native
+  Argon2 module lazily and **falls back to Node's scrypt** if it cannot be loaded, and the fallback
+  is silent apart from a log warning — while the `.clavis` file records the backend it actually used
+  (`keyDerivation.algorithm`). **Nothing asserted that field**, so a Windows build quietly using
+  scrypt would have been invisible. The new spec reads it off disk and fails by name if it ever
+  reads `scrypt`.
+- **The harness was hardened for the two platforms it had never met.** The artifact locator derived
+  the executable from a hardcoded list and looked for a flat file, so on macOS it found **nothing**
+  (the runner is arm64 and the layout is the `.app` bundle); it is now derived from
+  `process.platform` / `process.arch`, scoped to the host, and takes the app name from `productName`
+  the way electron-packager reads it. On macOS the log directory is `~/Library/Logs/<app>` —
+  **outside** the throwaway profile, so the specs that read it read a file shared by every Clavis
+  process on the machine; the log now follows the profile when `--user-data-dir` is present, and
+  the harness asserts it. `fs.rmSync` defaults to `maxRetries: 0`, so on Windows a file still held
+  open by a live Chromium child failed with `EBUSY` **from `afterEach`**, failing the test that had
+  just passed; removal now retries and never throws. Node maps `SIGTERM` and `SIGKILL` to one
+  forceful kill on Windows and `TerminateProcess` leaves the renderer children alive — orphaned
+  processes holding the profile's `SingletonLock` — so the teardown now kills the tree with
+  `taskkill /T /F` and falls back to `child.kill()`. `--no-sandbox` was passed unconditionally while
+  Playwright adds it **only on Linux**, so the spawned second instance and the launched one were
+  not the same programme on the other two platforms. And `Control+s` became `ControlOrMeta+s`: the
+  app accepts `ctrlKey || metaKey`, so the old press fired the handler on macOS too and the test
+  passed without ever touching ⌘S.
+- **The documentation now states what has actually been run.** `README.md` said "Only the Linux
+  artifacts have ever been executed by a test"; `SECURITY.md`'s limitation 4 was titled "only one
+  of them has ever been run". Both are now true-to-date: all three platforms are exercised, and
+  what remains unexecuted is the **published file** — the suite drives the packager output, not the
+  maker output, so the `.zip`, `Setup.exe` and `.dmg` that users download are still not the files
+  under test.
+
+### Verified
+
+- **The runners answered all three questions the work existed to ask** (run `39664705492`, a
+  `workflow_dispatch` on `main`): **15/15 on `windows-latest`** and **15/15 on `macos-latest`**,
+  with `quality` and both Linux `e2e` locales green. The app **launches on macOS** (the plugin log
+  reads *"ad-hoc signed …/out/clavis-darwin-arm64/clavis.app"*), the **native Argon2 module loads
+  on both** (`argon2id`, asserted), and the **single-instance lock refuses a second instance on
+  both**.
+- The macOS log relocation is confirmed by the outcome rather than by a claim: the "exactly one
+  `'Clavis started'`" assertion counts launches across every spec in the job, so it can only pass
+  if the log lives inside the throwaway profile.
+- `lint` 0 errors / 2 pre-existing warnings · `typecheck` 0 · `typecheck:test` 0 · **499/499** vitest
+  across 49 files · `npm run package` and `npm run make` OK (deb + AppImage) with the signing
+  plugin registered · e2e **15/15** against `out/clavis-linux-x64` in **both** locales — the
+  packaged binary, not the source tree.
+- The signing plugin is covered by 10 unit tests (the platform gate, the ad-hoc identity `-`, the
+  bundle discovered inside the platform directory, the non-`.app` paths skipped, and the failure
+  path), each mutation-checked.
+
 ## v0.6.8-beta (2026-10-20)
 
 **The password policy now accepts a passphrase — and the floor is still 12 characters, not 20.**
