@@ -76,6 +76,14 @@
   across 49 files · `npm run package` and `npm run make` OK (deb + AppImage) with the signing
   plugin registered · e2e **15/15** against `out/clavis-linux-x64` in **both** locales — the
   packaged binary, not the source tree.
+- **The published artefacts were checked, not the local build.** The two published `.dmg` files were
+  downloaded and compared side by side: `v0.6.8-beta` has **no `Contents/_CodeSignature/CodeResources`**
+  at all — electron-packager renamed the bundle and its helpers without re-sealing it, and the
+  executable kept Electron's own linker-signed ad-hoc signature under the identifier `Electron` —
+  whereas `v0.6.9-beta` carries a **complete seal** written by `codesign --force --deep --sign -`
+  (45 entries, listing the renamed `clavis Helper (GPU).app` and friends) and the executable's
+  signature now says **`com.electron.clavis`**. That the signed bundle launches is not an argument:
+  the macOS e2e leg ran **that exact app** on the runner.
 - The signing plugin is covered by 10 unit tests (the platform gate, the ad-hoc identity `-`, the
   bundle discovered inside the platform directory, the non-`.app` paths skipped, and the failure
   path), each mutation-checked.
