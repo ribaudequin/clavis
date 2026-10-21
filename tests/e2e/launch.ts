@@ -73,6 +73,31 @@ export interface IsolatedApp {
   close(): Promise<void>;
 }
 
+/**
+ * Removes a directory recursively, retrying while the OS still holds a handle on one of
+ * its files, and never throws.
+ *
+ * `fs.rmSync(dir, { recursive: true, force: true })` uses Node's default
+ * `maxRetries: 0`, and `force: true` only suppresses the error of a *missing* path. On
+ * Windows a file still open by a live Chromium child (`Local Storage/leveldb/*`,
+ * `Cache/*`, `SingletonLock`) fails with EBUSY/EPERM, and that exception is thrown
+ * from the spec's `afterEach` — failing the test that had just passed, over a file the
+ * test never touched.
+ *
+ * So it retries (Windows releases the handle shortly after the process dies) and
+ * reports instead of throwing: a leftover temporary directory is untidy, a teardown
+ * that fails the suite is worse.
+ */
+export function removeDir(dir: string): void {
+  try {
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  } catch (error) {
+    console.warn(
+      `[e2e] could not remove ${dir}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
 export async function launchIsolated(): Promise<IsolatedApp> {
   const target = resolveTarget();
   const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'clavis-e2e-profile-'));
@@ -102,12 +127,13 @@ export async function launchIsolated(): Promise<IsolatedApp> {
   const actual = await app.evaluate(async ({ app: electronApp }) => ({
     userData: electronApp.getPath('userData'),
     switched: electronApp.commandLine.hasSwitch('user-data-dir'),
+    logs: electronApp.getPath('logs'),
   }));
 
   const cleanup = async (): Promise<void> => {
     await app.close().catch(() => undefined);
-    fs.rmSync(profileDir, { recursive: true, force: true });
-    fs.rmSync(downloadDir, { recursive: true, force: true });
+    removeDir(profileDir);
+    removeDir(downloadDir);
   };
 
   // realpath, not resolve: os.tmpdir() is /var/folders/... on macOS while Electron reports
@@ -126,6 +152,23 @@ export async function launchIsolated(): Promise<IsolatedApp> {
     throw new Error(
       `Profile isolation failed: asked for ${profileDir}, Electron used ${actual.userData} ` +
         `(switch present: ${actual.switched}). Refusing to run a test against the real profile.`
+    );
+  }
+
+  // The log has to follow the profile as well. Electron's default log directory is
+  // inside `userData` on Linux and Windows, but at `~/Library/Logs/<app name>` on
+  // macOS — so a relocation that failed would leave the log in a file shared by every
+  // Clavis process on the machine, and the specs that read the log would read
+  // whichever process wrote there last. `src/main/index.ts` moves it into the profile;
+  // this checks that it stayed there.
+  //
+  // The log lives at `<profile>/logs`, so this is a *prefix* test: a path that starts
+  // with the profile directory, not one that equals it.
+  if (!canonical(actual.logs).startsWith(canonical(profileDir) + path.sep)) {
+    await cleanup();
+    throw new Error(
+      `Log isolation failed: the log would be written to ${actual.logs}, outside the ` +
+        `throwaway profile ${profileDir}. Refusing to run a test against a shared log.`
     );
   }
 

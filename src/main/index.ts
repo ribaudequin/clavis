@@ -8,6 +8,28 @@ import { acquireSingleInstanceLock } from './single-instance.js';
 
 let mainWindow: BrowserWindow | null = null;
 
+// The log has to follow the profile. Electron's default log directory sits
+// inside `userData` on Linux and Windows, but at `~/Library/Logs/<app name>` on
+// macOS — Electron 44's own `setAppLogsPath()` documentation says so — so under
+// `--user-data-dir=<profile>` the log would land outside the throwaway profile,
+// in a file shared by every Clavis process on the machine, and the e2e specs
+// would read whichever process wrote there last.
+// `app.setAppLogsPath()` overrides the same path service that
+// `app.getPath('logs')` reads, so the log stays where the app says it is and the
+// specs — which ask the running app — cannot disagree with it. On Linux and
+// Windows the resolved path is the one Electron already reports
+// (`<userData>/logs`), so this changes nothing there.
+let logRelocationError: string | null = null;
+if (app.commandLine.hasSwitch('user-data-dir')) {
+  try {
+    app.setAppLogsPath(path.join(app.getPath('userData'), 'logs'));
+  } catch (e) {
+    // A failure here must never stop the app from starting: the log simply
+    // stays where Electron put it.
+    logRelocationError = e instanceof Error ? e.message : String(e);
+  }
+}
+
 // SEC-09 — The logger is initialized here instead of inside the ready handler
 // because the "another instance is already running" line is written before the
 // app is ready, and electron-log writes to its own default location until
@@ -16,6 +38,14 @@ let mainWindow: BrowserWindow | null = null;
 // the Electron API, and it was measured to return the same path before and
 // after ready on Electron 44 — so resolving it this early is safe.
 initializeLogger();
+
+// Reported here and not inside the catch above: `logger.warn` is only safe
+// once `initializeLogger()` has pointed the file transport at the log file.
+if (logRelocationError) {
+  logger.warn('Could not move the log directory into the userData profile', {
+    error: logRelocationError,
+  });
+}
 
 // The lock has to be requested at module scope, before `app.whenReady()` and
 // before any window exists: two processes that both passed this point would

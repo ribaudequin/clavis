@@ -207,7 +207,7 @@ Before release, verify all 6 published assets:
 
 ## Security Notes
 
-- Binaries are **unsigned** (code signing skipped)
+- Binaries are **unsigned** (no certificate-based code signing; the macOS `.app` is ad-hoc signed only)
 - `argon2id` + `AES-256-GCM` encryption
 - Token-based import (5-min expiry, single-use)
 - CSP + sandbox enabled in renderer

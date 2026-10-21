@@ -118,14 +118,18 @@ test('Enter in the create form submits it', async () => {
   await expect(window.getByRole('dialog')).toHaveCount(0);
 });
 
-test('Ctrl+S saves the open drawer and the edit survives a reopen', async () => {
+test('Ctrl+S (⌘S on macOS) saves the open drawer and the edit survives a reopen', async () => {
   const { window } = await open();
   await createDrawer(window, 'Shortcut Save');
 
   await unlockDrawer(window, 'Shortcut Save');
   const edited = 'Saved with the keyboard shortcut.';
   await window.locator('#drawer-content-textarea').fill(edited);
-  await window.locator('#drawer-content-textarea').press('Control+s');
+  // `ControlOrMeta` is the platform-correct modifier: Ctrl on Linux and Windows, ⌘ on
+  // macOS — which is the accelerator the product actually offers there. A hardcoded
+  // `Control` still fires the handler on macOS (the app accepts ctrlKey *or* metaKey,
+  // `ViewDrawer.tsx:103`), so the test would keep passing while never touching ⌘S.
+  await window.locator('#drawer-content-textarea').press('ControlOrMeta+s');
 
   // Returning to the list at all means the save succeeded — handleSave only calls onBack()
   // after the result came back ok, and a failure leaves the drawer open with a toast. The

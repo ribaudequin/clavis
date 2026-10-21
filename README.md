@@ -47,7 +47,7 @@ Each release publishes 6 files:
 | Windows  | `Setup.exe`, `.nupkg`, portable `.zip` | x86-64 |
 | macOS    | `.dmg` | **arm64 only** |
 
-> **Unsigned builds.** Clavis is deliberately unsigned (see [SECURITY.md](SECURITY.md)). On Windows, SmartScreen shows "unknown publisher" — choose *More info → Run anyway*. On macOS, the `.dmg` is unnotarized, so right-click the app and choose **Open**, or run `xattr -d com.apple.quarantine /Applications/Clavis.app`.
+> **Unsigned builds.** Clavis is not signed with a certificate (see [SECURITY.md](SECURITY.md)). On Windows, SmartScreen shows "unknown publisher" — choose *More info → Run anyway*. On macOS, the `.app` is ad-hoc signed (free, no certificate) but the `.dmg` is **unnotarized**, so right-click the app and choose **Open**, or run `xattr -d com.apple.quarantine /Applications/Clavis.app`.
 
 > **Architectures, and what has actually been run.** The macOS build is **arm64 only** — the `.dmg` has no Intel (x86-64) or universal variant, and there is no arm64 build for Linux or Windows. The `.dmg` file name carries no architecture, so it does not look like the other two do. **Only the Linux artifacts have ever been executed by a test**; the Windows and macOS ones are built and published, but nothing has run them. See [SECURITY.md](SECURITY.md) for the full list of known limitations.
 

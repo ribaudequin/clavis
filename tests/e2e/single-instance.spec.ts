@@ -43,7 +43,7 @@ import type { ChildProcess } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { launchIsolated, UI } from './launch';
+import { launchIsolated, UI, removeDir } from './launch';
 import type { IsolatedApp } from './launch';
 import { resolveTarget, APP_VERSION } from './artifact';
 import type { Target } from './artifact';
@@ -66,6 +66,9 @@ const SECOND_INSTANCE_EXIT_TIMEOUT = 30_000;
 // How long the control is watched for an exit that must not happen.
 const CONTROL_OBSERVATION_WINDOW = 10_000;
 
+// `code` is null on POSIX when a signal killed the process and a number on Windows,
+// where the 'exit' event always carries the TerminateProcess exit code; `signal` is
+// always null on Windows.
 type ExitOutcome =
   | { kind: 'exited'; code: number | null; signal: NodeJS.Signals | null }
   | { kind: 'spawn-error'; message: string }
@@ -104,21 +107,24 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIM
  * losing process never opens a window, and Playwright's Electron launcher waits for one.
  */
 function spawnInstance(target: Target, userDataDir: string): SpawnedInstance {
-  // `--no-sandbox` first, exactly where Playwright puts it. This is not a shortcut: it is
-  // what makes the spawned process comparable to the first one.
+  // `--no-sandbox` first, exactly where Playwright puts it — on Linux, and only on
+  // Linux. This is not a shortcut: it is what makes the spawned process comparable to
+  // the first one.
   //
   // Playwright's Electron launcher builds its arguments as
   // `['--inspect=0', '--remote-debugging-port=0', ...args]` and then, on Linux,
   // `unshift`s `--no-sandbox` in front of them when `chromiumSandbox` is off (the
   // default) — `playwright-core/lib/coreBundle.js`, the Electron launcher's `launch()`.
-  // The first instance therefore always runs unsandboxed, and a raw `spawn` that does
-  // not repeat the flag is not running the same program.
+  // The first instance therefore runs unsandboxed on Linux and sandboxed on Windows and
+  // macOS, and the raw `spawn` below has to repeat the flag exactly where Playwright
+  // does: on Linux a spawn without it is not running the same program, and on Windows
+  // and macOS a spawn *with* it is not either.
   //
-  // The difference is invisible on a development machine and fatal on a CI runner. The
-  // runner has AppArmor's `kernel.apparmor_restrict_unprivileged_userns` set, so the
-  // unprivileged user namespace Chromium would normally use is refused; Chromium then
-  // insists on the SUID sandbox, finds `chrome-sandbox` in the packaged output owned by
-  // the runner user with mode 755 instead of 4755, and aborts:
+  // On Linux the difference is invisible on a development machine and fatal on a CI
+  // runner. The runner has AppArmor's `kernel.apparmor_restrict_unprivileged_userns`
+  // set, so the unprivileged user namespace Chromium would normally use is refused;
+  // Chromium then insists on the SUID sandbox, finds `chrome-sandbox` in the packaged
+  // output owned by the runner user with mode 755 instead of 4755, and aborts:
   //
   //   FATAL:sandbox/linux/suid/client/setuid_sandbox_host.cc:166] The SUID sandbox
   //   helper binary was found, but is not configured correctly.
@@ -129,17 +135,18 @@ function spawnInstance(target: Target, userDataDir: string): SpawnedInstance {
   // lock was never even reached.
   //
   // The application itself is unaffected: this flag is a test-harness concession that
-  // Playwright already makes for the instance it launches, and a user running the
-  // installed app gets Chromium's own sandbox.
+  // Playwright already makes on Linux for the instance it launches, and a user running
+  // the installed app gets Chromium's own sandbox.
   const args = [
-    '--no-sandbox',
+    // Linux only, because that is the only platform where Playwright adds it.
+    ...(process.platform === 'linux' ? ['--no-sandbox'] : []),
     // The AppImage has to be argv[1] as well as the executable: it is a self-extracting
     // archive with its own argv handling, and Electron lives inside it. The packager
     // output is already a plain Electron binary, and passing its own path as argv[1]
     // makes Electron try to load a directory as an application. Both shapes were
     // measured. The order here is the one Playwright produces for the same artifact
-    // (`--no-sandbox` first, then the AppImage path), and the CI `build` job runs the
-    // whole suite against the AppImage through Playwright.
+    // (on Linux, `--no-sandbox` first, then the AppImage path), and the CI `build` job
+    // runs the whole suite against the AppImage through Playwright.
     ...(target.passAsArgument ? [target.executablePath] : []),
     `--user-data-dir=${userDataDir}`,
   ];
@@ -195,10 +202,65 @@ function countLinesContaining(text: string, needle: string): number {
   return text.split('\n').filter((line) => line.includes(needle)).length;
 }
 
-/** Ends a spawned process, escalating to SIGKILL if SIGTERM is ignored. */
+/**
+ * Kills a process together with everything it started. Windows only.
+ *
+ * `child.kill()` there ends in `TerminateProcess`, which kills the browser process
+ * only: unlike POSIX, where Chromium's children notice the parent's death and go with
+ * it, the renderer and GPU children survive as orphans — and an orphaned `clavis.exe`
+ * still holds the profile's `SingletonLock`, which is exactly what the teardown below
+ * exists to prevent. `taskkill /T /F` takes the tree with it.
+ *
+ * The output is ignored on purpose: "the process was not found" is the normal answer
+ * when the child exited between the guard in `terminate()` and this call.
+ */
+function killTree(pid: number | undefined): void {
+  if (pid === undefined) return;
+  spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
+    windowsHide: true,
+    stdio: 'ignore',
+  }).on('error', () => undefined);
+}
+
+/**
+ * Ends a spawned process: SIGTERM, escalating to SIGKILL when it is ignored, on POSIX —
+ * and one tree-wide kill on Windows, where the signals do not exist.
+ */
 async function terminate(instance: SpawnedInstance): Promise<void> {
+  // Already gone. The two halves of this guard are not the same check on the two
+  // platforms: on POSIX a signalled child has a null `exitCode` and a set
+  // `signalCode`, so it is the second half that fires there; on Windows the 'exit'
+  // event always carries a numeric code (TerminateProcess) and a null signal, so it is
+  // the first half that fires there.
   if (instance.child.exitCode !== null || instance.child.signalCode !== null) return;
   const ended = withTimeout(instance.exited, 5_000);
+  if (process.platform === 'win32') {
+    // Windows has no POSIX signals: Node maps 'SIGKILL', 'SIGTERM', 'SIGINT' and
+    // 'SIGQUIT' onto one forceful, abrupt termination, so the escalation below would
+    // collapse into a single kill of the browser process — and that leaves the children
+    // alive. taskkill /T /F is the tree-wide kill, and /F is already forceful, so there
+    // is no second stage left to escalate to.
+    killTree(instance.child.pid);
+    if ((await ended) === TIMED_OUT) {
+      // The tree-kill did not end the process. `taskkill` can fail — it is not on PATH
+      // in every environment, and its own exit status is discarded — and Windows has no
+      // second escalation stage, so the browser process is still running, holding the
+      // control profile's SingletonLock.
+      //
+      // Fall back to killing the process itself: TerminateProcess ends the process
+      // that holds the lock, even when the renderer and GPU children survive it.
+      instance.child.kill();
+      if ((await withTimeout(instance.exited, 5_000)) === TIMED_OUT) {
+        console.warn(
+          `[e2e] the control instance (pid ${instance.child.pid}) is still alive after ` +
+            'taskkill and a direct kill. Its Chromium children may still hold the ' +
+            "profile's SingletonLock, and the next test would be measuring a profile " +
+            'somebody else already claimed.'
+        );
+      }
+    }
+    return;
+  }
   instance.child.kill('SIGTERM');
   if ((await ended) === TIMED_OUT) {
     // A stuck Electron. SIGKILL still releases the lock, because the lock is a file the
@@ -223,7 +285,11 @@ test.afterEach(async () => {
   await first?.close();
   first = null;
   for (const dir of tempProfiles) {
-    fs.rmSync(dir, { recursive: true, force: true });
+    // removeDir(), not fs.rmSync(): the control instance above has just been terminated,
+    // and its Chromium children may still hold files in this profile for a moment — and
+    // Node's default maxRetries is 0, so on Windows the removal would throw EBUSY from
+    // here and fail the test that had just passed. removeDir retries and never throws.
+    removeDir(dir);
   }
   tempProfiles.length = 0;
 });

@@ -124,12 +124,12 @@ It is made **only when the Credits modal is opened**, and only to compare the la
 
 **The check is bounded and fails closed.** It carries a **5-second** deadline after which the request is destroyed, listens for an error on the response as well as on the request, treats any non-2xx status as *no information* rather than parsing the body, and validates the payload with Zod. Every one of those paths resolves "no update known" instead of propagating: a stalled or hostile response can cost the About card its version line, and cannot hang the renderer, crash the main process, or leave the app believing it is up to date when it is not.
 
-### No code signing
+### Code signing and notarization
 
-Deliberately unsigned — there are no EV certificates and no Apple notarization credentials.
+There are no EV certificates and no Apple notarization credentials.
 
 - **Windows**: the release workflow passes two optional, unset secrets (`WINDOWS_CERT_FILE`, `WINDOWS_CERT_PASSWORD`). Because no signing happens, the `.exe` shows **"unknown publisher"** in SmartScreen and requires an explicit *More info → Run anyway*.
-- **macOS**: the `.dmg` is built with `format: "ULFO"` (unnotarized). Gatekeeper blocks first launch and requires an explicit override: right-click the app → **Open**, or `xattr -d com.apple.quarantine /Applications/Clavis.app`.
+- **macOS**: the `.app` bundle is **ad-hoc signed** — `codesign --force --deep --sign -`, which needs no certificate, no Apple account and no money, and is what makes the bundle launchable on arm64 (an invalid signature is a SIGKILL at launch). It is **not notarized**, because notarization needs the paid Apple Developer ID certificate, which this project does not have. So the `.dmg` is still built with `format: "ULFO"` and Gatekeeper still blocks the first launch: right-click the app → **Open**, or `xattr -d com.apple.quarantine /Applications/Clavis.app`.
 
 ## Known Limitations
 

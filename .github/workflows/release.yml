@@ -11,6 +11,14 @@ on:
     branches:
       - main
       - test/downgrade-forge-6.4.2
+  # The manual verification channel, and the reason the tag-only rule is survivable.
+  #
+  # The Windows and macOS legs run only on tags, and a tag cannot be iterated on:
+  # pushing a throwaway tag to test a workflow is exactly the kind of thing that ends
+  # up publishing something. A dispatch runs those legs against any ref, and publishes
+  # nothing — the `release` job is gated on the event being a push, so a dispatch
+  # cannot reach it even when the ref picked in the dropdown is a tag.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -107,9 +115,183 @@ jobs:
           CLAVIS_E2E_TARGET: out/clavis-linux-x64/clavis
           LANGUAGE: ${{ matrix.language }}
 
+  # The Windows and macOS legs. Tags only (owner decision, 2026-10-21), plus the manual
+  # trigger above.
+  #
+  # A separate job rather than a matrix dimension of `e2e`: that job is the cheap
+  # per-push gate (every push and every pull request, two locales, one platform) and it
+  # has to stay that way, while these two legs cost a native install and a package on a
+  # runner that is not Linux. The gap they close is the one this project carried from
+  # the start: the app is BUILT for three platforms and had only ever been EXECUTED on one.
+  # The published Windows zip, the Squirrel Setup.exe and the .dmg had never been
+  # launched by a single process — they were downloaded by users and believed to work.
+  #
+  # THIS JOB IS INFORMATIONAL. It does not gate the release: neither `build` nor
+  # `release` names it in its `needs`. The legs run only on tags (owner decision,
+  # 2026-10-21) plus the manual trigger above, so they measure rather than block —
+  # a cross-platform leg that failed would be a finding to write down, not a reason
+  # for the release to stop shipping.
+  #
+  # The macOS leg is EXPECTED TO BE GREEN. The `.app` is now AD-HOC SIGNED: a local
+  # Forge plugin (`scripts/forge-plugin-adhoc-sign.js`) signs the bundle in the
+  # `postPackage` hook, once the packager has renamed it — `codesign --force --deep
+  # --sign -` followed by `codesign --verify --deep`, and a failing `codesign` FAILS
+  # THE BUILD rather than shipping a bundle that cannot launch.
+  #
+  # The ad-hoc signature is what makes the bundle launchable on arm64, where an
+  # invalid signature is a SIGKILL at launch. It is FREE: no certificate, no Apple
+  # account, no money — which is exactly why it was chosen (owner decision,
+  # 2026-10-21) over the alternative of leaving the bundle unsigned.
+  #
+  # WHAT THE AD-HOC SIGNATURE DOES NOT FIX: the Gatekeeper "downloaded from the
+  # internet" quarantine warning remains. Removing that needs NOTARISATION, and
+  # notarisation needs a paid Apple Developer ID certificate — OUT OF SCOPE for
+  # budget reasons, and THAT PART IS UNCHANGED. A notarised, trusted bundle is a
+  # future item that costs money; the ad-hoc signature is the part that could be
+  # paid for with nothing but an afternoon.
+  #
+  # The Windows leg is EXPECTED TO BE GREEN — there is no signing problem on Windows
+  # (an unsigned `.exe` still runs, and there is no free publicly-trusted
+  # Authenticode certificate) — so a red Windows leg is a genuine finding, visible in
+  # this same job.
+  #
+  # Consequence for users, worth knowing: the macOS .dmg ALREADY PUBLISHED carries
+  # the UNSIGNED bundle — it was cut before this change — so it does not run on Apple
+  # Silicon. The next release's .dmg carries the ad-hoc-signed bundle. The
+  # quarantine warning will still be there on that one, for the notarisation reason
+  # above.
+  e2e-cross:
+    needs: quality
+    # The first two clauses are `build`'s condition, verbatim. It used to be mandatory:
+    # `build` needed this job, and a skipped dependency skips the dependent, so a
+    # narrower condition here would have blocked the `test/downgrade-forge-6.4.2` path
+    # entirely. Nothing needs this job any more — it is informational — but keeping the
+    # same trigger set keeps the measurement where the artefacts are built: on a tag and
+    # on the branch that builds them.
+    #
+    # The third clause is the manual channel the tag-only rule needs. A tag cannot be
+    # iterated on, so `workflow_dispatch` runs these legs against any ref; the
+    # `release` job below is gated on the event being a push, so a dispatch publishes
+    # nothing — not even when the ref picked in the dropdown is a tag.
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/test/downgrade-forge-6.4.2' || github.event_name == 'workflow_dispatch'
+    strategy:
+      # fail-fast off: a red Windows leg must not cancel the macOS one. They answer
+      # different questions — the win32 native module and the Windows kill semantics on
+      # one side, the ad-hoc-signed .app bundle, the log path and the single-instance
+      # lock on the other — and a cancelled leg produces no verdict at all.
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    # A hung Electron — a native modal nobody can dismiss — would otherwise hold the
+    # runner for its six-hour default. Thirty minutes is generous for an install, a
+    # packager build and the 15 specs.
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          # The same major as everywhere else in this workflow: Electron 44 requires
+          # >=22.12, and 24 is the runtime the actions themselves ask for.
+          node-version: 24
+          cache: npm
+
+      # Windows — skip the native rebuild, use the shipped prebuilds, exactly as the
+      # `build` job does. argon2 ships NAPI prebuilds inside the tarball (`prebuilds/
+      # win32-x64` among them) and its install script is only a node-gyp-build
+      # fallback, which on the runner would need MSVC to do anything at all. Electron
+      # 44's npm package has no postinstall script at all — it fetches the binary
+      # lazily, on the first require — so skipping the scripts costs nothing else.
+      - name: Install dependencies (Windows — skip native rebuild, use prebuilds)
+        if: runner.os == 'Windows'
+        run: npm ci --ignore-scripts
+
+      # macOS — the plain install. The runner has the toolchain and the darwin-arm64
+      # argon2 prebuild is in the tarball, so there is no source build to skip either.
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      # `electron-forge package` with no --platform, so it packages for the HOST: a
+      # native build for the runner it is about to run on. It takes about nine seconds
+      # and produces the fully packaged application (asar, native modules unpacked),
+      # with no squashfs, no deb and no dmg step — which is what makes this job
+      # affordable on a runner that is not Linux. `npm run make` (the maker output: the
+      # .dmg, the Squirrel installer) is a packaging problem, not a behaviour problem,
+      # and stays in the `build` job.
+      - name: Package application
+        run: npm run package
+
+      # English only, and that is a decision, not an oversight.
+      #
+      # The `language: [en, pt]` matrix on the Linux job sets the LANGUAGE environment
+      # variable, and that is a Linux-only lever: on Windows the UI locale comes from
+      # GetUserDefaultUILanguage and on macOS from [NSLocale preferredLanguages], both
+      # en-US on the runners. A pt leg here would render English, pass, and exercise
+      # nothing — leaving the pt-PT half of every two-locale regex in launch.ts
+      # permanently unexercised, which is the exact blind spot the matrix exists to
+      # close. The portable lever (stubbing navigator.language before the app boots)
+      # is a separate, deferred item, to be proven on Linux first, where it can be
+      # measured locally.
+      #
+      # DO NOT add a `language` dimension to this job's matrix: it would read as if
+      # pt-PT were covered on Windows and macOS while covering nothing at all.
+      #
+      # No CLAVIS_E2E_TARGET either: the locator derives the native build from the host
+      # (process.platform / process.arch) and finds the packaged app on its own. A
+      # hardcoded `out/clavis-darwin-arm64/...` would bake today's runner architecture
+      # into the workflow, and would be wrong the day macos-latest changes.
+      #
+      # The whole suite runs here, unmodified, on both runners — including
+      # single-instance.spec.ts, whose premise is the one that is platform-sensitive.
+      # Chromium's ProcessSingleton has two implementations: a named mutex on Windows
+      # and a POSIX lock file plus a unix socket on every POSIX platform, macOS
+      # included. So the macOS leg exercises the same lock-file mechanism Linux uses,
+      # and the platform-specific part there is the window behaviour — the
+      # `second-instance` handler's `restore()`/`focus()` half, which on macOS does
+      # not reliably raise a window.
+      #
+      # The "macOS hands the second instance off at the OS level" case does not apply
+      # here: that handoff is LaunchServices' behaviour when an app is opened through
+      # the Finder or `open`, and this harness never goes through LaunchServices — the
+      # locator execs `clavis.app/Contents/MacOS/clavis` directly and the spec spawns
+      # the raw binary. The decision is to read what the runner says rather than to
+      # exclude the spec up front; a verdict that differs from Linux is a finding to
+      # write down, not a reason to have guessed in advance.
+      #
+      # No xvfb here: the Windows and macOS runners have a desktop session, and the
+      # Linux leg keeps `xvfb-run -a`. `_electron` drives the application's own
+      # Chromium, so there is no Playwright browser to download either.
+      - name: End-to-end tests
+        run: npm run test:e2e
+
   build:
+    # The release gate: `quality` (lint, both typechecks, the unit suite) and `e2e` (the
+    # Linux suite, both locales, on every push and pull request).
+    #
+    # The cross-platform legs are NOT in here on purpose: they are informational (see
+    # `e2e-cross` above). They run only on tags, so a release must not depend on
+    # whether a Windows or macOS runner happened to be available when the tag was
+    # pushed.
     needs: [quality, e2e]
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/test/downgrade-forge-6.4.2'
+    # THE GATE RESTS ON THIS CONDITION NOT NAMING A STATUS-CHECK FUNCTION.
+    #
+    # GitHub ANDs an implicit `success()` into a job's `if:` that has no status-check
+    # function of its own, and a skipped or failed dependency skips the dependent.
+    # Those two rules together are what make the release depend on `quality` and `e2e`:
+    # either one does not run, or does not pass, `build` is skipped with it, and
+    # `release` never runs.
+    #
+    # So do not add `always()`, `!cancelled()` or `failure()` to the condition above:
+    # any of them replaces the implicit `success()` and the gate evaporates silently —
+    # `build` would then run and publish even when `quality` or the Linux `e2e` failed.
     strategy:
       fail-fast: false
       matrix:
@@ -196,8 +378,18 @@ jobs:
           if-no-files-found: error
 
   release:
+    # `build` only. `e2e-cross` is deliberately NOT named here: on a push to `main` and
+    # on a pull request that job is skipped, and a skipped dependency skips the
+    # dependent — so naming it would silently stop every release. The cross-platform
+    # legs are informational (see `e2e-cross` above); the release gate is `quality` and
+    # the Linux `e2e`, carried by `build`.
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    # `github.event_name == 'push'` is what makes the manual trigger safe. The "Run
+    # workflow" dropdown lets you pick a *tag*, and a dispatch made from a tag has
+    # github.ref = refs/tags/v… — the tag test alone would pass and the release would
+    # be published, which is precisely the accident the manual trigger exists to
+    # prevent. A release is published by pushing a tag and by nothing else.
+    if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
