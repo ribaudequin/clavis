@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { translations, t, resolveLocale, applyDocumentLanguage } from '../src/i18n';
 import { PASSWORD_MIN_LENGTH, PASSPHRASE_MIN_LENGTH } from '../src/shared/password-policy';
 import * as fs from 'fs';
@@ -22,9 +22,13 @@ function parityAgainst(reference: string, locale: string): { locale: string; mis
   };
 }
 
-beforeEach(() => {
-  vi.stubEnv('CI', undefined);
-});
+// HYG-23 — `process.env.CI` is no longer stubbed here. It was, to neutralise a
+// short-circuit that no longer exists: `detectLocale()` used to open with
+// `if (process.env.CI) return 'en';`, which was dead code in every packaged build
+// (Vite rewrites `process.env` to `{}`) and unnecessary in the tests (jsdom's
+// `navigator.language` is always 'en-US', and the tests that care pin it themselves).
+// Nothing reads the variable now, so stubbing it would only be a trace of a branch
+// that is gone — and the guard that keeps it gone is at the bottom of this file.
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -263,10 +267,36 @@ describe('document language (WCAG 3.1.1)', () => {
     }
   });
 
-  it('carries no CI short-circuit of its own, so it cannot answer differently under test', () => {
+  it('answers from the language tag alone, whatever the environment holds', () => {
     vi.stubEnv('CI', 'true');
     expect(resolveLocale('pt-PT')).toBe('pt-PT');
     expect(resolveLocale('en-US')).toBe('en');
+  });
+
+  // HYG-23 — The test above was misleading, and it is worth saying why, because the
+  // mistake it made is the mistake the whole item was about. It claimed that the
+  // locale decision "carries no CI short-circuit", and it asserted that against
+  // `resolveLocale` — the pure function, which never had one. The short-circuit lived
+  // in `detectLocale()`, the function the app actually calls, and *that* function did
+  // answer differently under CI until 2026-10-22. The assertion was true of a function
+  // that could not have been wrong, and silent about the one that was.
+  //
+  // So the guard is stated against the real decision path: the rendered string.
+  it('renders the same language with CI set and with it unset', () => {
+    const PROBE = 'label.credits_title';
+    setLanguage('pt-PT');
+    vi.stubEnv('CI', undefined);
+    const withoutCi = t(PROBE);
+    vi.stubEnv('CI', 'true');
+    const withCi = t(PROBE);
+
+    expect({ withCi, withoutCi }).toEqual({
+      withCi: translations['pt-PT'][PROBE],
+      withoutCi: translations['pt-PT'][PROBE],
+    });
+    // The count guard: the probe has to be one whose two catalogues differ, or the
+    // comparison above would hold under any locale decision at all.
+    expect(translations['en'][PROBE]).not.toBe(translations['pt-PT'][PROBE]);
   });
 
   it('writes the locale onto <html lang> for a Portuguese system language', () => {
@@ -356,5 +386,59 @@ describe('document language (WCAG 3.1.1)', () => {
       order: ['applyDocumentLanguage', 'render'],
       attribute: 'pt-PT',
     });
+  });
+});
+
+// HYG-23 — The structural half of the guard: the renderer must hold no CI override.
+//
+// The behavioural guard above proves the *rendered* language does not change when CI
+// is set, and it would catch the branch coming back. This one catches what it cannot:
+// an override through some *other* environment variable, and the general shape of the
+// problem — a branch that is dead in a packaged build, because Vite rewrites
+// `process.env` to `{}`, reads in the source like a feature and the next reader
+// trusts it. That branch was in the shipped bundle as `{}.CI ? 'en' : …`, a constant
+// undefined, for months.
+//
+// The scan reads the CODE, not the prose: the source's own note about the removed
+// branch quotes it verbatim, and a scan that read the comment would forbid the very
+// explanation of why the branch is gone. Both halves of that are proved below.
+describe('the renderer holds no CI override', () => {
+  const I18N_SOURCE = path.resolve(__dirname, '..', 'src', 'i18n', 'index.ts');
+  const source = fs.readFileSync(I18N_SOURCE, 'utf8');
+
+  function codeOnly(text: string): string {
+    return text
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/^\s*\/\/.*$/gm, ' ');
+  }
+
+  function envReadsIn(text: string): number {
+    return (codeOnly(text).match(/process\.env/g) ?? []).length;
+  }
+
+  it('sees an environment read in code — the count guard', () => {
+    const FIXTURE = [
+      'function detectLocale(): Locale {',
+      "  if (process.env.CI) return 'en';",
+      '}',
+    ].join('\n');
+    expect(envReadsIn(FIXTURE)).toBe(1);
+  });
+
+  it('ignores an environment read that only appears in a comment', () => {
+    const FIXTURE = [
+      '// This used to open with `if (process.env.CI) return \'en\';`.',
+      'function detectLocale(): Locale {',
+      "  return resolveLocale(navigator.language || 'en');",
+      '}',
+    ].join('\n');
+    expect(envReadsIn(FIXTURE)).toBe(0);
+  });
+
+  it('holds no environment read of any kind, so no other override can hide in here', () => {
+    // Narrow on purpose: `process.env` in the *main* process is a different thing
+    // (src/main/ipc-handlers.ts reads LANG for two log strings), and this file is the
+    // renderer's. What must not exist here is a second way to decide the locale.
+    expect(envReadsIn(source)).toBe(0);
   });
 });

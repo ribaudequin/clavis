@@ -25,6 +25,7 @@ export const translations: Record<string, TranslationDict> = {
     'btn.change_title': 'Alterar título',
     'msg.no_drawers': 'Nenhuma gaveta criada.',
     'msg.drawer_exported': 'Gaveta exportada com sucesso.',
+    'msg.drawer_export_failed': 'A exportação não foi concluída. O ficheiro não foi escrito.',
     'msg.drawer_deleted': 'Gaveta eliminada com sucesso.',
     'msg.imported': 'Importada com sucesso.',
     'msg.error_export': 'Erro ao exportar:',
@@ -133,6 +134,7 @@ export const translations: Record<string, TranslationDict> = {
     'btn.change_title': 'Change title',
     'msg.no_drawers': 'No drawers created.',
     'msg.drawer_exported': 'Drawer exported successfully.',
+    'msg.drawer_export_failed': 'The export did not finish. The file was not written.',
     'msg.drawer_deleted': 'Drawer deleted successfully.',
     'msg.imported': 'Imported successfully',
     'msg.error_export': 'Error exporting:',
@@ -231,8 +233,25 @@ export function resolveLocale(navigatorLanguage: string): Locale {
   return 'en';
 }
 
+// HYG-23 — There is no CI override here, and no environment override of any kind: the
+// locale is the system's, decided in exactly one place (resolveLocale, above).
+//
+// This function used to open with `if (process.env.CI) return 'en';`, added on 2026-09-12
+// to settle a PasswordModal.test.tsx failure on GitHub Actions. It was dead code in
+// every packaged build — Vite rewrites `process.env` to `{}`, so the branch shipped as
+// `{}.CI ? 'en' : …`, a constant undefined — and it stopped being needed by the tests
+// long ago: jsdom's `navigator.language` is always 'en-US', and the tests that care
+// about a locale pin it themselves. Measured before the removal: the suite was 513/513
+// green with the branch deleted, with `CI=true` and with `CI` unset.
+//
+// A branch that reads like an override and does nothing is worse than no branch: the
+// e2e comments here once claimed that `CI=1` pinned the packaged UI to English, and the
+// e2e locale matrix had to be built around a lever that was never there.
+//
+// The guard against it coming back is in tests/i18n.test.ts — behavioural (the rendered
+// language does not change when CI is set) and structural (this file holds no
+// `process.env.CI`).
 function detectLocale(): Locale {
-  if (process.env.CI) return 'en';
   return resolveLocale(navigator.language || 'en');
 }
 

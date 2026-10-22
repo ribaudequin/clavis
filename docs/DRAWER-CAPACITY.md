@@ -18,7 +18,7 @@ constant in the source; the file-size figures were measured, not estimated.
 | **Text that survives an export → import round trip** | the same 10 M code points, but the round trip completing does **not** mean it reopens |
 | **Size of the resulting `.clavis` file** | **2× the text**, because the payload is stored as hex |
 | **Where these limits are enforced** | four places, all in `src/main`, in **three different units** |
-| **Limit shown to the user** | none — and the refusal that does arrive says "Incorrect password" |
+| **Limit shown to the user** | the byte ceiling, in the capacity counter under the text — and the refusal, when it arrives, names the size, not the password |
 
 ---
 
@@ -36,16 +36,19 @@ They are separate checks in separate places, and they do not all measure the sam
 
 **Fixed in code, not in the unit.** `unlockDrawer()` returns a typed `{ok:false,reason}` (`SAV-02`), `encrypt()` rejects oversized content (`SAV-03`), `importDrawerRaw()` rejects oversized ciphertext (`SAV-01`), and all read paths (`Block B`) use `stat.size` before allocating. The gap between code-point and byte counting remains by design — the fix is that an oversized drawer is refused clearly, not silently.
 
-> ⚠️ **Until that is fixed, "10 MB" below means two different numbers depending on which check you
+> ⚠️ **"10 MB" below means two different numbers depending on which check you
 > are asking about.** For ASCII they coincide at 10 000 000. For anything else they do not.
 
 The third is not an independent number: it is derived from the second as
 `MAX_DECRYPTED_SIZE * 2 + 4_096`, because hex doubles the payload. See
 [Why the import cap is derived](#why-the-import-cap-is-derived).
 
-**There is no limit in the renderer.** No `maxLength` attribute exists anywhere under
+**There is no `maxLength` in the renderer.** No `maxLength` attribute exists anywhere under
 `src/renderer/`. The textarea accepts whatever is pasted into it, and the refusal arrives
-asynchronously from the main process with the message `Content too large (max 10MB)`.
+asynchronously from the main process as `ErrorCode.CONTENT_TOO_LARGE`; the renderer shows the
+translated sentence ("This drawer is too large for the app to open or save."), and the number
+reaches only the main process's log, where the Zod message reads
+`Content too large (max 10,000,000 code points)`.
 
 **This is a denial-of-service guard, not a product limit.** It exists so that a hostile or
 corrupt `.clavis` cannot make the main process allocate gigabytes — a real concern, since the
@@ -135,16 +138,26 @@ if (isCiphertextOverCap(drawer.encryptedData)) {
 Node's hex decoder stops at the first invalid pair, so the decoded length never exceeds `floor(len / 2)`.
 The residue is only drawers that were **already on disk** before the guards landed — see the banner above.
 
-`importDrawerRaw()` caps the **file** at `20_004_096` characters, and that number is no longer
-typed by hand. It is computed from the limit that decides what may be saved in the first place:
+`importDrawerRaw()` caps the **file** at `20_004_096` characters, and that number is not an
+independent constant any more: it is computed from the limit that decides what may be saved in the
+first place, and then clamped.
 
 ```ts
 const IMPORT_ENVELOPE_OVERHEAD = 4_096;
-const MAX_IMPORT_FILE_SIZE = MAX_DECRYPTED_SIZE * 2 + IMPORT_ENVELOPE_OVERHEAD;
+const ABSOLUTE_IMPORT_CEILING = 20_004_096;
+export const MAX_DRAWER_FILE_SIZE = Math.min(
+  MAX_DECRYPTED_SIZE * 2 + IMPORT_ENVELOPE_OVERHEAD,
+  ABSOLUTE_IMPORT_CEILING
+);
 ```
 
-Two constants cannot drift apart if only one of them exists. This is not cosmetic: the cap used to
-be an independent `11_000_000` whose own comment read
+The two branches are equal today — 10 000 000 × 2 + 4 096 = 20 004 096 — so the `Math.min` is a
+no-op, and that is exactly what it is there for: the clamp pins the denial-of-service bound, so a
+future rise in the text limit cannot carry the file ceiling up with it. Do not simplify it away.
+
+The file cap and the limit it caps are not free to drift: one is computed from the other, and the
+clamp is what holds the denial-of-service bound still while the text limit moves. This is not
+cosmetic: the cap used to be an independent `11_000_000` whose own comment read
 
 ```ts
 const MAX_IMPORT_FILE_SIZE = 11_000_000; // ~11MB; slightly above MAX_DECRYPTED_SIZE (10MB) to allow JSON overhead

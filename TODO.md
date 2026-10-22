@@ -793,7 +793,63 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
       re-threw them by type with the comment "Propagate to ipc-handlers for explicit message" — the same
       defect class, left standing in the file this work was cleaning.
 - [x] **HYG-13 — absolute boundary (`10_000_000`) in `tests/encryption.test.ts`** — DONE (2026-10-17)
-- [ ] **HYG-13b — the byte-cap boundaries are still asserted only *relative to* the constant.**
+- [x] **HYG-13b — the byte-cap boundaries are still asserted only *relative to* the constant — DONE 2026-10-22.**
+      **The anchor is `tests/limits.absolute.test.ts` (14 tests).** The cap family is
+      `CONTENT_CEILING = 10_000_000` → `MAX_CONTENT_CODE_POINTS` (code points) /
+      `MAX_PLAINTEXT_BYTES` (bytes) → `MAX_DECRYPTED_SIZE` (the re-export store.ts derives
+      from) → `MAX_DRAWER_FILE_SIZE` (characters of a `.clavis` file, `min(2× + 4 096,
+      20_004_096)`). **What was actually unguarded, measured rather than assumed:**
+      **(1) The file ceiling was pinned NOWHERE.** Two copies of `20_004_096` lived in the
+      test tree — the ipc-handlers store mock and the SEC-07 metadata assertion — but a copy
+      is a *use*, not an assertion, and the mock would have kept serving the old number after
+      the source moved. **Lowering `ABSOLUTE_IMPORT_CEILING` from `20_004_096` to `20_004_010`
+      — 86 characters, a cap that moved for real — left the whole suite green, 499/499.**
+      Below that the suite only notices by *collision* (the payloads the store tests build
+      stop fitting under the cap), not by comparison. **(2) The two content ceilings were
+      pinned, but by three unrelated files** (`tests/encryption.test.ts` (HYG-13),
+      `tests/ViewDrawer.test.tsx` (the tripwire), `tests/validation.test.ts` (the boundary
+      literals)) — three owners of one policy, none owning it whole. **(3) Nothing said the
+      file cap is DERIVED:** replacing the whole derivation in `store.ts` with
+      `export const MAX_DRAWER_FILE_SIZE = 20_004_096;` — same number, same behaviour today —
+      left the suite **516/516 green**. That is the house's "faithful re-inline" case: it
+      behaves identically, so no behavioural test can see it, and the clamp `store.ts` warns
+      about ("it becomes load-bearing the moment the text limit rises") is exactly what a
+      literal throws away.
+      **The fix, in three parts.** (a) *Value anchors*: the four numbers, stated once, in
+      absolute terms, with the unit relationship (the code-point cap admits 4× the bytes) and
+      the derivation relation. (b) *Wiring anchors*, built on the house pattern
+      (`vi.doMock` of `src/shared/limits.js`, then `await import('../src/main/store.js')`): the
+      file cap **follows the byte cap** when the byte cap moves (mocked to 1 000 000 → the cap
+      must be `2 004 096`), **stays pinned by the absolute ceiling** when the byte cap rises
+      (mocked to 50 000 000 → the cap must stay `20_004_096`), and **takes the envelope
+      allowance from the source** (mocked to 9 000 000 → `18 004 096`, which is only
+      `2 × 9 000 000 + 4 096` if `store.ts` adds its own 4 096). A count guard proves the
+      mock reaches the derivation at all (two byte caps → two file caps), so the three cannot
+      pass for the wrong reason. (c) *The copies retired*: the ipc-handlers mock no longer
+      overrides `MAX_DRAWER_FILE_SIZE` (the real value reaches the handler through the
+      spread), `tests/sec05-sec07-metadata.test.ts` reads the export instead of the literal,
+      and `tests/store.test.ts` states the envelope as `MAX_DRAWER_FILE_SIZE` instead of
+      `2 × MAX_DECRYPTED_SIZE + 4 096`.
+      **Mutation-verified (7 mutations, each reverted after the run):** the byte cap raised
+      → **14 red**; the code-point cap split off to 40 M → **5 red**; the file ceiling
+      lowered by 86 chars → **3 red**; the file cap hardcoded as a literal → **3 red**; the
+      envelope allowance changed to 8 192 → **2 red**; the absolute clamp removed → **1 red**;
+      the doc stating a different capacity → **1 red**.
+      **Two stale claims in `docs/DRAWER-CAPACITY.md` were corrected while the doc was being
+      guarded** (it now has a guard on its capacity table, row by row): the doc still quoted
+      a message the app never shows (`Content too large (max 10MB)` — the renderer shows the
+      translated sentence for `ErrorCode.CONTENT_TOO_LARGE`, and the number reaches only the
+      main process's log), and it still said "Limit shown to the user: none — and the refusal
+      says 'Incorrect password'", which stopped being true when the capacity counter and the
+      `too_large` refusal landed. The doc's derivation snippet was also a generation behind:
+      it showed `MAX_IMPORT_FILE_SIZE = MAX_DECRYPTED_SIZE * 2 + IMPORT_ENVELOPE_OVERHEAD`
+      with no `ABSOLUTE_IMPORT_CEILING` clamp.
+      **Gates:** lint 0 errors / 2 pre-existing warnings · both typechecks 0 · **513/513** vitest
+      across 50 files · `npm run build` OK.
+      **What this deliberately does not do:** the behavioural boundary tests stay relative
+      (`'x'.repeat(MAX_DECRYPTED_SIZE + 1)`). They probe the *true* boundary, and an absolute
+      construction would stop probing it the moment the cap moved; the anchor states the
+      policy and those tests hold the behaviour to it.
 - [x] **HYG-25 — the shipped asar contained the whole project directory — CLOSED 2026-10-18.**
       Found by extracting `app.asar` out of the locally built AppImage to verify the HYG-22 fixes
       were really in the binary. They were — and so was everything else. `packagerConfig` had **no
@@ -814,19 +870,101 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
       is a `files` key, but `@electron/packager` has no such option — the filter is `ignore`, and
       its entries must be **bare regex sources**, not `/.../ ` literals, because the packager calls
       `file.match(entry)` and the delimiters become part of the pattern.
-- [ ] **HYG-23 — `detectLocale()`'s `if (process.env.CI) return 'en'` is dead code in every packaged
-      build.** Vite rewrites `process.env` to `{}`, so the shipped bundle reads
+- [x] **HYG-23 — `detectLocale()`'s `if (process.env.CI) return 'en'` was dead code in every packaged
+      build — DELETED 2026-10-22 (owner decision: delete).**
+      **What it was:** Vite rewrote `process.env` to `{}`, so the shipped bundle read
       `function f(){return {}.CI?\`en\`:d(navigator.language||\`en\`)}` — a constant `undefined`. It
-      stabilises `tests/i18n.test.ts` and nothing else. Harmless today (the product is meant to follow
-      the system language) but it reads like a CI override, and an e2e comment here once claimed
-      `CI=1` pinned the packaged UI to English when it does nothing. **Decide:** delete the branch, or
-      accept it as test-only and say so where it is written.
-- [ ] **HYG-24 — `HomeScreen.tsx:92` revokes the export blob synchronously right after `a.click()`.**
-      It works because the download starts in the same task, which is a race the platform has not lost
-      yet. The e2e round trip exercises it, but only through the artificial `setSavePath` path that pins
-      the transfer, so a Chromium bump turning the race real would surface as a download timeout
-      pointing at the test harness rather than at this line. Move the revoke into the download's
-      completion, or document why it is safe.
+      was added on 2026-09-12 (`983bc88`) to settle a `PasswordModal.test.tsx` failure on GitHub
+      Actions, and it had been the wrong tool ever since: `resolveLocale()` was extracted as a pure
+      function (P3.32) and the locale decision was centralised (ADR-009 — *the app follows the
+      system language, no override*).
+      **Measured before the removal:** with the branch deleted the suite was **513/513 green in both
+      environments** — `CI=true` (what GitHub Actions sets) and `CI` unset. Nothing needed it:
+      jsdom's `navigator.language` is always `en-US`, and the tests that care about a locale pin it
+      themselves. The shipped bundle no longer contains `process.env` **at all** (verified in
+      `dist/renderer/assets/index-*.js`).
+      **The "accept it as test-only" option was not available where it stood:** the branch lives in
+      `src/`, so in the packaged app it was dead code, not a test-only convenience. The only honest
+      forms of that option were *delete it* or *make it real* (a runtime override read in the **main**
+      process, where `process.env` is real) — and a real override would contradict ADR-009, so the
+      owner chose deletion.
+      **The removal was not the whole item — the guard is.** `tests/i18n.test.ts` now has two halves:
+      **behavioural** (the *rendered* language does not change when `CI` is set: `t()` is compared
+      against the Portuguese catalogue with `CI=true` and with `CI` unset, with a count guard proving
+      the probe's two catalogues differ) and **structural** (the renderer's source holds **no**
+      `process.env` read of any kind, scanned *code only* — the source's own note about the removed
+      branch quotes it verbatim, so a scan that read the prose would forbid the explanation of why it
+      is gone; both halves of the scanner are proved on fixtures). **Measured:** restoring the branch
+      → **2 red**, the behavioural one and the structural one.
+      **The test that was there was misleading, and that is the transferable part.** It claimed
+      "carries no CI short-circuit of its own" while asserting against `resolveLocale` — the pure
+      function, which never had one. The short-circuit lived in `detectLocale()`, the function the
+      app actually calls, and *that* one did answer differently under CI. The assertion was true of
+      a function that could not have been wrong, and silent about the one that was.
+      **Four other test files were stubbing `CI` to `undefined`** to neutralise the branch
+      (`tests/ViewDrawer.test.tsx`, `tests/CreditsModal.test.tsx`, `tests/errorTranslation.test.tsx`,
+      `tests/ErrorBoundary.test.tsx`) — all removed, because a stub of a variable nobody reads is
+      only a trace of a branch that is gone. `tests/i18n.test.ts` still stubs `CI`, deliberately:
+      that is how it proves the override does nothing.
+      **Four comments that described the branch as if it were there** were corrected:
+      `tests/e2e/launch.ts`, `tests/e2e/functional-flow.spec.ts`, `.github/workflows/release.yml`
+      (the `language: [en, pt]` matrix) and the stale note in `tests/ViewDrawer.test.tsx` ("the
+      locale follows the system language and nothing else").
+      **Gates:** lint 0 errors / 2 pre-existing warnings · both typechecks 0 · **517/517** vitest
+      across 50 files (green with `CI=true` and with `CI` unset) · `npm run build` OK · e2e
+      **15/15** against `out/clavis-linux-x64` in **both locales** (`LANGUAGE=en` and `LANGUAGE=pt`).
+      **Not released:** nothing committed or tagged.
+- [x] **HYG-24 — the export revoked its blob in the click's own task — DONE 2026-10-22 (owner
+      decision: revoke at the download's completion).**
+      **What was measured before anything was changed** (the item's premise was "a race the platform
+      has not lost yet" — it is worse than that, and the failure is *silent*):
+      **(1) The export works today.** In the real app — no `will-download` listener, no `setSavePath` —
+      the file lands in `app.getPath('downloads')` (measured: `~/Transferências/<uuid>.clavis`), and the
+      e2e round trip imports it back and decrypts it. Electron auto-saves; there is no save dialog.
+      **(2) The revoke's position is load-bearing.** Revoking *before* `a.click()` — the negative
+      control — produces **no file at all**: `will-download` fires, the item then sits at
+      'progressing' forever, no state ever completes, no error surfaces, and the app still says
+      "exported successfully". A user would believe they had a backup.
+      **(3) The download completes ~70 ms after the click** (the file appears; the item's state reads
+      'completed'), and Electron's `updated` event **never** reports 'completed' for it — only
+      `getState()` does. The terminal state arrives on the item's own **`done`** event, which is what
+      the implementation listens to.
+      **(4) The e2e could see the failure, but as a bare timeout** — "No .clavis was written to
+      /tmp/clavis-e2e-download-XXXX within 15000ms" — pointing at the harness rather than at the
+      export, which is exactly what the item complained about.
+      **The fix, in three parts.**
+      **(a) The revoke moved to the download's completion.** A web page gets no download event and the
+      blob URL lives in the renderer's own context, so **only the main process can know when the
+      download ended**: `src/main/downloads.ts` observes `will-download`, waits for the item's `done`
+      event, and pushes `{fileName, outcome}` to the renderer on the new channel
+      `EXPORT_DOWNLOAD_DONE` — **the app's first main→renderer push**. The renderer matches the file
+      name to the export that is waiting for it, revokes the blob, and reports what happened.
+      **(b) The app stopped claiming a success it had not seen.** The "exported" toast now waits for
+      the download's real outcome (`msg.drawer_exported` on 'completed', the new
+      `msg.drawer_export_failed` on 'cancelled'/'interrupted') — instead of firing the instant the
+      click was dispatched, which is the instant nothing had been written yet. A false failure costs
+      the user one more export; a false success costs them the file they thought they had.
+      **(c) The failure is legible in the harness.** The e2e records the download's events
+      (`will-download`, `updated`, `done`) and the timeout message now says what it saw, so a stalled
+      export says "the transfer never finished" instead of only how long it waited.
+      **Two things the observer must not do, and one of them was a real temptation:** it must not call
+      `setSavePath` (that would decide where the file lands; the app's behaviour is Electron's
+      default, and an observing listener leaves that exactly as it was) and it must not swallow the
+      outcome.
+      **A fallback, because a download can also never end:** the renderer releases the blob after 30 s
+      and reports the export unfinished. Without it, the stall case would hold the exported ciphertext
+      — up to the size of a whole drawer — in memory for the life of the window.
+      **Mutations, measured:** restoring the synchronous revoke → **6 red** in `tests/HomeScreen.test.tsx`;
+      the main process never notifying → **2 red** in `tests/main-downloads.test.ts` **and the e2e fails**
+      (the export toast never appears — the e2e is a guard for the whole chain, not just for the
+      renderer); the observer calling `setSavePath` → **1 red**.
+      **The renderer had no test for the export at all** — the first coverage of that path is this
+      change's (`tests/HomeScreen.test.tsx`, 9 tests) plus the new `tests/main-downloads.test.ts`
+      (6 tests) and the preload's listener wiring (2 tests).
+      **Gates:** lint 0 errors / 2 pre-existing warnings · both typechecks 0 · **535/535** vitest across
+      51 files (green with `CI=true` and with `CI` unset) · `npm run build` OK · e2e **15/15** against
+      `out/clavis-linux-x64` in **both locales** (`LANGUAGE=en`, `LANGUAGE=pt`).
+      **Not released:** nothing committed or tagged.
 - [x] **HYG-26 — CI still declared Node 20-era action runtimes — CLOSED 2026-10-19.** GitHub retired
       the Node 20 action runtime on 2026-09-23; every run now emits a deprecation annotation for
       `actions/checkout@v4` and `actions/setup-node@v4`. Bumped to the Node 24 majors —
@@ -848,9 +986,12 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
 
 
 ## Progress
+- **2026-10-22 — HYG-24 closed: the export's blob is revoked when the download ends, and the app says what actually happened.** The revoke used to run in the click's own task, which works only because Chromium resolves the blob URL during the click's default action — and the failure mode of getting that wrong is **silent**: measured, revoking before the click produces no file at all, the download item sits at 'progressing' forever, and the app still said "exported successfully". **Owner decision: revoke at the download's completion.** Only the main process can know when a download ends (a web page gets no download event, and the blob URL lives in the renderer's context), so `src/main/downloads.ts` observes `will-download`, waits for the item's **`done`** event (Electron's `updated` event never reports 'completed' for this download — measured) and pushes `{fileName, outcome}` to the renderer — the app's **first main→renderer channel**. The renderer revokes the blob then, and the "exported" toast now reflects the download's real outcome instead of the click's. A 30 s fallback releases the blob and reports the export unfinished, because a download can also never end. **The e2e now says what it saw** (the download's events) instead of only how long it waited. **Mutations, measured:** the synchronous revoke → 6 red · the main process never notifying → 2 red **and the e2e fails** · the observer calling `setSavePath` → 1 red. The renderer had **no test for the export at all** before this. Gates: lint 0 errors / 2 pre-existing warnings · both typechecks 0 · **535/535** vitest across 51 files · `npm run build` OK · e2e **15/15** in **both locales**. **Not released:** nothing committed or tagged. **Next: UX-01.**
+- **2026-10-22 — HYG-23 closed: the CI override that was never an override is gone, and the locale has one decision.** `detectLocale()` used to open with `if (process.env.CI) return 'en';` — added on 2026-09-12 to settle a `PasswordModal.test.tsx` failure on GitHub Actions, and dead code in every packaged build since (Vite rewrites `process.env` to `{}`, so the shipped bundle carried `{}.CI ? 'en' : …`). **Measured before the removal:** with the branch deleted the suite was **513/513 green both with `CI=true` and with `CI` unset** — nothing needed it. **Owner decision: delete** (the "accept it as test-only" option was not available where it stood — the branch lives in `src/`, so it was dead code in the app, and the only honest alternative — a real override read in the main process — would contradict ADR-009). **The guard is the deliverable, not the deletion:** `tests/i18n.test.ts` now proves the *rendered* language does not change when `CI` is set (the old test asserted this about `resolveLocale`, the pure function, which never had the branch — it was true of a function that could not have been wrong, and silent about `detectLocale()`, the one that did) and that the renderer's source holds **no** `process.env` read of any kind, scanned code-only so the note explaining the removal is not itself forbidden. **Restoring the branch → 2 red.** **Four other test files were stubbing `CI` to `undefined`** to neutralise it — removed; and four comments that described it as if it were there were corrected (`tests/e2e/launch.ts`, `tests/e2e/functional-flow.spec.ts`, `.github/workflows/release.yml`, `tests/ViewDrawer.test.tsx`). Gates: lint 0 errors / 2 pre-existing warnings · both typechecks 0 · **517/517** vitest across 50 files · `npm run build` OK · e2e **15/15** in **both locales**. **Not released:** nothing committed or tagged. **Next: HYG-24.**
+- **2026-10-22 — HYG-13b closed: the content caps have one owner, and the file cap has one at all.** The item was "the byte-cap boundaries are asserted only *relative to* the constant". **What was actually unguarded, measured:** the file ceiling (`MAX_DRAWER_FILE_SIZE = 20_004_096`) was **pinned nowhere** — the two copies of the number in the test tree were *uses*, not assertions, and the ipc-handlers mock would have kept serving the old one; **lowering it by 86 characters left the whole suite green, 499/499**. The two content ceilings were pinned, but by **three unrelated files**, none owning the family whole. And **nothing said the file cap is derived**: replacing the derivation in `store.ts` with a literal of the same number left the suite **516/516 green** — the house's "faithful re-inline" case, which only a wiring guard can see. **The fix:** `tests/limits.absolute.test.ts` (14 tests) — the four numbers in absolute terms, plus mock-based wiring guards (the file cap follows the byte cap, stays pinned by the absolute ceiling when the byte cap rises, and takes the envelope allowance from the source), plus the three copies retired. **Mutations, measured (7):** byte cap raised → 14 red · code-point cap split → 5 · file ceiling lowered 86 chars → 3 · file cap as a literal → 3 · envelope allowance 8 192 → 2 · clamp removed → 1 · doc stating a different capacity → 1. **Three stale claims in `docs/DRAWER-CAPACITY.md` corrected** while the doc was being guarded. Gates: lint 0 errors / 2 pre-existing warnings · both typechecks 0 · **513/513** vitest across 50 files · `npm run build` OK · e2e **15/15** against `out/clavis-linux-x64`. **Not released:** nothing committed or tagged. **Next: HYG-23.**
 - **Released as `v0.6.9-beta` (2026-10-21):** `main` pushed alone (run `39668087280`: `quality` + both `e2e` legs green, `build`/`release` skipped), then tagged (run `39668721144`: **8 jobs green** — `quality`, both `e2e` locales, **both `e2e-cross` legs**, all three `build` targets and `release`), 6 artefacts. `/releases/latest` answers `v0.6.9-beta`, `prerelease: false`. **This is the first release whose tag run executed the Windows and macOS legs** — both 15/15. **The published `.dmg` was checked against the previous one, not just built:** `v0.6.8-beta` has **no `Contents/_CodeSignature/CodeResources`** (electron-packager renamed the bundle and its helpers without re-sealing it; the executable kept Electron's own linker-signed ad-hoc signature, identifier `Electron`), while `v0.6.9-beta` carries a **complete seal** (45 entries, listing the renamed `clavis Helper (GPU).app` and friends) and the executable's signature says **`com.electron.clavis`**. That the signed bundle launches is not an argument — the macOS e2e leg ran that exact app.
 - **Previous release — `v0.6.8-beta` (2026-10-20):** `main` pushed alone (run `39452501307`: `quality` + both `e2e` legs green, `build`/`release` skipped), then tagged (run `39453099582`: **7 jobs green**, 6 artifacts). `/releases/latest` answers `v0.6.8-beta`, `prerelease: false`. **The icon fix, verified on the published artefacts:** the published `clavis-win32-x64-0.6.8-beta.zip` carries the Clavis icon in `clavis.exe` (all nine PNG sizes, byte-for-byte), the Squirrel `Setup.exe` the same, and the published `clavis.dmg`'s `clavis.app/Contents/Resources/electron.icns` is byte-identical to `icons/clavis.icns` (md5 `4778df33…`). **Confirmed by the owner on Windows 11**, on the same machine where the defect was found: the published zip now shows the Clavis icon — the automated check proves it is embedded, the human confirms Windows renders it. Three changes went out together — **UX-08** (the unlock wait is cancellable and counted), **SEC-08 + UX-02** (the password policy accepts a passphrase, has one owner, and the meter's labels are translated) and **the app icon** (the Windows executable carried Electron's default icon, and so did the macOS `.app` and the window icon everywhere). **Next session: whatever comes after the release.** `CHANGELOG.md` carries both under **v0.6.8-beta**; `package.json` still says 0.6.7-beta, and the version bump belongs to the release commit.
-  **Still open, in the order the sessions have been ranking them:** **HYG-13b** (the byte-cap boundaries are asserted only *relative to* the constant) · HYG-23 · HYG-24 · UX-01 (dynamic focus trap) · UX-07 (debounced counters) · SEC-06 · REL-03 (caught IPC rejections) · REL-04 (timer cleanup) · QA-05 · QA-06 · the arm64-only macOS gap · the e2e teardown race.
+  **Still open, in the order the sessions have been ranking them:** **UX-01** (dynamic focus trap) · UX-07 (debounced counters) · SEC-06 · REL-03 (caught IPC rejections) · REL-04 (timer cleanup) · QA-05 · QA-06 · the arm64-only macOS gap · the e2e teardown race. **HYG-13b, HYG-23 and HYG-24 closed 2026-10-22.**
   **Five things the next session should not redo:** the delay ladder has **one owner** (`getUnlockDelay` in `src/main/ipc-handlers.ts`), read by both the unlock path and the `GET_UNLOCK_DELAY` query through the injected seam `IpcDeps.getUnlockDelay`. A second copy of the ladder in the renderer would make the countdown lie.
   The password rule has **one owner** too (`src/shared/password-policy.ts`), read by the main process and by the renderer, with the three drift guards in `tests/password-policy.one-owner.test.ts` — and the app icon is a **layout** (`icons/clavis.png`, `icons/clavis.ico`, `icons/clavis.icns` side by side with the same basename), guarded by `tests/packaging-icon.test.ts`.
   **What UX-08 leaves behind, on purpose:** the main process still finishes the wait and the derivation after the user cancels (the result is discarded) — the owner's decision from 2026-10-19, and the cost is bounded and paid only by the user who chose to cancel.

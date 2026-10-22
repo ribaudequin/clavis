@@ -28,7 +28,12 @@ vi.mock('../src/main/store.js', async (importOriginal) => {
     readDrawerRaw: vi.fn(),
     importDrawerRaw: vi.fn(),
     ensureDataDir: vi.fn(),
-    MAX_DRAWER_FILE_SIZE: 20_004_096,
+    // HYG-13b — MAX_DRAWER_FILE_SIZE is deliberately NOT overridden with a literal of
+    // its own. The mock used to carry 20_004_096, which is a use of the number and
+    // not an assertion of it: had the ceiling moved, this file would have kept
+    // testing the old one and said nothing. The real value reaches the handler
+    // through the spread above; its absolute value is pinned in
+    // tests/limits.absolute.test.ts.
   };
 });
 
@@ -81,6 +86,10 @@ const API_BY_CHANNEL = {
   [CHANNELS.SAVE_DRAWER]: 'saveDrawer',
   [CHANNELS.DELETE_DRAWER]: 'deleteDrawer',
   [CHANNELS.EXPORT_DRAWER]: 'exportDrawer',
+  // The one channel the main process pushes on: the renderer subscribes to it to
+  // learn when the export download ended. There is no handler for it here — it is
+  // a send, not an invoke.
+  [CHANNELS.EXPORT_DOWNLOAD_DONE]: 'onExportDownloadDone',
   [CHANNELS.OPEN_FILE_DIALOG]: 'openFile',
   [CHANNELS.IMPORT_DRAWER]: 'importDrawer',
   [CHANNELS.RESTART_APP]: 'restartApp',

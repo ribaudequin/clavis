@@ -30,13 +30,14 @@ export const E2E_PASSWORD = 'E2e-Smoke-Passphrase1!';
 
 // Every user-facing string goes through t(), and the locale is NOT pinned at runtime.
 //
-// `detectLocale()` opens with `if (process.env.CI) return 'en'`, which reads like a CI
-// override — and in the vitest suite it is one. In a packaged build it is dead code: Vite
-// substitutes `process.env` with `{}` at build time, so the branch is `{}.CI ? 'en' : ...`,
-// a constant undefined. Verified in the shipped bundle
-// (`function f(){return {}.CI?`en`:d(navigator.language||`en`)}`). A CI=1 env var on the
-// launched app therefore does nothing, which is why an earlier comment here claiming it
-// pinned English was wrong, and why the app rendered pt-PT on a box launched with CI=1.
+// There is no override of any kind — no CI variable, no environment variable: the locale
+// is the machine's. `detectLocale()` used to open with `if (process.env.CI) return 'en'`,
+// which read like an override and was not one: Vite substitutes `process.env` with `{}` at
+// build time, so the branch shipped as `{}.CI ? 'en' : …`, a constant undefined. It was
+// removed on 2026-10-22 (HYG-23) — the branch was dead code in the artifact, and unnecessary
+// in the tests. A CI=1 env var on the launched app therefore does nothing, which is why an
+// earlier comment here claiming it pinned English was wrong, and why the app rendered pt-PT
+// on a box launched with CI=1.
 //
 // The locale consequently follows the machine running the app. These regexes are the fix:
 // each matches both catalogues. They are not decoration — a name that matched only English
@@ -63,6 +64,10 @@ export const UI = {
   discardAndLeave: /^(discard and leave|descartar e sair)$/i,
 } as const;
 
+// Where the main process records what happened to each download, so a failed export
+// can say what it saw instead of only how long it waited.
+const DOWNLOAD_EVENTS_KEY = '__clavisDownloadEvents';
+
 export interface IsolatedApp {
   app: ElectronApplication;
   window: Page;
@@ -70,6 +75,7 @@ export interface IsolatedApp {
   profileDir: string;
   /** Where Electron writes `<a download>` exports, so a spec can read them back. */
   downloadDir: string;
+  downloadEvents(): Promise<string[]>;
   close(): Promise<void>;
 }
 
@@ -177,17 +183,40 @@ export async function launchIsolated(): Promise<IsolatedApp> {
   // without a listener here, `will-download` fires and then nothing is ever written —
   // Chromium waits for a save dialog that this environment never shows, and the file exists
   // neither in the download directory nor in ~/Downloads. `setSavePath` is what completes it.
-  await app.evaluate(async ({ session }, dir) => {
+  //
+  // HYG-24 — The events of that download are recorded, because a stalled export used
+  // to surface as a bare timeout that pointed at the harness rather than at the export.
+  // What the events say is the difference between the two failures that look alike
+  // from the outside: Chromium never started the transfer (the blob was gone before it
+  // took it) and Chromium started it and it never finished.
+  // The key travels in as an argument: `evaluate` runs the function in the main
+  // process, where this module's scope does not exist.
+  await app.evaluate(async ({ session }, options: { dir: string; key: string }) => {
+    const recorded = (globalThis as unknown as Record<string, string[]>)[options.key] ?? [];
+    (globalThis as unknown as Record<string, string[]>)[options.key] = recorded;
     session.defaultSession.on('will-download', (_event, item) => {
-      item.setSavePath(`${dir}/${item.getFilename()}`);
+      recorded.push(`will-download:${item.getFilename()}`);
+      item.setSavePath(`${options.dir}/${item.getFilename()}`);
+      item.on('updated', (_e: unknown, state: string) => {
+        recorded.push(`updated:${state}`);
+      });
+      item.on('done', (_e: unknown, state: string) => {
+        recorded.push(`done:${state}`);
+      });
     });
-  }, downloadDir);
+  }, { dir: downloadDir, key: DOWNLOAD_EVENTS_KEY });
 
-  return { app, window, profileDir, downloadDir, close: cleanup };
+  const downloadEvents = async (): Promise<string[]> =>
+    (await app.evaluate(async (_electron, key: string) => {
+      const recorded = (globalThis as unknown as Record<string, string[]>)[key];
+      return recorded ?? [];
+    }, DOWNLOAD_EVENTS_KEY)) as string[];
+
+  return { app, window, profileDir, downloadDir, downloadEvents, close: cleanup };
 }
 
 /** Waits for Chromium to finish writing the export; it is async and has no completion event. */
-export async function waitForDownload(downloadDir: string, timeoutMs = 15_000): Promise<string> {
+export async function waitForDownload(downloadDir: string, timeoutMs = 15_000, events?: () => Promise<string[]>): Promise<string> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const files = fs.existsSync(downloadDir) ? fs.readdirSync(downloadDir) : [];
@@ -199,7 +228,8 @@ export async function waitForDownload(downloadDir: string, timeoutMs = 15_000): 
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error(`No .clavis was written to ${downloadDir} within ${timeoutMs}ms.`);
+  const seen = events ? await events().catch(() => []) : [];
+  throw new Error(`No .clavis was written to ${downloadDir} within ${timeoutMs}ms. Download events: ${JSON.stringify(seen)}`);
 }
 
 /**

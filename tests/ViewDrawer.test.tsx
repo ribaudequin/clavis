@@ -173,8 +173,9 @@ describe('ViewDrawer', () => {
     const MIXED_BYTES = 13;
 
     // Independent of the component's formatNumber(), on purpose: asserting the source's
-    // own formatter against itself proves nothing. beforeEach pins en-US, and
-    // detectLocale() short-circuits to 'en', so 'en' is what the component formats with.
+    // own formatter against itself proves nothing. beforeEach pins en-US, and the locale
+    // follows the system language and nothing else (HYG-23), so 'en' is what the
+    // component formats with.
     const en = (n: number): string => new Intl.NumberFormat('en').format(n);
     const pt = (n: number): string => new Intl.NumberFormat('pt-PT').format(n);
 
@@ -203,12 +204,10 @@ describe('ViewDrawer', () => {
     }
 
     beforeEach(() => {
-      vi.stubEnv('CI', undefined);
       setLanguage('en-US');
     });
 
     afterEach(() => {
-      vi.unstubAllEnvs();
       vi.restoreAllMocks();
       setLanguage(ORIGINAL_LANGUAGE);
     });

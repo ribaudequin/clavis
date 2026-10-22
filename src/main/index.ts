@@ -3,6 +3,7 @@ import { app, BrowserWindow, ipcMain, dialog, shell, Menu } from 'electron';
 import * as path from 'path';
 import { ensureDataDir } from './store.js';
 import { registerIpcHandlers, clearImportTimers } from './ipc-handlers.js';
+import { observeDownloads } from './downloads.js';
 import { logger, initializeLogger } from './logger.js';
 import { acquireSingleInstanceLock } from './single-instance.js';
 
@@ -161,6 +162,11 @@ if (!isPrimaryInstance) {
     Menu.setApplicationMenu(null);
     registerIpcHandlers({ ipcMain, dialog });
     createWindow();
+    // HYG-24 — The renderer may only revoke the export's blob URL once Chromium is
+    // done with it, and only this process can see the download end. The window is
+    // resolved per notification, not captured: on macOS the window is recreated when
+    // the app is reactivated, and a captured one would point at a destroyed window.
+    observeDownloads(() => BrowserWindow.getAllWindows()[0] ?? null);
   });
 }
 

@@ -360,7 +360,10 @@ describe('store module', () => {
       expect(exported).not.toBeNull();
       // Hex doubles the payload, so this file is past the 11 MB the old cap allowed.
       expect(exported!.length).toBeGreaterThan(2 * MAX_DECRYPTED_SIZE);
-      expect(exported!.length).toBeLessThanOrEqual(2 * MAX_DECRYPTED_SIZE + 4096);
+      // HYG-13b — the ceiling is read from the store rather than restated as
+      // "2 x the byte cap plus the envelope allowance": that arithmetic was a third
+      // copy of a number the store already owns.
+      expect(exported!.length).toBeLessThanOrEqual(MAX_DRAWER_FILE_SIZE);
 
       expect(await deleteDrawer(drawer.id)).toBe(true);
       expect(await importDrawerRaw(exported!)).toBe(true);
@@ -391,13 +394,13 @@ describe('store module', () => {
       expect(atLimit.length).toBeGreaterThan(2 * MAX_DECRYPTED_SIZE);
       expect(await importDrawerRaw(atLimit)).toBe(true);
 
-      // The cap is 2 x MAX_DECRYPTED_SIZE plus the envelope allowance, so this
-      // payload pushes the file past it and must be refused before any parsing.
+      // The cap is the file ceiling, so this payload pushes the file past it and
+      // must be refused before any parsing.
       const overCap = buildDrawer(
         '123e4567-e89b-12d3-a456-426614174021',
         'ab'.repeat(MAX_DECRYPTED_SIZE + 4097)
       );
-      expect(overCap.length).toBeGreaterThan(2 * MAX_DECRYPTED_SIZE + 4096);
+      expect(overCap.length).toBeGreaterThan(MAX_DRAWER_FILE_SIZE);
       await expect(importDrawerRaw(overCap)).rejects.toBeInstanceOf(FileTooLargeError);
     });
 
@@ -411,7 +414,7 @@ describe('store module', () => {
       const id = '123e4567-e89b-12d3-a456-426614174022';
       const overCapCiphertext = buildDrawer(id, 'ab'.repeat(MAX_DECRYPTED_SIZE + 1));
       // Under the character cap on purpose: this is the case the cap cannot see.
-      expect(overCapCiphertext.length).toBeLessThanOrEqual(2 * MAX_DECRYPTED_SIZE + 4096);
+      expect(overCapCiphertext.length).toBeLessThanOrEqual(MAX_DRAWER_FILE_SIZE);
 
       expect(await importDrawerRaw(overCapCiphertext)).toBe(false);
       expect(warn).toHaveBeenCalledWith(
@@ -471,6 +474,12 @@ describe('store module', () => {
 
         const content = 'ã'.repeat(10_000_000);
         expect(content.length).toBeLessThanOrEqual(MAX_DECRYPTED_SIZE);
+        // HYG-13b — the premise, in the unit that decides it: 10 million code points
+        // (which the schema admits) and 20 million UTF-8 bytes (which the byte cap
+        // refuses). If the ceiling ever moves, this says so, instead of the refusal
+        // below quietly not coming.
+        expect(Buffer.byteLength(content, 'utf8')).toBe(20_000_000);
+        expect(Buffer.byteLength(content, 'utf8')).toBeGreaterThan(MAX_DECRYPTED_SIZE);
         expect(await saveDrawer(drawer.id, PASSWORD, 'Acentos', content)).toEqual({
           ok: false,
           reason: 'content_too_large',
@@ -501,6 +510,10 @@ describe('store module', () => {
       it('never reports an oversized note as a password or id problem', async () => {
         const drawer = await createDrawer('Acentos', PASSWORD);
         const refused = await saveDrawer(drawer.id, PASSWORD, 'Acentos', 'ã'.repeat(10_000_000));
+        // The premise first: the note WAS refused, and for its size. Without this the
+        // test would pass for the wrong reason — "not a password problem" is also
+        // what a save that stopped refusing oversized content would say.
+        expect(refused).toEqual({ ok: false, reason: 'content_too_large' });
         // 'password_too_weak' used to sit in this list and in SaveFailureReason. It is
         // gone because saveDrawer does not and must not consult the password policy: a
         // save re-uses the password that already opens the drawer, and there is no

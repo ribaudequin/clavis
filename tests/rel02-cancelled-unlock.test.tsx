@@ -111,6 +111,9 @@ function buildStub(): Window['electronAPI'] {
     restartApp: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
     getAppVersion: async (): Promise<string> => '0.0.0-test',
     checkUpdate: async (): Promise<{ tag_name?: string } | null> => null,
+    // HYG-24 — The export download's outcome. No test here exports anything, so the
+    // listener is a no-op that hands back the unsubscribe the renderer calls on unmount.
+    onExportDownloadDone: () => () => {},
   };
 }
 

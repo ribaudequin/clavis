@@ -21,7 +21,10 @@ import * as path from 'path';
 
 vi.mock('electron', () => ({
   contextBridge: { exposeInMainWorld: vi.fn() },
-  ipcRenderer: { invoke: vi.fn() },
+  // HYG-24 — `on`/`removeListener` are the push surface: the export download's
+  // outcome arrives on a channel the main process sends on, and the preload is the
+  // only context that can touch ipcRenderer.
+  ipcRenderer: { invoke: vi.fn(), on: vi.fn(), removeListener: vi.fn() },
 }));
 
 import { contextBridge, ipcRenderer } from 'electron';
@@ -39,8 +42,21 @@ const exposeInMainWorld = contextBridge.exposeInMainWorld as unknown as MockedFu
 const invoke = ipcRenderer.invoke as unknown as MockedFunction<
   (channel: string, ...args: unknown[]) => Promise<unknown>
 >;
+// The push surface, HYG-24: the export download's outcome arrives on a channel the
+// main process sends on, so the preload registers a listener rather than invoking.
+const on = ipcRenderer.on as unknown as MockedFunction<
+  (channel: string, listener: (event: unknown, ...args: unknown[]) => void) => void
+>;
+const removeListener = ipcRenderer.removeListener as unknown as MockedFunction<
+  (channel: string, listener: (event: unknown, ...args: unknown[]) => void) => void
+>;
 
-const API_KEYS = [
+// The two kinds are listed apart, because they are wired apart: every method here
+// reaches `ipcRenderer.invoke` on a channel, and the one below registers a listener
+// on a channel the main process pushes on. The count guard further down compares the
+// invoke calls in the source against INVOKE_API_KEYS, so the two lists cannot drift
+// into each other.
+const INVOKE_API_KEYS = [
   'listDrawers',
   'createDrawer',
 'unlockDrawer',
@@ -55,11 +71,25 @@ const API_KEYS = [
   'checkUpdate',
 ] as const satisfies readonly (keyof ElectronAPI)[];
 
+const LISTENER_API_KEYS = [
+  'onExportDownloadDone',
+] as const satisfies readonly (keyof ElectronAPI)[];
+
+const API_KEYS = [...INVOKE_API_KEYS, ...LISTENER_API_KEYS] as const satisfies readonly (keyof ElectronAPI)[];
+
 // `satisfies` rejects a listed key that is not on ElectronAPI; this rejects a key
 // added to ElectronAPI and forgotten here. Together they make the runtime key-set
 // comparison below exhaustive from both sides.
 type UnlistedApiKeys = Exclude<keyof ElectronAPI, (typeof API_KEYS)[number]>;
 export const _everyApiKeyIsListed: UnlistedApiKeys extends never ? true : UnlistedApiKeys[] = true;
+
+// The split has to hold in both directions: every method that is not a listener must
+// be on the invoke list, so a method cannot be quietly reclassified from one kind
+// to the other without this file noticing.
+type ListenerKeys = (typeof LISTENER_API_KEYS)[number];
+type InvokeOnlyKeys = Exclude<keyof ElectronAPI, ListenerKeys>;
+type UnlistedInvokeKeys = Exclude<InvokeOnlyKeys, (typeof INVOKE_API_KEYS)[number]>;
+export const _everyInvokeKeyIsListed: UnlistedInvokeKeys extends never ? true : UnlistedInvokeKeys[] = true;
 
 // The wire protocol is duplicated from `src/shared/channels.ts` on purpose: a
 // renamed constant must break this file, not just the main process.
@@ -71,6 +101,7 @@ const WIRE_PROTOCOL = [
   { name: 'SAVE_DRAWER', channel: CHANNELS.SAVE_DRAWER, wire: 'save-drawer' },
   { name: 'DELETE_DRAWER', channel: CHANNELS.DELETE_DRAWER, wire: 'delete-drawer' },
   { name: 'EXPORT_DRAWER', channel: CHANNELS.EXPORT_DRAWER, wire: 'export-drawer' },
+  { name: 'EXPORT_DOWNLOAD_DONE', channel: CHANNELS.EXPORT_DOWNLOAD_DONE, wire: 'export-download-done' },
   { name: 'IMPORT_DRAWER', channel: CHANNELS.IMPORT_DRAWER, wire: 'import-drawer' },
   { name: 'OPEN_FILE_DIALOG', channel: CHANNELS.OPEN_FILE_DIALOG, wire: 'open-file-dialog' },
   { name: 'RESTART_APP', channel: CHANNELS.RESTART_APP, wire: 'restart-app' },
@@ -137,6 +168,8 @@ async function importPreload(): Promise<void> {
   vi.resetModules();
   exposeInMainWorld.mockClear();
   invoke.mockClear();
+  on.mockClear();
+  removeListener.mockClear();
   await import('../src/main/preload/index');
 }
 
@@ -221,8 +254,10 @@ describe('channel wiring', () => {
     );
 
     // The count guard keeps a source refactor that stops matching the pattern
-    // from turning this into a test that passes on an empty list.
-    expect(firstArgs).toHaveLength(API_KEYS.length);
+    // from turning this into a test that passes on an empty list. It counts the
+    // *invoke* calls, so it is compared against the invoke list — the listener
+    // method does not go through invoke.
+    expect(firstArgs).toHaveLength(INVOKE_API_KEYS.length);
     expect(firstArgs.filter((arg) => !/^CHANNELS\.[A-Z0-9_]+$/.test(arg))).toEqual([]);
   });
 });
@@ -249,5 +284,38 @@ describe('return value identity', () => {
 
     expect(returned).toBe(issuedPromises[0]);
     await expect(returned).rejects.toBe(failure);
+  });
+});
+
+describe('the export download listener', () => {
+  it('subscribes to the download channel and hands the payload to the listener', async () => {
+    await importPreload();
+
+    const received: unknown[] = [];
+    exposedApi().onExportDownloadDone((result) => received.push(result));
+
+    expect(on).toHaveBeenCalledExactlyOnceWith(
+      CHANNELS.EXPORT_DOWNLOAD_DONE,
+      expect.any(Function)
+    );
+
+    // The handler the preload registered is the one that reaches the renderer's
+    // listener, with the main process's payload and nothing else.
+    const handler = on.mock.calls[0][1];
+    handler({}, { fileName: 'drawer.clavis', outcome: 'completed' });
+    expect(received).toEqual([{ fileName: 'drawer.clavis', outcome: 'completed' }]);
+  });
+
+  it('hands back the unsubscribe, and it removes that same listener', async () => {
+    // A listener that outlives its component is a leak that survives the window it
+    // belonged to, so the renderer must be able to let go of it.
+    await importPreload();
+
+    const unsubscribe = exposedApi().onExportDownloadDone(() => {});
+    const handler = on.mock.calls[0][1];
+
+    unsubscribe();
+
+    expect(removeListener).toHaveBeenCalledExactlyOnceWith(CHANNELS.EXPORT_DOWNLOAD_DONE, handler);
   });
 });

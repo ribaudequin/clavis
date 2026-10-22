@@ -57,6 +57,22 @@ export interface DrawerListItem {
   iconData: string;
 }
 
+/**
+ * How a download ended.
+ *
+ * `completed` is the only one that means the file was written; `cancelled` is the user
+ * closing the save dialog and `interrupted` is the transfer failing (a disk error, or
+ * the blob being gone before Chromium took it).
+ */
+export type DownloadOutcome = 'completed' | 'cancelled' | 'interrupted';
+
+/** What the main process knows about a finished download. */
+export interface DownloadResult {
+  /** The file name Chromium gave it — the renderer matches the pending export by it. */
+  fileName: string;
+  outcome: DownloadOutcome;
+}
+
 export interface ElectronAPI {
   listDrawers: () => Promise<Result<DrawerListItem[]>>;
   createDrawer: (title: string, password: string) => Promise<Result<EncryptedDrawer>>;
@@ -73,6 +89,18 @@ export interface ElectronAPI {
   saveDrawer: (id: string, password: string, title: string, content: string) => Promise<Result<void>>;
   deleteDrawer: (id: string) => Promise<Result<void>>;
   exportDrawer: (id: string) => Promise<Result<string>>;
+  /**
+   * How the export download ended.
+   *
+   * The renderer hands Chromium a blob URL and a download filename; the blob URL can
+   * only be revoked once the browser is done with it, and only the main process knows
+   * when that is — the renderer gets no download event. This is a push, not a query:
+   * the app is the only thing that downloads, so the notification carries the file
+   * name and the renderer matches it to the export that is waiting for it.
+   *
+   * Returns the unsubscribe function.
+   */
+  onExportDownloadDone: (listener: (result: DownloadResult) => void) => () => void;
   importDrawer: (token: string) => Promise<Result<void>>;
   openFile: () => Promise<Result<{ token: string; fileName: string } | null>>;
   restartApp: () => Promise<Result<void>>;

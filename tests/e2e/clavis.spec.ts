@@ -250,8 +250,21 @@ test('an exported drawer can be deleted and imported back, and still opens', asy
   // --- export -------------------------------------------------------------------
   const row = window.getByRole('listitem').filter({ hasText: 'Round Trip' });
   await row.getByRole('button', { name: /^(export|exportar)$/i }).click();
-  const exported = await waitForDownload(downloadDir);
+  // HYG-24 — The download's events go into the failure message. A stalled export
+  // used to surface as a bare timeout that pointed at the harness; the events say
+  // whether Chromium ever started the download and what state it reached, which is
+  // the difference between "the blob was revoked before the browser took it" and
+  // "the transfer failed".
+  const exported = await waitForDownload(downloadDir, 15_000, ctx?.downloadEvents);
   expect(exported.endsWith('.clavis')).toBe(true);
+
+  // HYG-24 — The export reports what the download actually did, and that report only
+  // exists if the whole chain works in the packaged app: the main process sees the
+  // download end, pushes the outcome to the renderer, and the renderer revokes the
+  // blob and says the file was written. Two-locale, like every other selector here.
+  await expect(
+    window.getByText(/exported successfully|exportada com sucesso/i)
+  ).toBeVisible({ timeout: 10000 });
 
   // --- delete, so the import is not blocked by OVERWRITE-01 --------------------
   await row.getByRole('button', { name: UI.delete }).click();

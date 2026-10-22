@@ -17,6 +17,15 @@ const DeleteConfirmModal = lazy(() => import('../components/DeleteConfirmModal')
 const CreditsModal = lazy(() => import('../components/CreditsModal'));
 const HeartIcon = lazy(() => import('../../../icons/svg/heart.svg?react'));
 
+// HYG-24 — How long an export may stay unresolved before the blob is released and
+// the export is reported as unfinished. Measured: the download of an in-memory blob
+// completes ~70 ms after the click (the file appears; the item's state reads
+// 'completed'), so this is a wide margin on the normal path. It exists for the
+// abnormal one: a download that never ends would otherwise hold the exported
+// ciphertext — up to the size of a whole drawer — in memory for the life of the
+// window.
+const EXPORT_DOWNLOAD_FALLBACK_MS = 30_000;
+
 interface ViewState {
   drawerId: string;
   password: string;
@@ -47,6 +56,21 @@ function HomeScreen(): React.JSX.Element {
   // user explicitly refused.
   const unlockAttempt = useRef(0);
 
+  // HYG-24 — The exports waiting for their download to end, keyed by the file name
+  // Chromium was given. The blob URL may only be revoked once the browser is done
+  // with it, and the renderer has no download event: the main process watches the
+  // download and pushes the outcome here (see src/main/downloads.ts).
+  //
+  // The timer is the fallback, and it is not decorative: a download that never ends —
+  // measured, a blob revoked before Chromium took it leaves the item at 'progressing'
+  // forever, with no file and no error — would otherwise hold the exported ciphertext
+  // in memory for the life of the window. The fallback releases it and says the
+  // export did not finish, because a false failure costs the user one more export
+  // and a false success costs them the file they thought they had.
+  const pendingExports = useRef(
+    new Map<string, { url: string; timer: ReturnType<typeof setTimeout> }>()
+  );
+
   const api = (): ElectronAPI => window.electronAPI;
 
   async function loadDrawers(): Promise<void> {
@@ -65,6 +89,41 @@ function HomeScreen(): React.JSX.Element {
 
   useEffect(() => {
     loadDrawers();
+  }, []);
+
+  // HYG-24 — The one push the app has: the main process tells us how the export
+  // download ended, because the renderer has no download event of its own and the
+  // blob URL may only be revoked once the browser is done with it. The listener is
+  // released on unmount, so a window that goes away does not leave a callback
+  // pointing at a component that is no longer there.
+  useEffect(() => {
+    const unsubscribe = api().onExportDownloadDone(({ fileName, outcome }) => {
+      const pending = pendingExports.current.get(fileName);
+      if (!pending) return;
+      pendingExports.current.delete(fileName);
+      clearTimeout(pending.timer);
+      URL.revokeObjectURL(pending.url);
+      if (outcome === 'completed') {
+        toast.success(t('msg.drawer_exported'));
+      } else {
+        // The download did not write the file. Saying so is the point of waiting:
+        // the toast used to claim success the moment the click was dispatched, which
+        // is exactly the moment nothing had been written yet.
+        toast.error(t('msg.drawer_export_failed'));
+      }
+    });
+    return () => {
+      unsubscribe();
+      // Whatever was still in flight is released with the screen. The notification
+      // will not arrive any more — the listener is gone — so the fallback timer
+      // would be the only thing left holding the blob, and it would fire a toast
+      // into a screen that is no longer there.
+      for (const [fileName, pending] of pendingExports.current) {
+        clearTimeout(pending.timer);
+        URL.revokeObjectURL(pending.url);
+        pendingExports.current.delete(fileName);
+      }
+    };
   }, []);
 
   function renderIcon(iconData: string): React.JSX.Element {
@@ -94,12 +153,26 @@ function HomeScreen(): React.JSX.Element {
       }
       const blob = new Blob([result.data], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
+      const fileName = `${id}.clavis`;
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${id}.clavis`;
+      a.download = fileName;
       a.click();
-      URL.revokeObjectURL(url);
-      toast.success(t('msg.drawer_exported'));
+      // HYG-24 — The revoke happens when the download ends, not here. Revoking now
+      // works only because Chromium resolves the blob URL during the click's default
+      // action, and a revoke that lands before that resolution kills the download
+      // outright: measured, the item sits at 'progressing' forever, no file is
+      // written, and the app says "exported successfully" anyway.
+      pendingExports.current.set(fileName, {
+        url,
+        timer: setTimeout(() => {
+          const pending = pendingExports.current.get(fileName);
+          if (!pending) return;
+          pendingExports.current.delete(fileName);
+          URL.revokeObjectURL(pending.url);
+          toast.error(t('msg.drawer_export_failed'));
+        }, EXPORT_DOWNLOAD_FALLBACK_MS),
+      });
     } finally {
       setExportingId(null);
     }

@@ -74,9 +74,10 @@ jobs:
     # switches it. The runner sets no LANGUAGE at all, so without this the pt-PT half of
     # every regex would be dead code in CI and a one-sided reword would ship green.
     #
-    # Also why `detectLocale()`'s `process.env.CI` branch cannot be relied on: Vite replaces
-    # `process.env` with `{}` in a packaged build, so that branch is dead code in the
-    # artifact and the CI=1 shortcut does nothing at all there.
+    # The packaged app has no locale override either, so this matrix is the only lever
+    # there is: `detectLocale()` follows the machine (HYG-23 removed its `process.env.CI`
+    # branch, which Vite had already turned into `{}.CI ? 'en' : …`, a constant undefined,
+    # in a packaged build — the CI=1 shortcut never did anything in the artifact).
     strategy:
       fail-fast: false
       matrix:

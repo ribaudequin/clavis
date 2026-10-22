@@ -17,8 +17,9 @@ import { APP_VERSION } from './artifact';
 
 // The launcher, the profile isolation and the bilingual name matching all live in launch.ts
 // now. This file used to carry its own copy of the launch, and the comment under it claimed
-// `CI=1` pinned the UI to English. It does not: Vite replaces `process.env` with `{}` in a
-// packaged build, so detectLocale()'s CI short-circuit is dead code there and the locale
+// `CI=1` pinned the UI to English. It does not, and it never could: `detectLocale()` has no
+// override of any kind (HYG-23 removed its `process.env.CI` branch, which Vite had already
+// turned into `{}.CI ? 'en' : …`, a constant undefined, in a packaged build), so the locale
 // follows the machine running the app. Hence every name matched below is a two-locale pattern.
 // `UI.delete` is the row button in the list; `UI.deleteDrawer` is the button inside an open
 // drawer, which opens the confirmation.

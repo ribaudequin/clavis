@@ -15,6 +15,7 @@ import {
   importDrawerRaw,
   listDrawers,
   unlockDrawer,
+  MAX_DRAWER_FILE_SIZE,
 } from '../src/main/store';
 import { logger } from '../src/main/logger';
 
@@ -111,7 +112,10 @@ describe('SEC-07 — bounded metadata', () => {
     const body = JSON.stringify(validDrawer(ID_1, { iconData }));
 
     // Under the file-size cap on purpose: only the metadata schema can refuse this.
-    expect(body.length).toBeLessThan(20_004_096);
+    // HYG-13b — the ceiling is read from the store, not restated here: the number
+    // had three owners (the source, the ipc-handlers mock and this line) and the
+    // copy in this file was the one that would have gone stale unnoticed.
+    expect(body.length).toBeLessThan(MAX_DRAWER_FILE_SIZE);
     expect(await importDrawerRaw(body)).toBe(false);
   });
 
