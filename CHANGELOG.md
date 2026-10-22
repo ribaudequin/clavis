@@ -1,5 +1,79 @@
 # Changelog — Clavis
 
+## v0.6.10-beta (2026-10-22)
+
+**Three guards, one of them guarding the truth: the caps, the locale, and the export.**
+**All three were places where the code could say one thing and the tests could not tell.**
+
+### Changed
+
+- **The export now reports what the download actually did — and the blob is revoked when the download
+  ends.** The export handed Chromium a blob URL and revoked it in the click's own task, which works
+  only because Chromium resolves the blob URL during the click's default action. The failure mode of
+  getting that wrong is **silent**: measured, revoking before the click writes **no file at all** —
+  the download item sits at `progressing` forever, no state ever completes, no error surfaces — and
+  the app still said *"exported successfully"*. A user would believe they had a backup.
+  Only the main process can know when a download ends (a web page gets no download event, and the blob
+  URL lives in the renderer's own context), so `src/main/downloads.ts` observes `will-download`, waits
+  for the item's **`done`** event — Electron's `updated` event never reports `completed` for this
+  download, measured — and pushes `{ fileName, outcome }` to the renderer. That is **the app's first
+  main→renderer channel**. The renderer matches the file name to the export waiting for it, revokes
+  the blob, and the *"exported"* toast now reflects the download's **real outcome**: a new
+  `msg.drawer_export_failed` replaces the success message when the transfer was cancelled or
+  interrupted. A false failure costs the user one more export; a false success costs them the file
+  they thought they had.
+  A **30 s fallback** releases the blob and reports the export unfinished, because a download can also
+  *never* end — and the exported ciphertext (up to the size of a whole drawer) would otherwise sit in
+  memory for the life of the window.
+- **The renderer's CI override is gone.** `detectLocale()` opened with `if (process.env.CI) return 'en'`,
+  added on 2026-09-12 to settle a `PasswordModal.test.tsx` failure on GitHub Actions. It was **dead
+  code in every packaged build**: Vite rewrites `process.env` to `{}`, so the shipped bundle carried
+  `{}.CI ? 'en' : …`, a constant `undefined`. It also read like a feature — an e2e comment once
+  claimed that `CI=1` pinned the packaged UI to English, which it never did. Measured before the
+  removal: with the branch deleted the suite was **513/513 green both with `CI=true` and with `CI`
+  unset**, so nothing needed it. The locale follows the system language and nothing else, which is
+  what ADR-009 has always said.
+- **The content caps have one owner, and the file cap has one at all.** Every boundary test builds its
+  input from the constant (`'x'.repeat(MAX_DECRYPTED_SIZE + 1)`), which is right for a behavioural
+  test and wrong as the only kind: retargeting the cap keeps every one of them green. Worse, the
+  **file ceiling** (`MAX_DRAWER_FILE_SIZE = 20_004_096`) was pinned **nowhere** — the two copies of the
+  number in the test tree were *uses*, not assertions — and **lowering it by 86 characters left the
+  whole suite green, 499/499**. And nothing said the file cap is *derived*: replacing the derivation
+  with a literal of the same number left the suite **516/516 green**. `tests/limits.absolute.test.ts`
+  is the anchor now: the four numbers in absolute terms, and mock-based guards that the file cap
+  follows the byte cap, stays pinned by the absolute ceiling when the byte cap rises, and takes the
+  envelope allowance from the source.
+
+### Fixed
+
+- **A stalled export now says what it saw.** The e2e records the download's events (`will-download`,
+  `updated`, `done`) and the timeout message carries them, so a failed export says "the transfer never
+  finished" instead of only how long it waited.
+- **`docs/DRAWER-CAPACITY.md` told the reader three things that were no longer true**: it quoted a
+  message the app never shows (the renderer shows the translated sentence for `CONTENT_TOO_LARGE`, and
+  the number reaches only the main process's log), it still said the limit was *"shown to the user:
+  none"* and that the refusal said *"Incorrect password"*, and its derivation snippet was a generation
+  behind — no `ABSOLUTE_IMPORT_CEILING` clamp, and the old constant name. The document now has a guard
+  on its capacity table, row by row.
+
+### Verified
+
+- **Mutations, measured** — each of these was reverted after the run:
+  the export's synchronous revoke restored → **6 red**; the main process never notifying → **2 red
+  _and the e2e fails_** (the export toast never appears, so the e2e guards the whole chain and not
+  only the renderer); the observer calling `setSavePath` → **1 red**; the screen's cleanup not
+  releasing the blob → **1 red**; the CI override restored → **2 red**; the file cap hardcoded as a
+  literal → **3 red**; the file ceiling lowered by 86 characters → **3 red**; the envelope allowance
+  changed → **2 red**; the absolute clamp removed → **1 red**; the doc stating a different capacity →
+  **1 red**; the byte cap raised → **14 red**; the code-point cap split off on its own → **5 red**.
+- **The export had no test at all** before this release. The new coverage is
+  `tests/HomeScreen.test.tsx` (9 tests), `tests/main-downloads.test.ts` (6) and the preload's listener
+  wiring (2).
+- `lint` 0 errors / 2 pre-existing warnings · `typecheck` 0 · `typecheck:test` 0 · **535/535** vitest
+  across 51 files (green with `CI=true` and with `CI` unset) · `npm run package` and `npm run make` OK
+  (deb + AppImage) · e2e **15/15** against the packaged output in **both** locales — the packaged
+  binary, not the source tree.
+
 ## v0.6.9-beta (2026-10-21)
 
 **Clavis now runs on all three platforms — and the macOS app is signed.**
