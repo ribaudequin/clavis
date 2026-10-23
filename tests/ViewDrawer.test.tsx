@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, waitFor, act } from '@testing-library/react';
 
 beforeEach(() => cleanup());
 afterEach(() => cleanup());
@@ -24,7 +24,7 @@ vi.mock('../src/shared/limits', async (importOriginal) => {
     MAX_PLAINTEXT_BYTES: 1_000,
   };
 });
-import ViewDrawer from '../src/renderer/pages/ViewDrawer';
+import ViewDrawer, { CONTENT_COUNTER_DEBOUNCE_MS } from '../src/renderer/pages/ViewDrawer';
 import { Result } from '../src/shared/types';
 import { MAX_CONTENT_CODE_POINTS, MAX_PLAINTEXT_BYTES } from '../src/shared/limits';
 import { translations } from '../src/i18n';
@@ -208,6 +208,7 @@ describe('ViewDrawer', () => {
     });
 
     afterEach(() => {
+      vi.useRealTimers();
       vi.restoreAllMocks();
       setLanguage(ORIGINAL_LANGUAGE);
     });
@@ -427,6 +428,69 @@ describe('ViewDrawer', () => {
       // Guards the comparison above from passing vacuously: the content is encoded once
       // on mount and not again.
       expect(afterMount).toBe(1);
+    });
+
+    it('keeps the initial counters exact on mount and updates only after the debounce', () => {
+      vi.useFakeTimers();
+      renderDrawer({ initialContent: 'Hello' });
+      expect(screen.getByText(/^5 characters$/)).toBeTruthy();
+      expect(screen.getByText(new RegExp(`^5 / ${en(MAX_PLAINTEXT_BYTES)} bytes$`))).toBeTruthy();
+      expect(screen.getByText('1%')).toBeTruthy();
+
+      fireEvent.change(screen.getByDisplayValue('Hello'), { target: { value: 'x'.repeat(500) } });
+      expect(screen.getByText(/^5 characters$/)).toBeTruthy();
+      expect(screen.getByText(new RegExp(`^5 / ${en(MAX_PLAINTEXT_BYTES)} bytes$`))).toBeTruthy();
+      expect(screen.getByText('1%')).toBeTruthy();
+
+      act(() => {
+        vi.advanceTimersByTime(CONTENT_COUNTER_DEBOUNCE_MS - 1);
+      });
+      expect(screen.getByText(/^5 characters$/)).toBeTruthy();
+      expect(screen.getByText(new RegExp(`^5 / ${en(MAX_PLAINTEXT_BYTES)} bytes$`))).toBeTruthy();
+      expect(screen.getByText('1%')).toBeTruthy();
+
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(screen.getByText(/^500 characters$/)).toBeTruthy();
+      expect(screen.getByText(new RegExp(`^500 / ${en(MAX_PLAINTEXT_BYTES)} bytes$`))).toBeTruthy();
+      expect(screen.getByText('50%')).toBeTruthy();
+    });
+
+    it('collapses rapid changes into one computation of the last value', () => {
+      vi.useFakeTimers();
+      const encode = vi.spyOn(TextEncoder.prototype, 'encode');
+      renderDrawer({ initialContent: 'Hello' });
+      const textarea = screen.getByDisplayValue('Hello');
+      fireEvent.change(textarea, { target: { value: 'a' } });
+      fireEvent.change(textarea, { target: { value: 'ab' } });
+      fireEvent.change(textarea, { target: { value: 'abc' } });
+      expect(screen.getByText(/^5 characters$/)).toBeTruthy();
+      expect(screen.queryByText(/^1 characters$/)).toBeNull();
+      expect(screen.queryByText(/^2 characters$/)).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(CONTENT_COUNTER_DEBOUNCE_MS);
+      });
+
+      expect(screen.getByText(/^3 characters$/)).toBeTruthy();
+      expect(screen.queryByText(/^1 characters$/)).toBeNull();
+      expect(screen.queryByText(/^2 characters$/)).toBeNull();
+      expect(encode).toHaveBeenCalledTimes(2);
+    });
+
+    it('clears the pending debounce on unmount without updating state', () => {
+      vi.useFakeTimers();
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { unmount } = renderDrawer({ initialContent: 'Hello' });
+      fireEvent.change(screen.getByDisplayValue('Hello'), { target: { value: 'x'.repeat(500) } });
+      unmount();
+      expect(() =>
+        act(() => {
+          vi.advanceTimersByTime(CONTENT_COUNTER_DEBOUNCE_MS);
+        }),
+      ).not.toThrow();
+      expect(consoleError).not.toHaveBeenCalled();
     });
 
     it('keeps the two real ceilings equal in value while named as different units', async () => {

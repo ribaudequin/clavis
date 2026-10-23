@@ -6,6 +6,15 @@ import DiscardChangesModal from '../components/DiscardChangesModal';
 import { t, tError, formatNumber } from '../../i18n';
 import { toast } from 'react-hot-toast';
 
+export const CONTENT_COUNTER_DEBOUNCE_MS = 200;
+
+function measureContent(value: string): { codePoints: number; bytes: number } {
+  return {
+    codePoints: countCodePoints(value),
+    bytes: new TextEncoder().encode(value).length,
+  };
+}
+
 interface ViewDrawerProps {
   drawerId: string;
   password: string;
@@ -25,6 +34,17 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [showSpinner, setShowSpinner] = useState(false);
   const spinnerTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [metrics, setMetrics] = useState(() => measureContent(initialContent));
+  const measuredContentRef = React.useRef(initialContent);
+
+  React.useEffect(() => {
+    if (content === measuredContentRef.current) return;
+    const timer = setTimeout(() => {
+      measuredContentRef.current = content;
+      setMetrics(measureContent(content));
+    }, CONTENT_COUNTER_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [content]);
 
   const isDirty = title !== initialTitle || content !== initialContent;
 
@@ -111,16 +131,9 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
   // grapheme clusters — those were both the wrong unit for the label and O(n) work
   // repeated on every keystroke, since content is a controlled textarea. The bar is
   // driven by bytes alone because that is the cap that refuses the save (SAV-01).
-  const { codePoints, bytes, maxBytes } = React.useMemo(() => {
-    const value = content || '';
-    return {
-      codePoints: countCodePoints(value),
-      bytes: new TextEncoder().encode(value).length,
-      // Formatted once here rather than per render: the ceiling does not move, and the
-      // locale decides the separator (pt-PT spaces, en commas).
-      maxBytes: formatNumber(MAX_PLAINTEXT_BYTES),
-    };
-  }, [content]);
+  const { codePoints, bytes } = metrics;
+  // Formatted per render so a language change is reflected without a content edit.
+  const maxBytes = formatNumber(MAX_PLAINTEXT_BYTES);
   const bytePct = Math.min(bytes / MAX_PLAINTEXT_BYTES, 1);
   // Rounded once and reused by both the bar width and the label, so the two cannot
   // disagree — an unrounded width beside a rounded label reads as two different numbers.

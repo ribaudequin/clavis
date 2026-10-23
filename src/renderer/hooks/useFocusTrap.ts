@@ -1,5 +1,17 @@
 import React, { useEffect, useRef, RefObject } from 'react';
 
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'textarea:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  '[contenteditable="true"]',
+  'audio[controls]',
+  'video[controls]',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ');
+
 interface UseFocusTrapOptions {
   isActive?: boolean;
 }
@@ -25,28 +37,27 @@ export function useFocusTrap(
 
     previouslyFocused.current = document.activeElement as HTMLElement | null;
 
-    const focusable = container.querySelectorAll<HTMLElement>(
-      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    );
-
-    if (focusable.length === 0) return;
-
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-
     function handleTab(e: KeyboardEvent) {
       if (e.key !== 'Tab') return;
 
+      const root = containerRef.current;
+      if (!root) return;
+
+      const focusable = root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const index = Array.from(focusable).indexOf(document.activeElement as HTMLElement);
+
       if (e.shiftKey) {
-        if (document.activeElement === first) {
+        if (index === -1 || index === 0) {
           e.preventDefault();
           last.focus();
         }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
+      } else if (index === -1 || index === focusable.length - 1) {
+        e.preventDefault();
+        first.focus();
       }
     }
 
