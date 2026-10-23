@@ -1,5 +1,40 @@
 # Changelog — Clavis
 
+## v0.6.11-beta (2026-10-23)
+
+**Two UI costs removed: the focus trap follows the DOM, and the counters stop rescanning the note on
+every keystroke. Neither was a visible failure; both were work the app did at the wrong time.**
+
+### Fixed
+
+- **The focus trap now reads the DOM at the Tab key, not at mount.** `useFocusTrap` captured the
+  focusable elements once, so a modal that swaps its own content kept wrapping against what used to be
+  there. `CreateDrawerModal` does exactly that — after a duplicate title it replaces the form with a
+  two-button confirmation — and the trap still held the unmounted form's first and last controls:
+  Tab stopped cycling inside the dialog and walked out of it. The list is now recomputed inside the
+  `keydown` handler (no `MutationObserver`: the keypress is the only consumer, and a second source of
+  truth for "what is on screen" is a liability). The selector also admits `[contenteditable="true"]`,
+  `audio[controls]` and `video[controls]`, and an `activeElement` that is no longer in the list goes to
+  the first control on Tab and the last on Shift+Tab instead of falling through. Four new tests drive
+  the real hook and the real modal through the duplicate warning; restoring the old hook turns **three
+  of the four red** — the middle-of-list test stays green, as it should.
+
+### Changed
+
+- **The capacity counters update 200 ms after the typing stops.** The character and byte counters ran
+  `countCodePoints` and a UTF-8 encode inside a `useMemo` keyed on `content`: at the 10 MB ceiling that
+  is two full scans of the note per character typed, on top of the controlled textarea's re-render.
+  The metrics are now measured on a 200 ms debounce with a single timer that is cleared on every
+  change and on unmount. The initial values are still computed synchronously, so the first render
+  after opening a drawer is exact, and rapid edits collapse into one measurement of the final value.
+  The main process still enforces the exact byte cap on save, so the debounce can only make the
+  number late, never wrong. The byte ceiling label is also formatted per render now, so a language
+  change is reflected without an edit.
+
+**Gates on the released tree:** lint 0 errors / 2 pre-existing warnings · both typechecks 0 ·
+**542/542** vitest across 52 files · `npm run release` OK (deb + AppImage) · e2e **15/15** against
+`out/clavis-linux-x64`.
+
 ## v0.6.10-beta (2026-10-22)
 
 **Three guards, one of them guarding the truth: the caps, the locale, and the export.**
