@@ -32,6 +32,7 @@ export const translations: Record<string, TranslationDict> = {
     'msg.error_delete': 'Erro ao eliminar:',
     'msg.error_delete_failed': 'Não foi possível eliminar a gaveta.',
     'msg.error_import': 'Erro ao importar:',
+    'msg.error_load_drawers': 'Erro ao carregar gavetas:',
     // UX-08 — The too-many-failed-attempts wait: the message that is seen
     // counting down and the static sentence a screen reader announces once.
     // Both exist because the number changes every second, and a live region
@@ -141,6 +142,7 @@ export const translations: Record<string, TranslationDict> = {
     'msg.error_delete': 'Error deleting:',
     'msg.error_delete_failed': 'Could not delete the drawer.',
     'msg.error_import': 'Error importing:',
+    'msg.error_load_drawers': 'Error loading drawers:',
     // UX-08 — The too-many-failed-attempts wait: the message that is seen
     // counting down and the static sentence a screen reader announces once.
     // Both exist because the number changes every second, and a live region

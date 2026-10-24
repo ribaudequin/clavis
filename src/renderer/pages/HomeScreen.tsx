@@ -79,9 +79,12 @@ function HomeScreen(): React.JSX.Element {
       const result = await api().listDrawers();
       if (!result.ok) {
         console.error('Failed to list drawers:', result.error);
+        toast.error(tError(result.error));
         return;
       }
       setDrawers(result.data);
+    } catch {
+      toast.error(t('msg.error_load_drawers'));
     } finally {
       setLoadingDrawers(false);
     }
@@ -173,6 +176,8 @@ function HomeScreen(): React.JSX.Element {
           toast.error(t('msg.drawer_export_failed'));
         }, EXPORT_DOWNLOAD_FALLBACK_MS),
       });
+    } catch {
+      toast.error(t('msg.error_export'));
     } finally {
       setExportingId(null);
     }
@@ -227,6 +232,8 @@ function HomeScreen(): React.JSX.Element {
       } catch {
         toast.error(t('msg.error_import'));
       }
+    } catch {
+      toast.error(t('msg.error_import'));
     } finally {
       setImporting(false);
     }

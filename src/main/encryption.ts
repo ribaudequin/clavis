@@ -106,6 +106,7 @@ export async function deriveKey(password: string | Buffer, salt: Buffer, params?
         raw: true,
       });
       if (hash.length !== KEY_LENGTH) {
+        hash.fill(0);
         throw new Error(`Argon2 raw output length ${hash.length} != expected ${KEY_LENGTH}`);
       }
     } else {
@@ -163,22 +164,26 @@ export async function encrypt(plainText: string, password: string | Buffer, para
   const iv = crypto.randomBytes(IV_LENGTH);
 
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-  const encrypted = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
-  const authTag = cipher.getAuthTag();
+  try {
+    const encrypted = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
+    const authTag = cipher.getAuthTag();
 
-  logger.debug('Content encrypted', { size: encrypted.length });
-  // P0.7 — Zero derived key from memory after use
-  key.fill(0);
-  return {
-    encryptedData: encrypted.toString('hex'),
-    salt: salt.toString('hex'),
-    iv: iv.toString('hex'),
-    authTag: authTag.toString('hex'),
-    // Report the backend that actually derived the key, not the one availability
-    // suggests: saving a legacy scrypt drawer on an argon2 build must not rewrite its
-    // metadata as argon2id.
-    algorithm: resolveKdfBackend(params),
-  };
+    logger.debug('Content encrypted', { size: encrypted.length });
+    // P0.7 — Zero derived key from memory after use
+    key.fill(0);
+    return {
+      encryptedData: encrypted.toString('hex'),
+      salt: salt.toString('hex'),
+      iv: iv.toString('hex'),
+      authTag: authTag.toString('hex'),
+      // Report the backend that actually derived the key, not the one availability
+      // suggests: saving a legacy scrypt drawer on an argon2 build must not rewrite its
+      // metadata as argon2id.
+      algorithm: resolveKdfBackend(params),
+    };
+  } finally {
+    key.fill(0);
+  }
 }
 
 export async function decrypt(

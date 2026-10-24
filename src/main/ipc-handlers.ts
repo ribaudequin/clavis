@@ -453,7 +453,11 @@ export function registerIpcHandlers(deps: IpcDeps): void {
       const token = randomUUID();
       allowedImportPaths.set(token, filePath);
 
-      const timer = setTimeout(() => allowedImportPaths.delete(token), 5 * 60 * 1000);
+      const timer = setTimeout(() => {
+        allowedImportPaths.delete(token);
+        const idx = importTimers.indexOf(timer);
+        if (idx >= 0) importTimers.splice(idx, 1);
+      }, 5 * 60 * 1000);
       importTimers.push(timer);
 
       logger.debug('File dialog completed', { fileName: path.basename(filePath) });
