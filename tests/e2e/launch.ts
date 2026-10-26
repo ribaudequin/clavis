@@ -138,6 +138,9 @@ export async function launchIsolated(): Promise<IsolatedApp> {
 
   const cleanup = async (): Promise<void> => {
     await app.close().catch(() => undefined);
+    // Teardown hygiene: wait for the process to exit before removing the profile,
+    // so the directory removal does not race with a still-exiting child.
+    await new Promise((resolve) => setTimeout(resolve, 500));
     removeDir(profileDir);
     removeDir(downloadDir);
   };

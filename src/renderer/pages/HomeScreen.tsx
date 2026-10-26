@@ -299,7 +299,7 @@ function HomeScreen(): React.JSX.Element {
 
 if (viewState) {
     return (
-      <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>}>
+      <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center">{t('label.loading')}</div>}>
         <ViewDrawer
           drawerId={viewState.drawerId}
           password={viewState.password}
