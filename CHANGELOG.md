@@ -1,5 +1,118 @@
 # Changelog — Clavis
 
+## v0.6.14-beta (2026-10-27)
+
+**The version finally matches the tag. The previous release published 0.6.12 binaries labelled
+`v0.6.13-beta`, which made the update check offer users a download identical to what they already had.**
+
+### Fixed
+
+- **The version is bumped, and the packaged asar is checked instead of assumed.** `package.json` reads
+  `0.6.14-beta`; the built artifacts are `clavis-0.6.14-beta-x64.AppImage` and
+  `clavis_0.6.14~beta_amd64.deb`, and the `package.json` **inside the asar** reads `0.6.14-beta` —
+  verified by extracting it, which is also how the `config.forge`-dropping failure of `fa7eede` would
+  have been caught. `config.forge` survived this bump intact: five makers, the ad-hoc-sign plugin and
+  `packagerConfig.icon` all still present.
+- **The tag and the assets now come from the same commit.** `v0.6.13-beta` was force-moved to
+  `30c019c` after publication while its assets had been built from `831c20a`, and the moved tag's run
+  was cancelled — so QA-03, UX-02 and the e2e teardown existed in `main` and in no binary. This
+  release ships from the tip of `main`, so the tag, the assets and the source agree.
+
+### Changed
+
+- **`CHANGELOG.md` is caught up.** The `v0.6.12-beta` and `v0.6.13-beta` sections were missing
+  entirely; both are written from the commits and the runs, not from memory, and the second one
+  records the two defects above rather than leaving them to be rediscovered.
+- **`TODO.md` reconciled with the code.** REL-01 (atomic `tmp` + `fsync` + `rename`) and SEC-04
+  (`wrong_password` before re-encrypting) had been done since `b09ee8c` and `be6e8fb` and were still
+  unchecked; P3.31's "remaining untested files" all have a test module. The four `*-smoke` tests are
+  recorded as shape-only, with a follow-up item, so the checkbox does not overstate what is covered.
+
+### Carried from `main` since the last published build
+
+- **QA-03:** Vitest no longer collects `tests/e2e/**` (`vitest.config.mts` excludes it).
+- **UX-02:** the `Suspense` fallback's hardcoded `Loading...` goes through `t('label.loading')`, so a
+  Portuguese UI no longer shows an English word while `ViewDrawer` loads.
+- **e2e teardown:** `cleanup()` waits 500 ms after `app.close()` before removing the profile, so the
+  removal no longer races a still-exiting child.
+- **`macos-13` reverted:** the runner sat in the queue for more than a day; the arm64-only macOS gap
+  stays documented and accepted.
+
+**Gates on this tree:** lint 0 errors / 2 pre-existing warnings · both typechecks 0 · **549/549** vitest
+across 54 files · `npm run release` OK (deb + AppImage) · e2e **14/14** against the AppImage in **both
+locales**. The suite is 14, not 15, because QA-05 deleted `tests/e2e/functional-flow.spec.ts` — every
+number in earlier entries that says 15/15 describes a tree that still had that spec.
+
+## v0.6.13-beta (2026-10-26)
+
+**A maintenance release with one honest revert, and one defect it did not notice: the version was
+never bumped, so the published binaries report `0.6.12-beta`.**
+
+### Fixed
+
+- **The stale e2e spec is gone (QA-05).** `tests/e2e/functional-flow.spec.ts` was deleted: it
+  re-walked the create/unlock/delete path that `clavis.spec.ts` already owns, and it was asserting a
+  `Ctrl+N` shortcut that **does not exist** anywhere in `src/`. Two specs for one flow means the
+  obsolete one is the one that rots first.
+- **The REL-04 timer test now covers the case it was named for.** The original test exercised the
+  cleanup path once; it now drives repeated import attempts and asserts the timer list does not grow,
+  so the splice-on-fire and the splice-on-quit branches are both observed.
+- **`npm audit fix --force` reverted, and the risk written down (QA-06).** The forced fix upgraded
+  `tailwindcss` from v3 to v4, which the project's config and class names do not survive
+  (`bg-gray-50` stops being recognised and the build breaks). `package-lock.json` was restored with
+  `npm ci`; the 43 dev-dependency advisories stand, documented as a known, deliberate exposure —
+  dev dependencies do not ship in the asar.
+
+### Changed
+
+- **The macOS gap is documented and accepted, not deferred.** CI's `macos-latest` is `arm64`, so the
+  `.dmg` is arm64-only; `macos-13` (`x64`) was added to the matrix in `30c019c` and reverted in
+  `4edcedc` after the runner sat in the queue for more than a day and timed out. There is no Intel
+  Mac build and no universal binary. This is stated in `SECURITY.md` and `README.md` rather than left
+  as a silent absence.
+
+### Known defects in this release
+
+- **The version string was not bumped.** `package.json` still reads `0.6.12-beta`, so every asset is
+  named `clavis-0.6.12-beta*` while the tag says `v0.6.13-beta`, and the in-app update check
+  (`tag_name` vs `app.getVersion()`) offers an "update" that is byte-for-byte the same build.
+- **The tag was force-moved after publication.** The release assets were built from `831c20a`; the tag
+  was later moved to `30c019c` (QA-03, UX-02, e2e teardown), whose tag run was **cancelled**, so none
+  of those three changes are in the published binaries.
+- Both are corrected in **v0.6.14-beta**, which ships from the tip of `main` with the version bumped.
+
+**Gates on the released tree (`831c20a`):** lint 0 errors / 2 pre-existing warnings · both typechecks 0 ·
+**542/542** vitest across 52 files · e2e **15/15** against the AppImage in **both locales** · tag run
+`40236278956`, 9 jobs green, 6 assets.
+
+## v0.6.12-beta (2026-10-24)
+
+**Three failure paths that were silent: keys left in memory, IPC rejections nobody caught, and a timer
+that outlived its token.**
+
+### Fixed
+
+- **SEC-06 — the derived key and the cipher key are zeroed on every error path.** `deriveKey()` wiped
+  the hash only on success, so an Argon2 result of the wrong length left the material alive in a
+  `Buffer` that was about to be thrown away — reachable whenever the native module answers with a
+  backend the code does not expect. It now calls `hash.fill(0)` **before** throwing. `encrypt()` had
+  the same shape: the `key.fill(0)` lived after `cipher.final()`, so a throw from `final()` skipped it.
+  The whole body is now in `try/finally`, which covers every exit including the exceptional one. Two
+  new tests in `tests/encryption.test.ts` assert the guards; 15/15 in that file.
+- **REL-03 — the three IPC calls the renderer awaited without a `catch` now report failure.** `loadDrawers`,
+  `handleExport` and `handleImport` (`HomeScreen.tsx`) each get `catch { toast.error(...) }` and a
+  `finally` that resets its loading flag. A rejected bridge call used to leave a spinner running and
+  the screen unchanged — the user's only signal was that nothing happened. `tests/rel03-caught-rejections.test.ts`
+  covers the three.
+- **REL-04 — an import token's cleanup timer is removed when it fires.** `importTimers` grew on every
+  import and only shrank at `will-quit`, so a long session accumulated timers that had already done
+  their job (and kept their closures alive). The timer now removes itself via `splice` inside its own
+  callback. `tests/rel04-timer-cleanup.test.ts`.
+
+**Gates on the released tree:** lint 0 errors / 2 pre-existing warnings · both typechecks 0 ·
+**542/542** vitest across 52 files · `npm run release` OK (deb + AppImage) · e2e **15/15** against the
+AppImage in **both locales** · tag run `40099571015`, 9 jobs green, 6 assets.
+
 ## v0.6.11-beta (2026-10-23)
 
 **Two UI costs removed: the focus trap follows the DOM, and the counters stop rescanning the note on
