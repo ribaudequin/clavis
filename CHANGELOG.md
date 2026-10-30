@@ -1,5 +1,56 @@
 # Changelog — Clavis
 
+## v1.0.0 (2026-10-30)
+
+**The first production release.** It is the `v0.6.15-beta` tree with the four High findings of the
+2026-10-30 code-quality audit closed, the dependency advisory patched, and the release pipeline given the
+guard that catches the version-vs-tag defect that produced `v0.6.13-beta`. No feature was added.
+
+### Fixed
+
+- **Two saves of the same drawer can no longer lose the newer edit.** `saveDrawer` is a read-modify-write:
+  it reads the file, decrypts it to verify the password, re-encrypts and renames. Two saves started in the
+  same tick both read the same bytes, and whichever rename landed last won — silently, with a success toast.
+  A per-drawer critical section (`withDrawerLock`) now serializes save, delete and import for one id, and
+  `ViewDrawer` refuses a re-entrant save, so the keyboard shortcut cannot start a second one while the first
+  is in flight. `atomicWrite` already kept the file from being corrupted; this keeps the *content* from being
+  overwritten by an older edit.
+- **A click on a modal's backdrop no longer disables Escape or the focus trap.** The listeners lived on the
+  full-screen overlay; clicking the dimmed margin moved focus to `<body>`, where a keydown never reaches a
+  descendant. `useModalKeyboard` and `useFocusTrap` now listen on the document, so Escape closes the dialog
+  and Tab (or Shift+Tab) pulls focus back to the first (last) control inside it.
+- **The password used to create a drawer is zeroed on every failure path.** `createDrawer` zeroed its buffer
+  only after `encrypt()` resolved, so a policy rejection or a KDF failure left the plaintext password in the
+  heap until GC. The buffer is now cleared in a `finally`.
+- **An existing drawers directory is tightened to `0700`.** `fs.mkdir(..., { mode: 0700 })` only applies at
+  creation; a profile created by an older build kept its `0755`, exposing the drawer list to other local
+  users. `ensureDataDir` now `chmod`s the directory after the mkdir (POSIX).
+- **The tag-version guard and the artifact verification close the `v0.6.13-beta` class of defect.**
+  `scripts/check-tag-version.sh` fails a tag whose name does not match `package.json`; the release job
+  verifies every downloaded artifact's name against the tag and prints its SHA-256. The macOS `.dmg` is
+  renamed to `clavis-<version>.dmg` so it can satisfy the same check.
+
+### Security
+
+- **`zod` 4.5.4 → 4.6.7** (GHSA-mrhx-c7xc-m3w5: memory exhaustion while validating oversized constrained
+  collections). Zod parses every untrusted `.clavis` file, so the advisory is on the path a crafted drawer
+  would take. `npm audit --omit=dev` is now a gate in `quality`.
+
+### Changed
+
+- The five modal backdrops share one style (`bg-black bg-opacity-60`).
+- The four shape-only smoke tests (`ToastProvider`, `SkeletonLoader`, `types`, `channels`) were replaced with
+  tests that assert behaviour or real values.
+- `scripts/release-phase.sh` was deleted: it did not parse (`bash -n` exited 2), bumped only `package.json`,
+  and expected artifacts in a directory the build no longer writes.
+- Flatpak is dropped: the manifest never built, was pinned to `0.3.4-alpha`, and had no CI job.
+
+### Known limitations
+
+- The macOS `.dmg` is arm64-only and not notarised; the Windows installer is unsigned. Both are stated in
+  `README.md` and `SECURITY.md`.
+- A save still replaces the drawer's only file (atomically). There is no per-drawer history or backup file.
+
 ## v0.6.15-beta (2026-10-30)
 
 **The leftovers behind the last two releases, closed. No behaviour was redesigned; every change removes

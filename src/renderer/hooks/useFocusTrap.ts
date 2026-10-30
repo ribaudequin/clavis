@@ -61,10 +61,14 @@ export function useFocusTrap(
       }
     }
 
-    container.addEventListener('keydown', handleTab);
+    // UX-01 — Bind to the document, not the container. A click on the backdrop moves focus to
+    // <body>, and a keydown that starts there bubbles to the document and never reaches an
+    // overlay descendant, so a container-bound handler would let Tab walk into the UI behind
+    // the scrim. With the listener here, `index === -1` (focus outside) is already handled.
+    document.addEventListener('keydown', handleTab);
 
     return () => {
-      container.removeEventListener('keydown', handleTab);
+      document.removeEventListener('keydown', handleTab);
       if (previouslyFocused.current && document.body.contains(previouslyFocused.current)) {
         previouslyFocused.current.focus();
       }

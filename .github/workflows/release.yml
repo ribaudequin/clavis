@@ -352,6 +352,20 @@ jobs:
           WINDOWS_CERT_FILE: ${{ secrets.WINDOWS_CERT_FILE }}
           WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
 
+      # The dmg maker has no artifact-name template: it writes `clavis.dmg`, so the release
+      # job's name-vs-tag verification rejected it and the first tag that ran that check
+      # (run 41101945946, v1.0.0) failed before publishing. Rename it here, where the file
+      # is produced, so the uploaded artifact and the published asset both carry the version.
+      - name: Version the macOS .dmg filename
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          find out/make -name '*.dmg' -print0 | while IFS= read -r -d '' f; do
+            mv "$f" "$(dirname "$f")/clavis-${VERSION}.dmg"
+          done
+          find out/make -name '*.dmg'
+
       # The artifact users download, exercised before it is uploaded. Placed here rather than
       # only in the e2e job so that "the released binary passed the flow" is structural:
       # `release` needs `build`, so a failure here stops the publication. Linux only, because

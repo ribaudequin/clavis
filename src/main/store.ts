@@ -690,14 +690,18 @@ export async function saveDrawer(
 
 export async function deleteDrawer(id: string): Promise<boolean> {
   if (!isValidId(id)) return false;
-  try {
-    await fs.unlink(getDrawerFilePath(id));
-    logger.info('Drawer deleted', { id });
-    return true;
-  } catch (e) {
-    logger.error('Delete failed', { id, error: e instanceof Error ? e.message : String(e) });
-    return false;
-  }
+  // DATA-01 — Same critical section as saveDrawer/import: a delete that lands between a
+  // save's read and its rename would otherwise be undone by the save (the drawer reappears).
+  return withDrawerLock(id, async () => {
+    try {
+      await fs.unlink(getDrawerFilePath(id));
+      logger.info('Drawer deleted', { id });
+      return true;
+    } catch (e) {
+      logger.error('Delete failed', { id, error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+  });
 }
 
 export async function readDrawerRaw(id: string): Promise<string | null> {
@@ -793,18 +797,22 @@ export async function importDrawerRaw(fileContent: string): Promise<boolean> {
       return false;
     }
 
-    // OVERWRITE-01: check existing drawer
-    const filePath = getDrawerFilePath(drawer.id);
-    const fileExists = await fs.access(filePath).then(() => true).catch(() => false);
-    if (fileExists) {
-      logger.warn('importDrawerRaw: drawer already exists — overwrite blocked', { id: drawer.id });
-      throw new DrawerAlreadyExistsError(drawer.id);
-    }
+    // OVERWRITE-01 / DATA-01 — Check and write inside the same per-drawer critical section
+    // as save and delete: two concurrent imports of one id could both pass the access()
+    // test, and a save in flight would otherwise race this write.
+    return await withDrawerLock(drawer.id, async () => {
+      const filePath = getDrawerFilePath(drawer.id);
+      const fileExists = await fs.access(filePath).then(() => true).catch(() => false);
+      if (fileExists) {
+        logger.warn('importDrawerRaw: drawer already exists — overwrite blocked', { id: drawer.id });
+        throw new DrawerAlreadyExistsError(drawer.id);
+      }
 
-    await ensureDataDir();
-    await atomicWrite(filePath, fileContent);
-    logger.info('Drawer imported', { id: drawer.id });
-    return true;
+      await ensureDataDir();
+      await atomicWrite(filePath, fileContent);
+      logger.info('Drawer imported', { id: drawer.id });
+      return true;
+    });
   } catch (e) {
     if (e instanceof DrawerAlreadyExistsError || e instanceof FileTooLargeError) {
       throw e; // Propagate to ipc-handlers for explicit message
