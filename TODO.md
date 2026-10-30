@@ -53,16 +53,15 @@ e2e **14/14** · `npm audit --omit=dev` **1 high** · `npm audit` **43** (4 crit
       `useFocusTrap` now both listen on `document`, so Escape closes the dialog and Tab / Shift+Tab pull focus
       back to the first / last control inside it; `tests/ux01-backdrop-focus.test.tsx` covers the three keys
       from `<body>`, and `tests/ux08-cancellable-unlock.test.tsx` pins the Escape case.
-- [ ] **REL-08 — v1.0.0 is tagged but NOT published.** The tag `v1.0.0` (`9709abf`) was pushed and tag run
+- [x] **REL-08 — v1.0.0 is tagged but NOT published.** The tag `v1.0.0` (`9709abf`) was pushed and tag run
       `41101945946` ran: 8/8 jobs green (`quality`, both `e2e` locales, both `e2e-cross` legs, three `build`
       targets), **`release` failed** in 3m59s at `Verify downloaded artifacts` with
       `FAIL name mismatch: clavis.dmg (expected version 1.0.0)` — `maker-dmg` emits the unversioned `clavis.dmg`,
-      and the check (added 2026-10-30, after `v0.6.15-beta` shipped) had never run on a tag before. Consequence:
-      no Release object, `/releases/latest` still `v0.6.15-beta`; the three bundles are retained as workflow
-      artifacts (Linux 228 MB, Windows 478 MB, macOS 131 MB; 90 days). **Fix:** name the `.dmg`
-      `clavis-${version}.dmg` in the macOS build step (or exempt that one name in the check while keeping the
-      existence + checksum assertions), add the `CHANGELOG.md` v1.0.0 section, then either re-create `v1.0.0`
-      (safe — nothing was published, unlike the `v0.6.13-beta` tag move) or ship `v1.0.1`.
+      and the check (added 2026-10-30, after `v0.6.15-beta` shipped) had never run on a tag before.
+      **FIXED AND PUBLISHED 2026-10-30:** the macOS build step now renames the `.dmg` to
+      `clavis-${version}.dmg`; the tag was re-created at `c4404d2` after the fixes (safe — no Release object had
+      been created), and tag run `41105274767` is **9/9 green**. Release `v1.0.0` published at 18:22Z with 6
+      assets, all versioned (`clavis-1.0.0.dmg` included), `prerelease: false`; `/releases/latest` = `v1.0.0`.
 
 ### Medium — close before the 1.0 tag (evidence + snippets in the report)
 
