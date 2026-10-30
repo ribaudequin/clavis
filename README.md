@@ -13,7 +13,9 @@
 
 ---
 
-**Clavis v1.0.0** — released 2026-10-30 (tag `v1.0.0`). All 4 audit Highs closed, gates green, AppImage validated (14/14 e2e). Flatpak dropped; arm64-only `.dmg` accepted gap. for storing sensitive data such as banking information, PINs, website passwords, safe codes, and door codes.
+**Clavis v1.0.0** — released 2026-10-30 (tag `v1.0.0`). All 4 audit Highs closed, gates green, AppImage validated (14/14 e2e). Flatpak dropped; arm64-only `.dmg` accepted gap.
+
+Encrypted notes for passwords, PINs, bank details and safe codes.
 
 Everything stays on your machine. Drawers are encrypted with AES-256-GCM, each one has its own password, and there is no account, no sync, and no analytics.
 
