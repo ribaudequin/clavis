@@ -48,27 +48,35 @@ One maker per platform, with `platforms` gating each to its OS:
 
 ## Workflow — `.github/workflows/release.yml`
 
-Four jobs (actions run on the Node 24 runtime; CI uses `node-version: 24`):
+Five jobs (actions run on the Node 24 runtime; CI uses `node-version: 24`). A tag run is therefore **8 job instances**: `quality`, `e2e` ×2 locales, `e2e-cross` ×2 platforms, `build` ×3 platforms, `release`.
 
 1. **quality** (`ubuntu-latest`, every push and PR): `npm ci` → `npm run lint` → `npm run typecheck` → `npm run typecheck:test` → `npm test`.
-2. **e2e** (`needs: quality`, `ubuntu-latest`, every push and PR) — `language: [en, pt]` matrix: `npm ci` → `npm run build` → `npm run package` → `xvfb-run -a npm run test:e2e` against `out/clavis-linux-x64/clavis`.
-3. **build** (`needs: [quality, e2e]`, gated to `v*` tags) — matrix over `ubuntu-latest`, `windows-latest`, `macos-latest`:
+2. **e2e** (`needs: quality`, `ubuntu-latest`, every push and PR) — `language: [en, pt]` matrix: `npm ci` → `npm run build` → `npm run package` → `xvfb-run -a npm run test:e2e` against `out/clavis-linux-x64/clavis`. Both locales are run because every selector in the suite is a two-locale pattern; Chromium reads `LANGUAGE`, not `LANG`.
+3. **e2e-cross** (`needs: quality`, matrix `windows-latest` / `macos-latest`, tag or `workflow_dispatch`): the same suite against the packaged build on each platform. It is **informational** — nothing `needs:` it, so an unavailable runner cannot block a release. `workflow_dispatch` is the manual channel: a tag cannot be iterated on, and a dispatch publishes nothing because `release` requires a push event.
+4. **build** (`needs: [quality, e2e]`, gated to `v*` tags) — matrix over `ubuntu-latest`, `windows-latest`, `macos-latest`:
    - checkout, setup Node 24 (cached), `npm ci` (Windows uses `--ignore-scripts` to keep the argon2 prebuilds)
    - **Windows only:** copy `electron-winstaller/vendor/7z-x64.exe` → `7z.exe` (forge#3892)
    - **Linux only:** `apt-get install dpkg-dev fakeroot build-essential g++ make python3 python3-dev squashfs-tools`
    - `npm run build` → `npm run make` (optionally passing cert secrets for Windows signing)
    - uploads artefacts as `clavis-<os>-<ref>` (`out/make/**/*.{deb,AppImage,dmg,exe,zip,nupkg}`)
    - **Linux only:** runs the e2e suite against the packaged AppImage before upload
-4. **release** — on `v*` tags, `ubuntu-latest`: downloads all artefacts (merged) and publishes a GitHub Release via `softprops/action-gh-release@v3` with auto-generated notes.
+5. **release** (`needs: build`, `ubuntu-latest`, push event on a `v*` tag): downloads all artefacts (merged) and publishes a GitHub Release via `softprops/action-gh-release@v3` with auto-generated notes.
 
 ## Release
 
+The version bump is **manual**, and it must happen before the tag: `v0.6.13-beta` was tagged while `package.json` still read `0.6.12-beta`, so six assets were published under the older name and every 0.6.12 user was offered a byte-identical "update".
+
 ```bash
-git tag v0.1.3-alpha
-git push origin v0.1.3-alpha
+npm version 0.6.15-beta --no-git-tag-version   # package.json + package-lock.json, together
+git commit -am "v0.6.15-beta — <summary>"
+git push origin main                            # quality + both e2e locales run first
+git tag v0.6.15-beta
+git push origin v0.6.15-beta                    # build ×3 + release
 ```
 
-Watch progress at `https://github.com/ribaudequin/clavis/actions`. The Release appears at `https://github.com/ribaudequin/clavis/releases` with 6 assets (2 Linux + 3 Windows + 1 macOS).
+`main` is pushed **before** the tag on purpose: the gate then runs against the commit that will be released, not after the fact. Watch progress at `https://github.com/ribaudequin/clavis/actions`. The Release appears at `https://github.com/ribaudequin/clavis/releases` with 6 assets (2 Linux + 3 Windows + 1 macOS).
+
+Before tagging, confirm locally that the packaged app carries the version the tag will claim — `npx @electron/asar extract-file out/clavis-linux-x64/resources/app.asar package.json` from a scratch directory (`extract-file` writes into the **cwd**). That check covers the version only: Forge deletes `config.forge` from the copy it puts in the asar, so `config: {}` is correct there and the makers/plugins/icon have to be read from the source `package.json`.
 
 ## Notes
 
@@ -78,7 +86,7 @@ Watch progress at `https://github.com/ribaudequin/clavis/actions`. The Release a
 - **Windows argon2:** the old `scripts/afterPack.js` ELF-stripping hack is **no longer needed** because Win32 builds now run on the native `windows-latest` runner (argon2 is compiled as PE32+ natively), not cross-compiled via Linux/Wine. It is kept in `scripts/backup/` for reference.
 - **AppImage:** `squashfs-tools` is installed explicitly on the Linux runner.
 - **Forge version:** pinned to **6.4.2** across all `@electron-forge/*` packages (7.11.2 pulled 30 CVEs via `tar`, `extract-zip`, `image-size`, `tmp`). Forge 6.4.2 has **no NSIS maker** and cannot read `.mts` config files.
-- **Workflow trigger:** `quality` and `e2e` run on every push and PR; `build` and `release` only on tags `v*`.
+- **Workflow trigger:** `quality` and `e2e` run on every push and PR; `e2e-cross` runs on tags (and on `workflow_dispatch`, where it publishes nothing); `build` on tags; `release` only on a **push** of a `v*` tag.
 
 ## Old local build scripts
 

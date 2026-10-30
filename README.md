@@ -49,7 +49,7 @@ Each release publishes 6 files:
 
 > **Unsigned builds.** Clavis is not signed with a certificate (see [SECURITY.md](SECURITY.md)). On Windows, SmartScreen shows "unknown publisher" — choose *More info → Run anyway*. On macOS, the `.app` is ad-hoc signed (free, no certificate) but the `.dmg` is **unnotarized**, so right-click the app and choose **Open**, or run `xattr -d com.apple.quarantine /Applications/Clavis.app`.
 
-> **Architectures, and what has actually been run.** The macOS build is **arm64 only** — the `.dmg` has no Intel (x86-64) or universal variant, and there is no arm64 build for Linux or Windows. The `.dmg` file name carries no architecture, so it does not look like the other two do. **All three platforms are now executed by the end-to-end suite** — Linux on every push, and Windows and macOS on every release tag (2026-10-21: 15/15 on `windows-latest` and 15/15 on `macos-latest`, against the packaged build). The **published** files themselves — the `.zip`, the `Setup.exe`, the `.dmg` — are still not the ones the suite runs, because it drives the packager output rather than the maker output. See [SECURITY.md](SECURITY.md) for the full list of known limitations.
+> **Architectures, and what has actually been run.** The macOS build is **arm64 only** — the `.dmg` has no Intel (x86-64) or universal variant, and there is no arm64 build for Linux or Windows. The `.dmg` file name carries no architecture, so it does not look like the other two do. **All three platforms are executed by the end-to-end suite** — Linux on every push, and Windows and macOS on every release tag (measured on `v0.6.15-beta`, 2026-10-30: **14/14** on Linux and **14/14** on each of `windows-latest` and `macos-latest`, against the packaged build; 14 rather than 15 because `functional-flow.spec.ts` was deleted as redundant in QA-05). The **published** files themselves — the `.zip`, the `Setup.exe`, the `.dmg` — are still not the ones the suite runs, because it drives the packager output rather than the maker output. See [SECURITY.md](SECURITY.md) for the full list of known limitations.
 
 > **Flatpak**: a manifest exists in `flatpak/` but is experimental and does not currently build.
 
@@ -116,14 +116,25 @@ Pressing **Back** with unsaved edits opens a dialog with three choices: **Cancel
 
 ### All Platforms (GitHub Actions, recommended)
 
-Release binaries are built **remotely on GitHub Actions** native runners (Linux, Windows, macOS) and published to a GitHub Release automatically. Just push a version tag matching `package.json`:
+Release binaries are built **remotely on GitHub Actions** native runners (Linux, Windows, macOS) and published to a GitHub Release automatically. The version bump is manual, so bump it first — a tag whose name and `package.json` disagree is how `v0.6.13-beta` ended up publishing `0.6.12` binaries — then push `main` on its own (so the quality and e2e gates run before the tag exists) and push the tag:
 
 ```bash
-git tag v0.4.6-beta
-git push origin v0.4.6-beta
+npm version 0.6.15-beta --no-git-tag-version   # updates package.json and package-lock.json
+git commit -am "v0.6.15-beta — <one-line summary>"
+git push origin main                            # quality + e2e run first
+git tag v0.6.15-beta
+git push origin v0.6.15-beta                    # builds all 3 platforms and publishes
 ```
 
 The workflow builds all 3 platforms and publishes 6 assets (`.deb` + `.AppImage` for Linux · Squirrel `Setup.exe` + `.nupkg` + portable `.zip` for Windows · `.dmg` for macOS) to [GitHub Releases](https://github.com/ribaudequin/clavis/releases). See `.github/workflows/release.yml` and `BUILD_MANUAL.md`.
+
+To confirm a build carries the version its name claims, extract the app's `package.json` rather than trusting the file name:
+
+```bash
+npx @electron/asar extract-file out/clavis-linux-x64/resources/app.asar package.json
+```
+
+> Run that from a scratch directory: `extract-file` writes into the **current** one. And note what the check can and cannot show: `config.forge` is **deliberately removed** by Forge from the copy that goes into the asar, so `config: {}` is correct there — makers, plugins and the icon are verified in the source `package.json`.
 
 ### Local Build (Linux)
 

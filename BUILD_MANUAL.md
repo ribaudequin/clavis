@@ -67,14 +67,14 @@ Restrict to one platform with `npm run make -- --platform=linux`.
 | `npm run typecheck:test` | `tsc -p tsconfig.test.json` — test suite (excluded from `typecheck`) |
 | `npm test` | Vitest |
 
-`src/renderer` and the `*.tsx` component tests are **not** typechecked yet (known gap, tracked as P2.24 in `TODO.md`).
+`tsconfig.test.json` includes `tests/**/*.ts` **and** `tests/**/*.tsx`, so the component tests and `tests/e2e/**` are typechecked by the third command. The renderer sources are pulled into that same program through those test imports, which is how a type error in a `.tsx` component surfaces here even though `tsconfig.json` excludes `src/renderer` (P2.24, closed 2026-10-04).
 
 ## Key Config Files
 
 | File | Purpose |
 |------|---------|
 | `package.json` → `config.forge` | electron-forge config — single source of truth for makers, packager icon, `asar.unpack` for argon2 |
-| `.github/workflows/release.yml` | CI: `quality` gates job + build matrix (ubuntu/windows/macos) + release job |
+| `.github/workflows/release.yml` | CI: `quality` gate → `e2e` (pt/en) → `e2e-cross` (Windows/macOS, informational) → `build` matrix (ubuntu/windows/macos) → `release` |
 | `vite.config.mts` | Renderer bundling (React + Tailwind + SVGR, manual chunks) |
 | `tsconfig.json` | TypeScript config — `module: CommonJS` (main process); `src/renderer` excluded |
 | `tsconfig.test.json` | TypeScript config for the test suite (`src/main` + `src/shared` + `tests/**/*.ts`) |
@@ -86,20 +86,34 @@ Restrict to one platform with `npm run make -- --platform=linux`.
 
 `.github/workflows/release.yml`:
 - **quality** job (`ubuntu-latest`, every push/PR): `npm ci` → `lint` → `typecheck` → `typecheck:test` → `test`.
-- **build** job (matrix `ubuntu-latest` / `windows-latest` / `macos-latest`, `needs: quality`, gated to `v*` tags): `npm ci` (Windows uses `--ignore-scripts` to keep argon2 prebuilds) → Squirrel `7z.exe` fix → Linux packaging tools → `npm run build` → `npm run make`. Uploads artefacts as `clavis-<os>-<ref>`.
-- **release** job (`v*` tags only): downloads all artefacts and publishes the GitHub Release with auto-generated notes.
+- **e2e** job (`needs: quality`, `ubuntu-latest`, every push/PR): matrix `language: [en, pt]` → `npm run package` → Playwright against the packaged build. Chromium reads `LANGUAGE`, not `LANG`.
+- **e2e-cross** job (`needs: quality`, matrix `windows-latest` / `macos-latest`, tags and `workflow_dispatch`): the same suite on the other two platforms. **Informational** — nothing depends on it, so a missing runner cannot block a release.
+- **build** job (matrix `ubuntu-latest` / `windows-latest` / `macos-latest`, `needs: [quality, e2e]`, gated to `v*` tags): `npm ci` (Windows uses `--ignore-scripts` to keep argon2 prebuilds) → Squirrel `7z.exe` fix → Linux packaging tools → `npm run build` → `npm run make`. Uploads artefacts as `clavis-<os>-<ref>`; the Linux leg also runs the e2e suite against the AppImage before upload.
+- **release** job (`needs: build`, push event on a `v*` tag): downloads all artefacts and publishes the GitHub Release with auto-generated notes.
+
+A tag run is 8 job instances: `quality`, `e2e` ×2, `e2e-cross` ×2, `build` ×3, `release`. Push `main` **before** the tag so the gates run against the exact commit being released:
 
 ```bash
-git tag v0.1.3-alpha
-git push origin v0.1.3-alpha
+git push origin main
+git tag v0.6.15-beta
+git push origin v0.6.15-beta
 ```
 
 ## Version Bump
 
 ```bash
-# Update version in package.json (takes version from package.json)
-npm version 0.1.3-alpha --no-git-tag-version
+npm version 0.6.15-beta --no-git-tag-version   # package.json and package-lock.json, together
 ```
+
+The bump is **manual** — no CI step compares the tag with `package.json`. That is exactly how `v0.6.13-beta` published `0.6.12` binaries: the tag was created, the manifest was not bumped, and the in-app update check then offered every 0.6.12 user a download identical to what they already had. Bump, commit, push `main`, then tag.
+
+Verify the packaged result instead of trusting the file name — from a scratch directory, because `extract-file` writes into the current one:
+
+```bash
+npx @electron/asar extract-file out/clavis-linux-x64/resources/app.asar package.json
+```
+
+The extracted `package.json` proves the **version**. It cannot prove `config.forge`: Forge deletes that key from the copy it puts in the asar, so `config: {}` is what a correct build looks like. Check makers, the ad-hoc-sign plugin and `packagerConfig.icon` in the source manifest.
 
 ## Releases
 

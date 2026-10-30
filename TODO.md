@@ -1074,6 +1074,21 @@ placeholders and is now 4 real cases driving the real components. **Extended:** 
 `~40 MB` worst case in `importDrawerRaw` was **documented** rather than reduced.
 
 ## Progress
+- **2026-10-30 — documentation pass: every public claim was checked against the tree and the release, and seven
+  files were wrong.** `README.md` and `SECURITY.md` still advertised **15/15** e2e; measured on `v0.6.15-beta`, the
+  suite is **14/14** on Linux and **14/14** on each of `windows-latest` and `macos-latest` (`functional-flow.spec.ts`
+  was deleted as redundant in QA-05). The README release section told contributors to push a tag and nothing else —
+  the exact procedure that produced the `v0.6.13-beta` phantom update — so it now states the manual bump, the
+  two-step push, and the asar extraction that proves the version. `docs/clavis-ci-cd-setup.md` said "Four jobs" and
+  omitted `e2e-cross` (five jobs, **8 job instances** on a tag run). `BUILD_MANUAL.md` claimed the renderer was not
+  typechecked (P2.24 closed 2026-10-04 — `tsconfig.test.json` covers `tests/**/*.tsx`, which pulls the components
+  in). `CONTRIBUTING.md` asked for `51/51` tests and named `eslint.config.cjs`, which does not exist. `docs/user-guide.md`
+  gave one content ceiling where there are two. And `docs/MILESTONES.md`, the document that is supposed to say what
+  v1.0 needs, was still in Portuguese and still showing the `v0.4.0-beta` gate table — rewritten in English with
+  evidence per row. **Governance closed:** the PR template moved from `.github/template/` to `.github/`, the only
+  path GitHub discovers (P4.31). **Still open, and now in one place:** P2.20 (three modal backdrop styles measured,
+  decision not taken), P3.31b (four shape-only smoke tests), BS-16 (dependency review), the CI tag/version guard,
+  the published artifacts not being the ones under test, and Flatpak ship-or-drop.
 - **Released as `v0.6.15-beta` (2026-10-30): the small-defect sweep, with the version checked instead of assumed.**
   `package.json` and `package-lock.json` bumped together (`npm version 0.6.15-beta --no-git-tag-version` — the
   lockfile had been stale at `0.6.12-beta` since before `v0.6.13-beta`, which is exactly the drift this release
