@@ -1083,7 +1083,11 @@ placeholders and is now 4 real cases driving the real components. **Extended:** 
   (`@electron-forge/core/dist/api/package.js:169-172`), so `config` is `{}` in every correct build — the five
   makers, the ad-hoc-sign plugin and `packagerConfig.icon` are verified in the **source** manifest. e2e **14/14**
   against the new AppImage. **Local gates:** lint 0 errors / 2 warnings · both typechecks 0 · **568/568** vitest
-  across 57 files.
+  across 57 files. **Published from `01d77cf` in two steps, on purpose:** `main` pushed alone first (run
+  `41072433880`: `quality` + both `e2e` locales green, `build`/`release`/`e2e-cross` skipped), then the tag (run
+  `41073098838`: **9 jobs green** — `quality`, both `e2e` locales, **both `e2e-cross` legs**, all three `build`
+  targets and `release`). 6 assets, all named `0.6.15`: `.deb`, `.AppImage`, `.exe`, `.nupkg`, `.zip`, `.dmg`;
+  `/releases/latest` = `v0.6.15-beta`, `prerelease: false`.
 - **2026-10-28 — the small-defect sweep is closed (shipped in `v0.6.15-beta`).** Five handlers gained the `catch`
   they were missing (`HomeScreen` ×4, `PasswordModal` ×1) and the five un-awaited call sites now go
   through one `reportFailure()` helper; `ErrorBoundary` awaits `restartApp` and shows a translated
