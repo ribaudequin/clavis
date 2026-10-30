@@ -405,7 +405,9 @@ describe('UX-08 — the counter REL-02 shipped is now reachable', () => {
     // never reaches the container that owns the listener. The test that proves
     // the fix is only worth anything next to this one.
     fireEvent.keyDown(document.body, { key: 'Escape' });
-    expect(screen.queryByRole('dialog')).not.toBeNull();
+    // UX-01 — listener is now on document, so Escape reaches the handler even when
+    // focus is on <body> (backdrop click / disabled input); the prompt closes.
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('does not open the drawer when the unlock is cancelled with the Cancel button', async () => {

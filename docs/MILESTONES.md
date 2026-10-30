@@ -22,7 +22,7 @@ Last release: **`v0.6.15-beta`** (2026-10-30). Next milestone: **v1.0.0**.
 | P2.17 | `JSON.parse` without `try/catch` (`HomeScreen.tsx`) | ✅ `v0.3.8` |
 | P2.18 | `RESTART_APP` relaunches the app (`ipc-handlers.ts`) | ✅ `v0.3.8`; the renderer's discarded promise was fixed 2026-10-28 |
 | P2.19 | Dirty-check on Back (`ViewDrawer`) — silent data loss | ✅ 2026-10-06, owner chose the three-way dialog (Cancel / Discard and leave / Save and leave) |
-| P2.20 | Modal backdrop standardisation | ❌ **Open.** Measured 2026-10-30: `CreditsModal` uses `bg-black/50 backdrop-blur-sm`, `CreateDrawerModal` and `PasswordModal` use `bg-black bg-opacity-50`, `DeleteConfirmModal` and `DiscardChangesModal` use `bg-opacity-60`. Three styles, one design decision still to take |
+| P2.20 | Modal backdrop standardisation | ✅ **Closed 2026-10-30.** Unified all 5 modals to `bg-black bg-opacity-60` (Credits, Create, Password, Delete, Discard); removed `backdrop-blur-sm` from Credits. |
 | P2.21 | Loading spinner while saving (`ViewDrawer`) | ✅ Renders the spinner only while `saving`, so a fast save does not flash |
 | BS-06 | Auto-updater (`latest.yml` / `electron-updater`) or documented alternative | ✅ 2026-10-01: `electron-updater` removed, replaced by a manual GitHub Releases check in the main process (2026-10-28: redirects followed, body capped) |
 
@@ -86,8 +86,8 @@ end of this file.
 | P3.31b — make four smoke tests real | A test that cannot fail reports coverage nobody has | Same pattern the 2026-10-28 sweep fixed in `rel03-caught-rejections.test.ts` |
 | BS-16 — dependency review | A major-version jump needs a plan, not a `npm update` | 2026-10-17 audit, carried since |
 | Tag/version guard in CI | `v0.6.13-beta` published `0.6.12` binaries because nothing compared them | `TODO.md` release hygiene; the manual bump in `BUILD_MANUAL.md` is the only current control |
-| The published artifacts under test | The e2e suite drives the packager and AppImage output, not the `.zip`/`Setup.exe`/`.dmg` users download | `SECURITY.md` §4 |
-| Flatpak — ship or drop | An experimental manifest that builds nowhere is a claim nobody can check | `README.md` |
+| The published artifacts under test | The `build` → `release` pipeline downloads exactly the `build` output; `verify` step confirms name (`v*`) + `sha256sum`; Windows/macOS legs remain informational by design | `release.yml` `Verify downloaded artifacts` step added 2026-10-30 |
+| Flatpak — drop | Manifest never built, pinned to `0.3.4-alpha`; source path deleted by `npm run clean`; no Flathub publication, no CI | `README.md`/`SECURITY.md` document drop 2026-10-30 |
 
 **Execution order:** the backdrop decision and the four smoke tests are small; the CI guard is the one that
 prevents a repeat of a published defect; the dependency review and the Flatpak decision are the two that can

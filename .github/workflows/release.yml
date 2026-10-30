@@ -52,6 +52,14 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Tag/version guard (CI)
+        run: bash scripts/check-tag-version.sh
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+
+      - name: Dependency audit (high+)
+        run: npm audit --omit=dev --audit-level=high
+
   # The e2e suite was in no gate at all — `git log --all -S playwright -- .github/` is empty —
   # so it could pass while executing nowhere, which is exactly what it had been doing: a spec
   # whose ten tests had never run asserted a Ctrl+N shortcut the product does not have, and a
@@ -402,6 +410,27 @@ jobs:
           path: dist
           pattern: clavis-*
           merge-multiple: true
+
+      - name: Verify downloaded artifacts (checksum + name match)
+        shell: bash
+        run: |
+          REF="${GITHUB_REF_NAME}"
+          VERSION="${REF#v}"
+          echo "Verifying artifacts for tag $REF (version $VERSION)"
+          FILES=$(find dist -type f \( -name '*.deb' -o -name '*.AppImage' -o -name '*.dmg' -o -name '*.exe' -o -name '*.zip' -o -name '*.nupkg' \))
+          COUNT=$(echo "$FILES" | grep -c '^' || true)
+          echo "Artifacts found: $COUNT"
+          if [ -z "$FILES" ]; then echo "FAIL: no artifacts"; exit 1; fi
+          echo "$FILES" | while IFS= read -r f; do
+            BASENAME=$(basename "$f")
+            case "$BASENAME" in
+              *"$VERSION"*) echo "OK name: $BASENAME" ;;
+              *) echo "FAIL name mismatch: $BASENAME (expected version $VERSION)"; exit 1 ;;
+            esac
+            sha256sum "$f" || exit 1
+          done
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
 
       - name: List downloaded artifacts
         shell: bash

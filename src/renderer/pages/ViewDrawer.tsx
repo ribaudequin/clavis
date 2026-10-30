@@ -71,6 +71,7 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
   }
 
   async function handleSave(): Promise<void> {
+    if (saving || deleting) return;
     if (title.trim() === '') {
       toast.error(t('msg.title_empty'));
       return;

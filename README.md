@@ -51,7 +51,7 @@ Each release publishes 6 files:
 
 > **Architectures, and what has actually been run.** The macOS build is **arm64 only** — the `.dmg` has no Intel (x86-64) or universal variant, and there is no arm64 build for Linux or Windows. The `.dmg` file name carries no architecture, so it does not look like the other two do. **All three platforms are executed by the end-to-end suite** — Linux on every push, and Windows and macOS on every release tag (measured on `v0.6.15-beta`, 2026-10-30: **14/14** on Linux and **14/14** on each of `windows-latest` and `macos-latest`, against the packaged build; 14 rather than 15 because `functional-flow.spec.ts` was deleted as redundant in QA-05). The **published** files themselves — the `.zip`, the `Setup.exe`, the `.dmg` — are still not the ones the suite runs, because it drives the packager output rather than the maker output. See [SECURITY.md](SECURITY.md) for the full list of known limitations.
 
-> **Flatpak**: a manifest exists in `flatpak/` but is experimental and does not currently build.
+> **Flatpak**: dropped (2026-10-30). The manifest (`flatpak/com.github.marcelosalvador.Clavis.yaml`) is pinned to `0.3.4-alpha`, never builds (`npm run clean` deletes its source path), and was never published to Flathub; it is not a v1.0.0 blocker. See `docs/MILESTONES.md`.
 
 ### From Source
 
@@ -116,7 +116,7 @@ Pressing **Back** with unsaved edits opens a dialog with three choices: **Cancel
 
 ### All Platforms (GitHub Actions, recommended)
 
-Release binaries are built **remotely on GitHub Actions** native runners (Linux, Windows, macOS) and published to a GitHub Release automatically. The version bump is manual, so bump it first — a tag whose name and `package.json` disagree is how `v0.6.13-beta` ended up publishing `0.6.12` binaries — then push `main` on its own (so the quality and e2e gates run before the tag exists) and push the tag:
+Release binaries are built **remotely on GitHub Actions** native runners (Linux, Windows, macOS) and published to a GitHub Release automatically. The version bump is manual, so bump it first — a tag whose name and `package.json` disagree is how `v0.6.13-beta` ended up publishing `0.6.12` binaries (fixed by the CI tag/version guard, `scripts/check-tag-version.sh`, 2026-10-30). Push `main` first, then the tag; the `release` workflow verifies downloaded artifacts by checksum + name match before publishing.
 
 ```bash
 npm version 0.6.15-beta --no-git-tag-version   # updates package.json and package-lock.json

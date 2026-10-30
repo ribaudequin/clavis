@@ -21,7 +21,7 @@ export function useModalKeyboard(
       }
     }
 
-    container.addEventListener('keydown', handleKeyDown);
-    return () => container.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [containerRef, onEscape]);
 }

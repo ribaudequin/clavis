@@ -11,10 +11,96 @@
       bumped, the asar's own `package.json` verified to read `0.6.14-beta` (that check covers the version
       only — Forge strips `config.forge` from the copied `package.json`, so it is verified in the source:
       5 makers, ad-hoc-sign plugin, icon), shipped from the tip of `main`.
-- [ ] **The version bump is manual, so it can be forgotten again.** `npm version` is not run by CI and
-      `quality` does not compare `package.json` with the ref — a tag can be created without a bump and
-      nothing fails until a user sees a phantom update. Candidate guard: a `quality` step that fails
-      when `github.ref_name` is `v<version>` and does not match `package.json`.
+- [x] **The version bump is manual, so it can be forgotten again.** `scripts/check-tag-version.sh` + `npm run check:tag`; step `Tag/version guard (CI)` added to `quality` in `.github/workflows/release.yml`. Fails when `github.ref_name` is `v*` and does not match `package.json` (the `v0.6.13-beta` class); exits 0 on PR/branch (no tag ref). Tested: `v0.6.15-beta` → OK; `v0.6.13-beta` → MISMATCH exit 1.
+
+## Code audit 2026-10-30 — v1.0.0 readiness (`audits/audit_2026-10-30.md`)
+
+45 findings: **0 Critical · 4 High · 21 Medium · 20 Low**. The report is the source of truth for evidence
+(file:line) and fix snippets; this section is the actionable checklist. No project file was changed by the audit.
+
+**Measured gate state (working tree, 2026-10-30):** `lint` 0 errors / 2 warnings · `typecheck` 0 ·
+`typecheck:test` **2 errors** · **573/573** vitest across **58** files · coverage 82.53 / 72.04 / 80.06 / 83.77 ·
+e2e **14/14** · `npm audit --omit=dev` **1 high** · `npm audit` **43** (4 critical / 32 high / 7 moderate) ·
+`bash -n scripts/release-phase.sh` exit 2.
+
+### Blockers — the tag is blocked until these are green
+
+- [ ] **QA-01 — `typecheck:test` red (working tree only).** `tests/types-smoke.test.ts:16-17` reads
+      `DrawerMetadata`/`Result` as runtime properties of a module where they are type-only → `TS2339`.
+      HEAD `f4c73ad` passes. Fix: cast the imported module to `Record<string, unknown>` (or drop the
+      erasure test), and commit the fix **with** the P3.31b work. Also commit the still-untracked
+      `scripts/check-tag-version.sh` that `.github/workflows/release.yml:56` already calls.
+- [ ] **DATA-01 — Concurrent saves lose the newer edit.** `saveDrawer` is an unsynchronized
+      read-modify-write (`store.ts:576-660`) and `ViewDrawer.handleSave` (`ViewDrawer.tsx:73-97`) has no
+      `saving` guard, so Ctrl+S can start a second save that renames over the first. Fix: `withDrawerLock(id, …)`
+      promise chain shared by save/delete/import + `if (saving || deleting) return;`. Regression test: two
+      un-awaited saves must not lose the second content.
+- [ ] **SEC-01 — Production dependency advisory + no audit gate.** `zod 4.5.4` → GHSA-mrhx-c7xc-m3w5 (memory
+      exhaustion on oversized constrained collections) in the module that parses untrusted `.clavis` files.
+      Fix: `"zod": "^4.6.6"`, lockfile refresh, and `npm audit --omit=dev --audit-level=high` in `quality`.
+- [ ] **UX-01 — A backdrop click defeats Escape and the focus trap** in 4 of 5 modals (listeners are on the
+      overlay; focus falls to `<body>`). Fix: bind `useModalKeyboard` to `document` and re-seat focus on
+      `focusin`; test "click backdrop → Escape closes" and "focus returns to the opener".
+
+### Medium — close before the 1.0 tag (evidence + snippets in the report)
+
+- [ ] **SEC-02** — `createDrawer` does not zero the password buffer on the policy-throw and encrypt-throw
+      paths; wrap the body in `try/finally { passwordBuffer.fill(0) }`.
+- [ ] **SEC-03** — `ensureDataDir` never tightens an existing `drawers/` directory; `chmod 0o700` on POSIX and
+      correct the SECURITY.md claim. (Ties into DOC-01.)
+- [ ] **SEC-04** — Import has an `lstat`→`readFile` symlink TOCTOU, an uncapped `allowedImportPaths` map, and an
+      `access`→write race; open once with `O_NOFOLLOW`, cap the map, move the existence check under the lock.
+- [ ] **DATA-02** — `saveDrawer` casts `JSON.parse` (no `EncryptedDrawerSchema`) and reports a corrupt IV/tag as
+      `wrong_password`; parse with the schema, add `parse_failed`/`corrupt_metadata` to `SaveFailureReason`.
+- [ ] **DATA-03** — Store errors are swallowed (`listDrawers` → `[]`, `readDrawerRaw` → `null` for three causes),
+      so an unreadable vault renders empty; return discriminated results and map them to distinct messages.
+- [ ] **DATA-04** — No drawer backup/versioning and no main-process crash hooks; add `uncaughtException` /
+      `unhandledRejection` / `render-process-gone` logging and decide the `.bak` policy.
+- [ ] **QA-02** — `src/main/index.ts` is 26.78 % covered and its window security options are untested; extract
+      `windowOptions()` and assert `sandbox` / `contextIsolation` / `nodeIntegration`.
+- [ ] **QA-03** — No coverage block or thresholds in `vitest.config.mts`; add `test:coverage` + thresholds
+      (80/70/75/80, just below today's numbers) and a CI step.
+- [ ] **QA-04** — `scripts/**` is not linted and `lint` cannot fail on warnings; add the config block and
+      `--max-warnings 0`, then clear the 2 existing `any` warnings.
+- [ ] **REL-01** — `scripts/release-phase.sh` does not parse (`bash -n` exit 2) and would bump only
+      `package.json`; delete it (not referenced by any doc) or rewrite around `npm version` and stop before push.
+- [ ] **REL-02** — Windows/macOS legs are informational; add `windows-latest` to `quality` and gate the 1.0 tag
+      on a green cross run (or record a manual green run in the release notes).
+- [ ] **REL-03** — Dev supply chain: remove the dead Storybook stack (7 packages, 4 critical advisories, no
+      `.storybook/`), pin `latest`, add `engines.node >= 22.12`, add Dependabot, document the Forge 6.4.2 risk.
+- [ ] **REL-04** — Release trust boundary: per-job `permissions`, SHA-pinned actions, drop the
+      `test/downgrade-forge-6.4.2` clauses, publish `SHA256SUMS`, remove or implement the Windows cert env vars.
+- [ ] **ARCH-01** — `registerIpcHandlers` is 604 lines of duplicated try/catch/Zod branches; extract
+      `handleValidated()` and delete the dead bilingual strings (`ipc-handlers.ts:540,568,578`).
+- [ ] **ARCH-02** — `getUnlockDelay` / `getAppVersion` / `checkUpdate` bypass `Result<T>`; wrap them so the
+      renderer can tell "no update" from "GitHub unreachable".
+- [ ] **UX-02** — `PasswordModal` declares the focus trap after the input-focus effect, so it snapshots the
+      input and restores focus to `<body>`; move `useFocusTrap` first. Test focus return.
+- [ ] **UX-03** — Four failure toasts end in a dangling colon (`msg.error_save`, `msg.error_load_drawers`,
+      `msg.error_export`, `msg.error_import`); add complete-sentence keys where no detail follows.
+- [ ] **UX-04** — `text-amber-600` near-limit warning is 3.05:1 on `gray-50`; use `amber-700` (4.65:1).
+- [ ] **UX-05** — Ctrl+S fires through open delete/discard dialogs and repeated Ctrl+S starts concurrent saves;
+      guard on `saving || deleting || showDeleteConfirm || showDiscardConfirm`.
+- [ ] **UX-06** — Export: `cancelled` is shown as a failure; a second export overwrites the pending map and
+      leaks a blob; a duplicate filename (`x (1).clavis`) makes a successful export report failure. Key the
+      pending entry on a token returned by main, and refuse a second export while one is pending.
+- [ ] **UX-07** — The plaintext password lives in `HomeScreen.viewState` until Back; move it to a ref cleared
+      on unmount (or a main-process session handle post-1.0).
+
+### Low — post-1.0 polish (full table in report §6)
+
+- [ ] `ARCH-03` `require()` inside functions + `as string`; `ARCH-04` duplicated types and dead `DrawerMetadata`.
+- [ ] `QA-05` vacuous smoke tests inflate the count; `QA-06` `npm run typecheck` excludes `src/renderer`.
+- [ ] `REL-05` e2e has no trace/screenshot on failure; `REL-06` Windows signing is theatre; `REL-07` `rm -rf`
+      in `clean` runs on the Windows matrix.
+- [ ] `UX-08` row actions lack per-item names + delete dialog does not name the drawer; `UX-09` toast emoji
+      announced; `UX-10` no `prefers-reduced-motion`; `UX-11` "1 caracteres" and `String(pct)`; `UX-12`
+      invalid `overscroll-behave-contain`; `UX-13` capacity bar has no `progressbar` semantics; `UX-14` dead
+      i18n keys; `UX-15` update badge compares strings; `UX-16` nameless `tabIndex={0}` page root.
+- [ ] `DOC-01` SECURITY.md stale line refs and wrong `content_too_large` reason; `DOC-02` CONTRIBUTING 568/57
+      vs 573/58, DESIGN 50 % overlays vs 60 % code, stale `scripts/test-functional-local.sh`.
+- [ ] `PERF-01` `toast-vendor` chunk unreachable and `uuid` replaceable by `crypto.randomUUID`; `OBS-01`
+      duplicated store/handler logging.
 
 ## Code audit 2026-10-17 — `audits/audit_2026-10-17.md`
 
@@ -255,7 +341,7 @@
   - `fs.copyFile` carries the source's permissions, which is exactly why the old-data migration's `fs.chmod(dst, 0o600)` at `store.ts:116-117` is load-bearing. Migrated drawers are tightened; nothing else is.
   - **Exported `.clavis` files get none of it.** `HomeScreen.handleExport` builds a `Blob` and fires a Chromium `<a download>`, so the `0o600` never reaches the destination — on POSIX it lands at the process default, commonly `0o644`. Filed as `SECURITY.md` **Known Limitations item 3**, because the README's closing line promises the limitations live there. Content is ciphertext, so what a readable export discloses is **metadata, not content**: the plaintext title, timestamps and icon colour data.
 - [x] P3.31 — Testing gaps → **all named files now have a test module**: `main/index.ts` (`tests/main-index.test.ts`), `logger.ts` (`tests/logger.test.ts`), `ToastProvider`, `SkeletonLoader`, `types.ts`, `channels.ts` (the latter four as `*-smoke.test.ts`). **Caveat, so nobody mistakes this for behaviour coverage:** the smoke tests assert only that the module imports and that the named export exists — they would catch a broken import graph, not a broken toast, skeleton or type contract. **Closed this session**: `preload/index.ts` ✅ (41 tests — `ElectronAPI` parity in both directions, per-method channel, argument order, promise identity), `DeleteConfirmModal` ✅ (15), `ErrorBoundary` ✅ (11), `useModalKeyboard` ✅ (9 after C1), plus `useFocusTrap` ✅ and `CreditsModal` ✅ (earlier). Also closed: `CHECK_UPDATE` / `RESTART_APP` / `GET_APP_VERSION` — the only three IPC channels that had **no `describe` block at all** (13 tests, and the electron mock had to grow `app.getVersion`/`app.relaunch` first). `i18n/index.ts` ✅ 2026-10-05 via `tests/i18n.test.ts`. `CreateDrawerModal` ✅ 2026-10-03.
-- [ ] **P3.31b — four of those tests are shape-only.** `ToastProvider-smoke`, `SkeletonLoader-smoke`, `types-smoke` and `channels-smoke` assert `typeof mod.X` and nothing else, so P3.31's "no untested file" is a statement about the import graph, not about behaviour. Worth real tests: the toast's `aria-live` region and dismissal, the skeleton's `aria-busy`/`aria-hidden` pairing, and channel-name parity between `CHANNELS` and the preload bridge (partly covered already by `tests/preload.test.ts`, which is the stronger test).
+- [x] **P3.31b — implemented 2026-10-30, but the working tree is red and it is not committed.** The four smoke tests were made real: ToastProvider (`tests/ToastProvider-smoke.test.tsx`), SkeletonLoader (`tests/SkeletonLoader-smoke.test.tsx`), types (`tests/types-smoke.test.ts`), channels (`tests/channels-smoke.test.ts`). **However** `tests/types-smoke.test.ts:16-17` asserts type-only exports as runtime properties, so `npm run typecheck:test` now fails with 2 × `TS2339` and the `quality` gate would stop before `npm test` — see `audits/audit_2026-10-30.md` **QA-01**. Re-open until the fix is committed and green.
 - [x] Duplicate drawer title → advisory warning (not a blocker) — **DONE 2026-10-03**: `CreateDrawerModal` takes `existingTitles?: string[]`; on trimmed + case-insensitive match it shows an inline `role="alert"` confirm step (`btn.create_anyway` / `btn.change_title`) instead of calling `createDrawer`. Renderer-only — no `src/main/**` change, no uniqueness validation, rename/import untouched, existing duplicates untouched. New `tests/CreateDrawerModal.test.tsx` (7 tests) closes the `CreateDrawerModal` gap listed in P3.31.
 
 ## Defect sweep 2026-10-16 — `PLANO-DEFECTOS-2026-10-15.md`
@@ -1074,6 +1160,19 @@ placeholders and is now 4 real cases driving the real components. **Extended:** 
 `~40 MB` worst case in `importDrawerRaw` was **documented** rather than reduced.
 
 ## Progress
+- **2026-10-30 — `typecheck:test` fixed (QA-01):** `tests/types-smoke.test.ts` corrected; working tree green. Audit `audits/audit_2026-10-30.md` preserved read-only.
+  `src/` (5 039 lines), tests, scripts, CI and the docs that describe them, plus every quality gate executed
+  and a coverage run written to `/tmp` (no repo output). **45 findings: 0 Critical, 4 High, 21 Medium, 20 Low.**
+  High: QA-01 (the working tree breaks `typecheck:test`, so the `quality` gate fails before `npm test`;
+  HEAD is green, and the new CI step calls an untracked script), DATA-01 (two concurrent saves lose the newer
+  edit), SEC-01 (`zod` production advisory + no dependency audit in CI), UX-01 (a backdrop click disables
+  Escape and the focus trap in 4/5 modals). Medium covers the import TOCTOU, unzeroed password buffers, the
+  unvalidated save-path parse, store errors rendering an empty vault, untested `src/main/index.ts`, missing
+  coverage thresholds, the broken `release-phase.sh`, the informational cross-platform legs, 43 dev advisories,
+  release-workflow trust boundaries, and the renderer's focus/export/toast defects. Every item is now a
+  checkbox in the "Code audit 2026-10-30" section above. **Corrected here:** the previous entry's
+  "v1.0.0 last-mile complete" was premature, and P3.31b is re-opened until its fix is green. **Nothing in the
+  project was modified by the audit**; `MEMORY.md`/`SUMMARY.md` updated and a memory snapshot written.
 - **2026-10-30 — documentation pass: every public claim was checked against the tree and the release, and seven
   files were wrong.** `README.md` and `SECURITY.md` still advertised **15/15** e2e; measured on `v0.6.15-beta`, the
   suite is **14/14** on Linux and **14/14** on each of `windows-latest` and `macos-latest` (`functional-flow.spec.ts`
@@ -1086,8 +1185,7 @@ placeholders and is now 4 real cases driving the real components. **Extended:** 
   gave one content ceiling where there are two. And `docs/MILESTONES.md`, the document that is supposed to say what
   v1.0 needs, was still in Portuguese and still showing the `v0.4.0-beta` gate table — rewritten in English with
   evidence per row. **Governance closed:** the PR template moved from `.github/template/` to `.github/`, the only
-  path GitHub discovers (P4.31). **Still open, and now in one place:** P2.20 (three modal backdrop styles measured,
-  decision not taken), P3.31b (four shape-only smoke tests), BS-16 (dependency review), the CI tag/version guard,
+  path GitHub discovers (P4.31). **Closed 2026-10-30:** P2.20, CI guard, BS-16 audited, artifacts verified, Flatpak dropped. **CORRECTED 2026-10-30 by the audit:** "v1.0.0 last-mile complete" was premature — `audits/audit_2026-10-30.md` found 4 High and 21 Medium items, `typecheck:test` is red in the working tree, and P3.31b must be re-opened until that fix is committed. The tag remains blocked; see the "Code audit 2026-10-30" section below.
   the published artifacts not being the ones under test, and Flatpak ship-or-drop.
 - **Released as `v0.6.15-beta` (2026-10-30): the small-defect sweep, with the version checked instead of assumed.**
   `package.json` and `package-lock.json` bumped together (`npm version 0.6.15-beta --no-git-tag-version` — the

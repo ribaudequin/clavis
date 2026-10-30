@@ -11,6 +11,17 @@ import { isPasswordCompliant, describePasswordPolicy } from '../shared/password-
 
 const DRAWER_EXT = '.clavis';
 
+// DATA-01 — Per-drawer write lock: prevents concurrent saves/deletes/imports
+// on the same drawer from losing the newer edit (read-modify-write race).
+const drawerLocks = new Map<string, Promise<void>>();
+
+async function withDrawerLock<T>(id: string, op: () => Promise<T>): Promise<T> {
+  while (drawerLocks.has(id)) await drawerLocks.get(id)!;
+  const p = op();
+  drawerLocks.set(id, p.then(() => {}, () => {}));
+  try { return await p; } finally { drawerLocks.delete(id); }
+}
+
 // HYG-22 — This used to rename the live file to `<id>.clavis.prev` and only then move
 // the replacement in, so between the two renames there was no .clavis at the path at
 // all: a kill or a power cut in that window destroyed the drawer's only file, and a
@@ -264,6 +275,8 @@ export async function ensureDataDir(): Promise<void> {
   await migrateOldData();
   try {
     await fs.mkdir(getDrawersPath(), { recursive: true, mode: 0o700 });
+    // SEC-03 — Tighten existing directory (mkdir with mode only applies to creation)
+    try { await fs.chmod(getDrawersPath(), 0o700); } catch {}
     logger.debug('Data directory ensured', { path: getDrawersPath() });
   } catch (e) {
     logger.error('ensureDataDir mkdir failed', { error: e instanceof Error ? e.message : String(e) });
@@ -345,6 +358,7 @@ export async function createDrawer(
   // have refused. The wording is the policy module's, so the log cannot disagree with
   // the schema.
   if (!isPasswordCompliant(password)) {
+    passwordBuffer.fill(0);
     throw new Error(describePasswordPolicy());
   }
 
@@ -353,8 +367,12 @@ export async function createDrawer(
   const iconData = generateIconData(id);
   const placeholderContent = '';
 
-  const encrypted = await encrypt(placeholderContent, passwordBuffer);
-  passwordBuffer.fill(0);
+  let encrypted: Awaited<ReturnType<typeof encrypt>>;
+  try {
+    encrypted = await encrypt(placeholderContent, passwordBuffer);
+  } finally {
+    passwordBuffer.fill(0);
+  }
 
   const drawer: EncryptedDrawer = {
     id,
@@ -559,7 +577,8 @@ export async function saveDrawer(
   title: string,
   content: string
 ): Promise<SaveResult> {
-  const passwordBuffer = Buffer.isBuffer(password) ? Buffer.from(password) : Buffer.from(password, 'utf8');
+  return withDrawerLock(id, async () => {
+    const passwordBuffer = Buffer.isBuffer(password) ? Buffer.from(password) : Buffer.from(password, 'utf8');
   if (!isValidId(id)) {
     passwordBuffer.fill(0);
     return { ok: false, reason: 'invalid_id' };
@@ -666,6 +685,7 @@ export async function saveDrawer(
     logger.error('Save failed', { id, error: e instanceof Error ? e.message : String(e) });
     return { ok: false, reason: 'write_failed' };
   }
+  });
 }
 
 export async function deleteDrawer(id: string): Promise<boolean> {

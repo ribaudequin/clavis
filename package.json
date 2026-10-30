@@ -29,6 +29,7 @@
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
+    "check:tag": "bash scripts/check-tag-version.sh",
     "memory:snapshot": "bash scripts/snapshot-memory.sh",
     "flatpak-make": "flatpak-builder --repo=repo build-dir flatpak/com.github.marcelosalvador.Clavis.yaml",
     "storybook": "storybook dev -p 6006",
@@ -92,7 +93,7 @@
     "argon2": "^0.45.1",
     "electron-log": "^5.4.4",
     "uuid": "^11.1.0",
-    "zod": "^4.5.4"
+    "zod": "^4.6.7"
   },
   "config": {
     "forge": {

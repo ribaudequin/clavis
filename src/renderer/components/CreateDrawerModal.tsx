@@ -146,7 +146,7 @@ function CreateDrawerModal({ onClose, onCreated, existingTitles }: CreateDrawerM
   return (
     <div
       ref={modalRef}
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50"
       role="dialog"
       aria-modal="true"
       aria-labelledby="create-drawer-title"
