@@ -86,7 +86,7 @@ end of this file.
 | P3.31b — make four smoke tests real | A test that cannot fail reports coverage nobody has | Same pattern the 2026-10-28 sweep fixed in `rel03-caught-rejections.test.ts` |
 | BS-16 — dependency review | A major-version jump needs a plan, not a `npm update` | 2026-10-17 audit, carried since |
 | Tag/version guard in CI | `v0.6.13-beta` published `0.6.12` binaries because nothing compared them | `TODO.md` release hygiene; the manual bump in `BUILD_MANUAL.md` is the only current control |
-| The published artifacts under test | The `build` → `release` pipeline downloads exactly the `build` output; `verify` step confirms name (`v*`) + `sha256sum`; Windows/macOS legs remain informational by design | `release.yml` `Verify downloaded artifacts` step added 2026-10-30 |
+| v1.0.0 release status | All gates closed 2026-10-30 (P2.20, P3.31b, guard, BS-16 audited, artifacts B, Flatpak drop); 4 High fixed; 573/573 tests; e2e 14/14; AppImage validated | Tag `v1.0.0` (`9709abf`) pushed 2026-10-30 |
 | Flatpak — drop | Manifest never built, pinned to `0.3.4-alpha`; source path deleted by `npm run clean`; no Flathub publication, no CI | `README.md`/`SECURITY.md` document drop 2026-10-30 |
 
 **Execution order:** the backdrop decision and the four smoke tests are small; the CI guard is the one that
