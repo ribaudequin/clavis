@@ -13,7 +13,7 @@
 
 ---
 
-**Clavis v1.0.0** — released 2026-10-30 (tag `v1.0.0`). All 4 audit Highs closed, gates green, AppImage validated (14/14 e2e). Flatpak dropped; arm64-only `.dmg` accepted gap.
+**Clavis v1.0.0** — released 2026-10-30 (tag `v1.0.0`, 6 assets, [`/releases/latest`](https://github.com/ribaudequin/clavis/releases/latest)). All four audit High findings closed; CI 9/9 green on the tag (577 unit tests in 60 files, 14/14 e2e on Linux, Windows and macOS). Flatpak dropped; arm64-only `.dmg` accepted gap.
 
 Encrypted notes for passwords, PINs, bank details and safe codes.
 
@@ -51,7 +51,7 @@ Each release publishes 6 files:
 
 > **Unsigned builds.** Clavis is not signed with a certificate (see [SECURITY.md](SECURITY.md)). On Windows, SmartScreen shows "unknown publisher" — choose *More info → Run anyway*. On macOS, the `.app` is ad-hoc signed (free, no certificate) but the `.dmg` is **unnotarized**, so right-click the app and choose **Open**, or run `xattr -d com.apple.quarantine /Applications/Clavis.app`.
 
-> **Architectures, and what has actually been run.** The macOS build is **arm64 only** — the `.dmg` has no Intel (x86-64) or universal variant, and there is no arm64 build for Linux or Windows. The `.dmg` file name carries no architecture, so it does not look like the other two do. **All three platforms are executed by the end-to-end suite** — Linux on every push, and Windows and macOS on every release tag (measured on `v0.6.15-beta`, 2026-10-30: **14/14** on Linux and **14/14** on each of `windows-latest` and `macos-latest`, against the packaged build; 14 rather than 15 because `functional-flow.spec.ts` was deleted as redundant in QA-05). The **published** files themselves — the `.zip`, the `Setup.exe`, the `.dmg` — are still not the ones the suite runs, because it drives the packager output rather than the maker output. See [SECURITY.md](SECURITY.md) for the full list of known limitations.
+> **Architectures, and what has actually been run.** The macOS build is **arm64 only** — the `.dmg` has no Intel (x86-64) or universal variant, and there is no arm64 build for Linux or Windows. The `.dmg` file name carries the version (`clavis-1.0.0.dmg`) but not the architecture, unlike the other two platforms, so the gap is not visible from the release page. **All three platforms are executed by the end-to-end suite** — Linux on every push, and Windows and macOS on every release tag (measured on `v1.0.0`, 2026-10-30: **14/14** on Linux and **14/14** on each of `windows-latest` and `macos-latest`, against the packaged build; 14 rather than 15 because `functional-flow.spec.ts` was deleted as redundant in QA-05). The **published** files themselves — the `.zip`, the `Setup.exe`, the `.dmg` — are still not the ones the suite runs, because it drives the packager output rather than the maker output. See [SECURITY.md](SECURITY.md) for the full list of known limitations.
 
 > **Flatpak**: dropped (2026-10-30). The manifest (`flatpak/com.github.marcelosalvador.Clavis.yaml`) is pinned to `0.3.4-alpha`, never builds (`npm run clean` deletes its source path), and was never published to Flathub; it is not a v1.0.0 blocker. See `docs/MILESTONES.md`.
 
@@ -121,14 +121,15 @@ Pressing **Back** with unsaved edits opens a dialog with three choices: **Cancel
 Release binaries are built **remotely on GitHub Actions** native runners (Linux, Windows, macOS) and published to a GitHub Release automatically. The version bump is manual, so bump it first — a tag whose name and `package.json` disagree is how `v0.6.13-beta` ended up publishing `0.6.12` binaries (fixed by the CI tag/version guard, `scripts/check-tag-version.sh`, 2026-10-30). Push `main` first, then the tag; the `release` workflow verifies downloaded artifacts by checksum + name match before publishing.
 
 ```bash
-npm version 0.6.15-beta --no-git-tag-version   # updates package.json and package-lock.json
-git commit -am "v0.6.15-beta — <one-line summary>"
+npm version <version> --no-git-tag-version      # updates package.json and package-lock.json
+git commit -am "v<version> — <one-line summary>"
 git push origin main                            # quality + e2e run first
-git tag v0.6.15-beta
-git push origin v0.6.15-beta                    # builds all 3 platforms and publishes
+git tag v<version>
+GITHUB_REF_NAME=v<version> npm run check:tag    # the same guard CI runs
+git push origin v<version>                      # builds all 3 platforms and publishes
 ```
 
-The workflow builds all 3 platforms and publishes 6 assets (`.deb` + `.AppImage` for Linux · Squirrel `Setup.exe` + `.nupkg` + portable `.zip` for Windows · `.dmg` for macOS) to [GitHub Releases](https://github.com/ribaudequin/clavis/releases). See `.github/workflows/release.yml` and `BUILD_MANUAL.md`.
+The workflow builds all 3 platforms and publishes 6 assets (`.deb` + `.AppImage` for Linux · Squirrel `Setup.exe` + `.nupkg` + portable `.zip` for Windows · `.dmg` for macOS, renamed `clavis-<version>.dmg` so it can pass the name check) to [GitHub Releases](https://github.com/ribaudequin/clavis/releases). See `.github/workflows/release.yml` and `BUILD_MANUAL.md`.
 
 To confirm a build carries the version its name claims, extract the app's `package.json` rather than trusting the file name:
 

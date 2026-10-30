@@ -48,7 +48,7 @@ One maker per platform, with `platforms` gating each to its OS:
 
 ## Workflow — `.github/workflows/release.yml`
 
-Five jobs (actions run on the Node 24 runtime; CI uses `node-version: 24`). A tag run is therefore **8 job instances**: `quality`, `e2e` ×2 locales, `e2e-cross` ×2 platforms, `build` ×3 platforms, `release`.
+Five jobs (actions run on the Node 24 runtime; CI uses `node-version: 24`). A tag run is therefore **9 job instances**: `quality`, `e2e` ×2 locales, `e2e-cross` ×2 platforms, `build` ×3 platforms, `release`.
 
 1. **quality** (`ubuntu-latest`, every push and PR): `npm ci` → `npm run lint` → `npm run typecheck` → `npm run typecheck:test` → `npm test`.
 2. **e2e** (`needs: quality`, `ubuntu-latest`, every push and PR) — `language: [en, pt]` matrix: `npm ci` → `npm run build` → `npm run package` → `xvfb-run -a npm run test:e2e` against `out/clavis-linux-x64/clavis`. Both locales are run because every selector in the suite is a two-locale pattern; Chromium reads `LANGUAGE`, not `LANG`.
@@ -60,18 +60,20 @@ Five jobs (actions run on the Node 24 runtime; CI uses `node-version: 24`). A ta
    - `npm run build` → `npm run make` (optionally passing cert secrets for Windows signing)
    - uploads artefacts as `clavis-<os>-<ref>` (`out/make/**/*.{deb,AppImage,dmg,exe,zip,nupkg}`)
    - **Linux only:** runs the e2e suite against the packaged AppImage before upload
-5. **release** (`needs: build`, `ubuntu-latest`, push event on a `v*` tag): downloads all artefacts (merged) and publishes a GitHub Release via `softprops/action-gh-release@v3` with auto-generated notes.
+   - **macOS only:** renames the maker's `clavis.dmg` to `clavis-<version>.dmg`, because the release job requires the version in every artifact name
+5. **release** (`needs: build`, `ubuntu-latest`, push event on a `v*` tag): downloads all artefacts (merged), verifies each name against the tag's version and prints its SHA-256, then publishes a GitHub Release via `softprops/action-gh-release@v3` with auto-generated notes.
 
 ## Release
 
-The version bump is **manual**, and it must happen before the tag: `v0.6.13-beta` was tagged while `package.json` still read `0.6.12-beta`, so six assets were published under the older name and every 0.6.12 user was offered a byte-identical "update".
+The version bump is still **manual**, but it is guarded: `scripts/check-tag-version.sh` runs in `quality` and fails when the tag name and `package.json` disagree. That guard exists because `v0.6.13-beta` was tagged while `package.json` still read `0.6.12-beta`, so six assets were published under the older name and every 0.6.12 user was offered a byte-identical "update".
 
 ```bash
-npm version 0.6.15-beta --no-git-tag-version   # package.json + package-lock.json, together
-git commit -am "v0.6.15-beta — <summary>"
+npm version <version> --no-git-tag-version      # package.json + package-lock.json, together
+GITHUB_REF_NAME=v<version> npm run check:tag    # exits 1 on a mismatch
+git commit -am "v<version> — <summary>"
 git push origin main                            # quality + both e2e locales run first
-git tag v0.6.15-beta
-git push origin v0.6.15-beta                    # build ×3 + release
+git tag v<version>
+git push origin v<version>                      # build ×3 + release
 ```
 
 `main` is pushed **before** the tag on purpose: the gate then runs against the commit that will be released, not after the fact. Watch progress at `https://github.com/ribaudequin/clavis/actions`. The Release appears at `https://github.com/ribaudequin/clavis/releases` with 6 assets (2 Linux + 3 Windows + 1 macOS).

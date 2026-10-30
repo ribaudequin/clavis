@@ -37,7 +37,7 @@ clavis/
 
 - [ ] `npm run lint` passes (0 errors)
 - [ ] `npm run typecheck` and `npm run typecheck:test` pass
-- [ ] `npm run test` passes — **568 tests in 57 files** as of `v0.6.15-beta` (the count only goes up; it is not a target)
+- [ ] `npm run test` passes — **577 tests in 60 files** as of `v1.0.0` (the count only goes up; it is not a target)
 - [ ] No `release/` or `dist/` files included (see `.gitignore`)
 - [ ] `CHANGELOG.md` updated if the change is user-visible
 - [ ] `SECURITY.md` reviewed if the change touches encryption, IPC, or validation

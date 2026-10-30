@@ -88,24 +88,30 @@ Restrict to one platform with `npm run make -- --platform=linux`.
 - **quality** job (`ubuntu-latest`, every push/PR): `npm ci` → `lint` → `typecheck` → `typecheck:test` → `test`.
 - **e2e** job (`needs: quality`, `ubuntu-latest`, every push/PR): matrix `language: [en, pt]` → `npm run package` → Playwright against the packaged build. Chromium reads `LANGUAGE`, not `LANG`.
 - **e2e-cross** job (`needs: quality`, matrix `windows-latest` / `macos-latest`, tags and `workflow_dispatch`): the same suite on the other two platforms. **Informational** — nothing depends on it, so a missing runner cannot block a release.
-- **build** job (matrix `ubuntu-latest` / `windows-latest` / `macos-latest`, `needs: [quality, e2e]`, gated to `v*` tags): `npm ci` (Windows uses `--ignore-scripts` to keep argon2 prebuilds) → Squirrel `7z.exe` fix → Linux packaging tools → `npm run build` → `npm run make`. Uploads artefacts as `clavis-<os>-<ref>`; the Linux leg also runs the e2e suite against the AppImage before upload.
-- **release** job (`needs: build`, push event on a `v*` tag): downloads all artefacts and publishes the GitHub Release with auto-generated notes.
+- **build** job (matrix `ubuntu-latest` / `windows-latest` / `macos-latest`, `needs: [quality, e2e]`, gated to `v*` tags): `npm ci` (Windows uses `--ignore-scripts` to keep argon2 prebuilds) → Squirrel `7z.exe` fix → Linux packaging tools → `npm run build` → `npm run make`. Uploads artefacts as `clavis-<os>-<ref>`; the Linux leg also runs the e2e suite against the AppImage before upload, and the macOS leg renames the `.dmg` to `clavis-<version>.dmg` so it can satisfy the release name check.
+- **release** job (`needs: build`, push event on a `v*` tag): downloads all artefacts, verifies every name contains the tag's version and prints each SHA-256, then publishes the GitHub Release with auto-generated notes.
 
-A tag run is 8 job instances: `quality`, `e2e` ×2, `e2e-cross` ×2, `build` ×3, `release`. Push `main` **before** the tag so the gates run against the exact commit being released:
+A tag run is 9 job instances: `quality`, `e2e` ×2, `e2e-cross` ×2, `build` ×3, `release`. Push `main` **before** the tag so the gates run against the exact commit being released:
 
 ```bash
 git push origin main
-git tag v0.6.15-beta
-git push origin v0.6.15-beta
+git tag v<version>
+git push origin v<version>
 ```
 
 ## Version Bump
 
 ```bash
-npm version 0.6.15-beta --no-git-tag-version   # package.json and package-lock.json, together
+npm version <version> --no-git-tag-version   # package.json and package-lock.json, together
+GITHUB_REF_NAME=v<version> npm run check:tag # exits 1 if the tag and the manifest disagree
 ```
 
-The bump is **manual** — no CI step compares the tag with `package.json`. That is exactly how `v0.6.13-beta` published `0.6.12` binaries: the tag was created, the manifest was not bumped, and the in-app update check then offered every 0.6.12 user a download identical to what they already had. Bump, commit, push `main`, then tag.
+The bump is still **manual**, but it is no longer unguarded: `scripts/check-tag-version.sh` runs in the
+`quality` job of every tag build and fails when the tag name and `package.json` disagree. That is exactly how
+`v0.6.13-beta` published `0.6.12` binaries — the tag was created, the manifest was not bumped, and the in-app
+update check then offered every 0.6.12 user a download identical to what they already had. Bump, run the guard,
+commit, push `main`, then tag. The release job additionally verifies that every downloaded artifact's name
+contains the version, and publishes the SHA-256 of each.
 
 Verify the packaged result instead of trusting the file name — from a scratch directory, because `extract-file` writes into the current one:
 

@@ -7,8 +7,11 @@
 - [ ] Documentation update
 
 ## Tests
-- [ ] Added/updated tests pass
-- [ ] No syntax errors
+- [ ] `npm run lint` passes (0 errors)
+- [ ] `npm run typecheck` passes
+- [ ] `npm run typecheck:test` passes
+- [ ] `npm test` passes
+- [ ] `npm run test:e2e` passes (for UI or behaviour changes)
 
 ## Checklist
 - [ ] CHANGELOG.md updated
