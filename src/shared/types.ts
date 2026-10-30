@@ -11,6 +11,11 @@ export enum ErrorCode {
   // WRITE_FAILED renders "The operation could not be completed." and throws away
   // the only message that tells the user why their drawer will not open.
   CONTENT_TOO_LARGE = 'CONTENT_TOO_LARGE',
+  // SAV-01 — The *character* cap (Zod's .max on content, which counts code points) is
+  // a different limit from CONTENT_TOO_LARGE (bytes, and the drawer file's own
+  // ceiling). They collapse into the same code today, so the user cannot be told
+  // which one refused the save; this code names the code-point cap.
+  CONTENT_TOO_LONG = 'CONTENT_TOO_LONG',
   // SEC-01 — A drawer encrypted with argon2id cannot be read on a build whose native
   // argon2 module failed to load. Reporting that as DECRYPT_FAILED would tell the user
   // their correct password is wrong and feed the unlock rate limiter.

@@ -142,6 +142,13 @@ The residue is only drawers that were **already on disk** before the guards land
 independent constant any more: it is computed from the limit that decides what may be saved in the
 first place, and then clamped.
 
+**The cost of that ceiling, stated rather than implied:** a 20 MB `.clavis` file is *parsed*, not just
+measured. `JSON.parse` holds the source string and the resulting object graph at the same time, and the
+hex payload alone is 20 MB of the source, so the worst case `importDrawerRaw()` will accept is roughly
+**40 MB of live JSON** (source + parsed), plus the ciphertext the parse materialises. It is local-only
+and user-initiated on a file the user picked, which is why it is accepted rather than tightened; the
+alternative was a cap low enough to reject legitimate maximal drawers again (`DOS-02`).
+
 ```ts
 const IMPORT_ENVELOPE_OVERHEAD = 4_096;
 const ABSOLUTE_IMPORT_CEILING = 20_004_096;

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { translations, t, resolveLocale, applyDocumentLanguage } from '../src/i18n';
+import { translations, t, tError, resolveLocale, applyDocumentLanguage } from '../src/i18n';
+import { ErrorCode } from '../src/shared/types';
 import { PASSWORD_MIN_LENGTH, PASSPHRASE_MIN_LENGTH } from '../src/shared/password-policy';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -166,6 +167,32 @@ describe('the strength meter labels', () => {
         });
       }
     }
+  });
+});
+
+// SAV-01 — the user is told which limit refused the save. The two codes are separate so
+// that the message can be: the same text under two codes would make the split invisible.
+describe('the two content limits have two messages', () => {
+  const CASES = [
+    { code: ErrorCode.CONTENT_TOO_LONG, key: 'error.content_too_long' },
+    { code: ErrorCode.CONTENT_TOO_LARGE, key: 'error.content_too_large' },
+  ] as const;
+
+  it('resolves each code to its own key in both locales, and the messages differ', () => {
+    setLanguage('pt-PT');
+    const pt = CASES.map(({ code }) => tError({ code, message: 'untranslated English' }));
+    setLanguage('en');
+    const en = CASES.map(({ code }) => tError({ code, message: 'untranslated English' }));
+
+    for (const [index, { key }] of CASES.entries()) {
+      expect(pt[index]).toBe(translations['pt-PT'][key as keyof (typeof translations)['pt-PT']]);
+      expect(en[index]).toBe(translations['en'][key as keyof (typeof translations)['en']]);
+      // The English literal in `message` must never reach the screen.
+      expect(pt[index]).not.toContain('untranslated English');
+      expect(en[index]).not.toContain('untranslated English');
+    }
+    expect(pt[0]).not.toBe(pt[1]);
+    expect(en[0]).not.toBe(en[1]);
   });
 });
 

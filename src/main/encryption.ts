@@ -142,6 +142,18 @@ export class ContentTooLargeError extends Error {
   }
 }
 
+// P0.12 — The same cap as ContentTooLargeError, measured on the other side of the
+// cipher: an oversized *ciphertext* used to be decoded in full before anything
+// compared it against the ceiling, so refusing it cost the allocation it refused.
+// Callers must be able to tell this apart from a bad password: a drawer whose stored
+// ciphertext is too large is damage to the file, not a guess at the key.
+export class CiphertextTooLargeError extends Error {
+  constructor() {
+    super(`Ciphertext exceeds max size (${MAX_DECRYPTED_SIZE} bytes)`);
+    this.name = 'CiphertextTooLargeError';
+  }
+}
+
 export async function encrypt(plainText: string, password: string | Buffer, params?: KDFParams): Promise<{
   encryptedData: string;
   salt: string;
@@ -197,6 +209,17 @@ export async function decrypt(
   const salt = Buffer.from(saltHex, 'hex');
   const iv = Buffer.from(ivHex, 'hex');
   const authTag = Buffer.from(authTagHex, 'hex');
+  // P0.12 — Allocation-free size guard *before* the decode: Buffer.from would have
+  // allocated the whole ciphertext first, so a 500 MB hex payload became a 250 MB
+  // buffer for a check that then refused it. Hex decodes to floor(len / 2) bytes at
+  // most — Node's decoder stops at the first invalid pair — so the comparison needs
+  // no allocation and is an exact upper bound.
+  if (Math.floor(encryptedDataHex.length / 2) > MAX_DECRYPTED_SIZE) {
+    logger.error('Ciphertext exceeds maximum size', {
+      size: Math.floor(encryptedDataHex.length / 2),
+    });
+    throw new CiphertextTooLargeError();
+  }
   const encryptedData = Buffer.from(encryptedDataHex, 'hex');
 
   const key = await deriveKey(password, salt, kdfParams);
@@ -208,10 +231,11 @@ export async function decrypt(
     decipher.setAuthTag(authTag);
 
     const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
-    if (decrypted.length > MAX_DECRYPTED_SIZE) {
-      logger.error('Decrypted content exceeds maximum size', { size: decrypted.length });
-      throw new Error('Decrypted content exceeds maximum size');
-    }
+    // The plaintext cannot outgrow the ciphertext it came from: AES-GCM is a stream mode
+    // and the tag is returned separately, so `decrypted.length === encryptedData.length`,
+    // and the allocation-free guard above has already refused anything over the cap. The
+    // output check that used to live here was unreachable once that guard existed —
+    // measured, the guard answers first for every input that could have reached it.
     logger.debug('Content decrypted', { size: decrypted.length });
     // P0.7 — Zero derived key from memory after use
     key.fill(0);

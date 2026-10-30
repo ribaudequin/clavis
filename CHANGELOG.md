@@ -1,5 +1,81 @@
 # Changelog — Clavis
 
+## Unreleased — small-defect sweep (2026-10-28)
+
+**The leftovers behind the last two releases, closed. No behaviour was redesigned; every change removes
+a way the app could fail silently, or a statement in the docs that had stopped being true.**
+
+### Fixed
+
+- **A restart that fails no longer goes quiet.** `ErrorBoundary`'s Restart called
+  `window.electronAPI.restartApp?.()` without awaiting or handling the promise, so a rejected bridge call
+  became an unhandled rejection and the crash screen sat there as if nothing had been clicked. It now
+  awaits the call and treats both failure shapes alike — a rejection and a `Result` with `ok: false` (the
+  main process answers `WRITE_FAILED` as a value) — by showing a translated message inside the crash
+  screen and re-enabling the button. A second click while the first is in flight is ignored.
+- **Five handlers could fail without telling the user.** `HomeScreen`'s `loadDrawers`, `handleExport`,
+  `confirmDelete`, `handleImport` and `PasswordModal.handleSubmit` each had a `try` whose only handler was
+  `finally`: the loading flag was reset and the rejection escaped to the global handler. Each now catches
+  and shows the existing translated message; `PasswordModal` adds none on purpose, because its `onSubmit`
+  catches its own failure and sets the field error. The five un-awaited `loadDrawers()` call sites go
+  through one `reportFailure()` helper.
+- **An oversized stored ciphertext is refused before it is decoded.** `decrypt()` called
+  `Buffer.from(encryptedDataHex, 'hex')` before comparing anything against the ceiling, so a 500 MB hex
+  payload became a 250 MB buffer for a check that then refused it. The comparison now runs on the string
+  length (`floor(len / 2)` bytes, which hex can never exceed) and throws the new
+  `CiphertextTooLargeError`. `saveDrawer` maps that to `too_large`; it used to report every non-KDF
+  failure from that call as `wrong_password`, which sent the user to guess a password that was never the
+  problem. The post-decode plaintext-size check was **deleted as unreachable** — AES-GCM is a stream mode
+  with the tag returned separately, so the plaintext is exactly as long as the ciphertext.
+- **`check-update` follows redirects and caps the body.** A 3xx (a renamed repository) used to read as "no
+  information". It now follows up to five redirects, resolves `Location` against the hop that served it,
+  refuses any target that is not `https:` (a downgrade would repeat the request in clear text) and drains
+  the redirect body instead of accumulating it. The body is capped at 256 KiB; exceeding it destroys the
+  response, not just the accumulation. One 5 s deadline still covers the whole chain.
+- **The UI says which content limit refused a save.** The code-point cap (Zod's `.max` on `content`) and
+  the UTF-8 byte cap collapsed into one error code and one message, so a user stopped by the byte cap saw
+  the character counter sitting at its own limit and no explanation. `ErrorCode.CONTENT_TOO_LONG` now
+  names the character cap; `CONTENT_TOO_LARGE` keeps the byte cap and the drawer-file cap. Both messages
+  are in both catalogues and neither contains a number — the ceiling has one owner in
+  `src/shared/limits.ts`.
+
+### Accessibility
+
+- **The 13 decorative icons in `CreditsModal` are hidden from the accessibility tree.** They had been
+  deferred while the brand work was in flight; that work is finished, so the deferral was closed. None of
+  them was the only content of an interactive element, so no label was needed in its place. A new test
+  asserts the structure rather than a count: every graphic in the dialog is either `aria-hidden` or an
+  `<img>` with `alt`, and every control still has a name of its own.
+- **`msg.error_delete` is documented as a prefix.** The key ends in a colon because callers append a
+  translated detail; the one call site with no detail — a rejected bridge call — now uses the complete
+  sentence `msg.error_delete_failed`, so the colon can no longer dangle.
+
+### Documentation
+
+- **`DESIGN.md`:** the "contract to follow when adding a sixth modal" snippet now reads
+  `useFocusTrap(modalRef, { isActive: isOpen })` with the reason stated (a literal `true` traps nothing
+  for a modal mounted once and opened by a prop), the Known-gaps intro no longer claims every row is live,
+  and the malformed `danger.svg` row has its 3 cells back.
+- **`docs/DRAWER-CAPACITY.md`:** the worst case `importDrawerRaw()` accepts is stated — ~40 MB of live
+  JSON, source string and parsed graph together — and why it is accepted rather than tightened.
+
+### Tests
+
+- **New:** `tests/decrypt-ciphertext-guard.test.ts` (the guard fires without decoding, proved with a
+  `Buffer.from` spy rather than a timing assertion, plus the `>`/`>=` boundary),
+  `tests/save-drawer-too-large.test.ts` (end-to-end on a corrupted drawer, including that the file is left
+  untouched) and `tests/CreditsModal-icons.test.tsx` (structure, mutation-checked).
+- **Rewritten:** `tests/rel03-caught-rejections.test.ts` was three `expect(true).toBe(true)` placeholders —
+  a test that cannot fail — and now drives the real `HomeScreen` through the export, the import, the
+  delete-confirm modal and the initial load, plus a rejected `onSubmit` in `PasswordModal`.
+- **Extended:** `ErrorBoundary` (+4), `PasswordModal` (+1), `i18n` (+1, the two codes resolve to different
+  strings in both locales), `ipc-handlers` (+4, the redirect chain and the body cap), and the old
+  "decrypted content exceeds maximum size" case in `encryption.test.ts` rewritten for the guard that now
+  answers first.
+- **Gates:** lint 0 errors / 2 pre-existing warnings · both typechecks 0 · **568/568** vitest across **57**
+  files (baseline before this work: 549/54) · `npm run release` green (deb + AppImage, asar `package.json`
+  reads `0.6.14-beta`) · e2e **14/14** against that AppImage with `LANGUAGE=en` and `LANGUAGE=pt`.
+
 ## v0.6.14-beta (2026-10-27)
 
 **The version finally matches the tag. The previous release published 0.6.12 binaries labelled
@@ -10,9 +86,10 @@
 - **The version is bumped, and the packaged asar is checked instead of assumed.** `package.json` reads
   `0.6.14-beta`; the built artifacts are `clavis-0.6.14-beta-x64.AppImage` and
   `clavis_0.6.14~beta_amd64.deb`, and the `package.json` **inside the asar** reads `0.6.14-beta` —
-  verified by extracting it, which is also how the `config.forge`-dropping failure of `fa7eede` would
-  have been caught. `config.forge` survived this bump intact: five makers, the ad-hoc-sign plugin and
-  `packagerConfig.icon` all still present.
+  verified by extracting it. That check covers the version only: Forge deletes `config.forge` from the
+  copied `package.json` before it goes into the asar, so the asar's `config` is `{}` on every correct
+  build. `config.forge` was therefore verified in the **source** `package.json` — five makers, the
+  ad-hoc-sign plugin and `packagerConfig.icon` all still present, which is the failure mode of `fa7eede`.
 - **The tag and the assets now come from the same commit.** `v0.6.13-beta` was force-moved to
   `30c019c` after publication while its assets had been built from `831c20a`, and the moved tag's run
   was cancelled — so QA-03, UX-02 and the e2e teardown existed in `main` and in no binary. This

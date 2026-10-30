@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
-import { encrypt, decrypt, MAX_DECRYPTED_SIZE, DEFAULT_MEMORY_COST, MIN_MEMORY_COST, MAX_MEMORY_COST, MIN_TIME_COST, MAX_TIME_COST, MIN_PARALLELISM, MAX_PARALLELISM, DEFAULT_TIME_COST, DEFAULT_PARALLELISM, deriveKey, ContentTooLargeError, KdfBackendUnavailableError, type KDFParams } from './encryption.js';
+import { encrypt, decrypt, MAX_DECRYPTED_SIZE, DEFAULT_MEMORY_COST, MIN_MEMORY_COST, MAX_MEMORY_COST, MIN_TIME_COST, MAX_TIME_COST, MIN_PARALLELISM, MAX_PARALLELISM, DEFAULT_TIME_COST, DEFAULT_PARALLELISM, deriveKey, ContentTooLargeError, CiphertextTooLargeError, KdfBackendUnavailableError, type KDFParams } from './encryption.js';
 import { logger } from './logger.js';
 import { EncryptedDrawer, DrawerListItem } from '../shared/types.js';
 import { EncryptedDrawerSchema, type EncryptedDrawerMetadata } from './validation.js';
@@ -606,6 +606,14 @@ export async function saveDrawer(
         passwordBuffer.fill(0);
         logger.warn('Save refused: KDF backend unavailable', { id, backend: e.algorithm });
         return { ok: false, reason: 'kdf_backend_unavailable' };
+      }
+      // P0.12 — A stored ciphertext above the ceiling is damaged file data, not a
+      // failed password guess: decrypt() now refuses it before decoding, and this
+      // catch used to turn every non-KDF failure into 'wrong_password'.
+      if (e instanceof CiphertextTooLargeError) {
+        passwordBuffer.fill(0);
+        logger.warn('Save refused: stored ciphertext exceeds max size', { id });
+        return { ok: false, reason: 'too_large' };
       }
       passwordBuffer.fill(0);
       logger.warn('Save refused: wrong password', { id });

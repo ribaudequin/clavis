@@ -5,10 +5,10 @@
 // user-visible strings are matched bilingually rather than pinned to one language.
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import ErrorBoundary from '../src/renderer/components/ErrorBoundary';
 import { t, translations } from '../src/i18n';
-import { DrawerListItem, ElectronAPI, EncryptedDrawer, Result } from '../src/shared/types';
+import { DrawerListItem, ElectronAPI, EncryptedDrawer, ErrorCode, Result } from '../src/shared/types';
 
 const ERROR_TITLE = /^(something went wrong|algo correu mal)$/i;
 const ERROR_DETAILS = /^(error details|detalhes do erro)$/i;
@@ -287,6 +287,97 @@ describe('ErrorBoundary — focus after the tree is replaced', () => {
       focusOnDetails: true,
       focusOnRestart: false,
     });
+  });
+});
+
+describe('ErrorBoundary — a restart that fails is reported, not swallowed', () => {
+  /** The button is the only control in the fallback, so a second click is the whole
+   *  double-submit surface. It is also the state the user needs back to try again. */
+  function restartButton(): HTMLButtonElement {
+    return screen.getByRole<HTMLButtonElement>('button', { name: RESTART });
+  }
+
+  it('shows the translated error when restartApp rejects, and leaves the button usable', async () => {
+    // A rejected bridge call used to be an unhandled rejection: the crash screen stayed
+    // exactly as it was and the user had no way to know the click did anything. The test
+    // being green is itself part of the assertion — Vitest fails a file whose promise
+    // rejects with no handler — and the visible message is the other half.
+    const restartApp = vi.fn(async (): Promise<Result<void>> => {
+      throw new Error('channel closed');
+    });
+    installBridge({ restartApp });
+    renderCaught();
+
+    fireEvent.click(restartButton());
+
+    expect(await screen.findByText(t('error.write_failed'))).toBeTruthy();
+    expect(restartApp).toHaveBeenCalledTimes(1);
+    expect(restartButton().disabled).toBe(false);
+    expect(restartButton().getAttribute('aria-busy')).toBe('false');
+  });
+
+  it('shows the same message when the main process answers WRITE_FAILED instead of rejecting', async () => {
+    // The IPC layer reports a failed relaunch as a value; a torn-down channel rejects. The
+    // user cannot tell those apart and should not have to.
+    const restartApp = vi.fn(
+      async (): Promise<Result<void>> => ({
+        ok: false,
+        error: { code: ErrorCode.WRITE_FAILED, message: 'Failed to restart app' },
+      })
+    );
+    installBridge({ restartApp });
+    renderCaught();
+
+    fireEvent.click(restartButton());
+
+    expect(await screen.findByText(t('error.write_failed'))).toBeTruthy();
+    expect(restartApp).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a second click while the first restart is still in flight', async () => {
+    let resolveRestart: (value: Result<void>) => void = () => {};
+    const restartApp = vi.fn(
+      () =>
+        new Promise<Result<void>>((resolve) => {
+          resolveRestart = resolve;
+        })
+    );
+    installBridge({ restartApp });
+    renderCaught();
+
+    fireEvent.click(restartButton());
+
+    // `disabled` is what the user sees; the private flag is what closes the gap before React
+    // re-renders, and a synchronous double click lands in exactly that gap.
+    expect(restartButton().disabled).toBe(true);
+    expect(restartButton().getAttribute('aria-busy')).toBe('true');
+    fireEvent.click(restartButton());
+
+    expect(restartApp).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveRestart({ ok: true, data: undefined });
+    });
+
+    // Success leaves the app to quit, so the button must not come back to life.
+    expect(restartButton().disabled).toBe(true);
+    expect(screen.queryByText(t('error.write_failed'))).toBeNull();
+  });
+
+  it('announces the failure through the same alert region the crash is announced in', async () => {
+    // The fallback root is `role="alert"`; the message inside it is a second one so that a
+    // screen reader announces the change of state instead of silently re-reading nothing.
+    const restartApp = vi.fn(async (): Promise<Result<void>> => {
+      throw new Error('channel closed');
+    });
+    installBridge({ restartApp });
+    const { fallback } = renderCaught();
+
+    fireEvent.click(restartButton());
+
+    const message = await screen.findByText(t('error.write_failed'));
+    expect(message.getAttribute('role')).toBe('alert');
+    expect(fallback.contains(message)).toBe(true);
   });
 });
 

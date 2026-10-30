@@ -118,7 +118,16 @@ const readFileMock = fsPromises.readFile as unknown as MockedFunction<
 // check-update handler uses, and the fake request/response objects implement
 // exactly the members it touches — `.on()`, `.destroy()` and `statusCode`.
 type Listener = (payload?: unknown) => void;
-type MockResponse = { statusCode: number; on: (event: string, listener: Listener) => MockResponse };
+type MockResponse = {
+  statusCode: number;
+  /** Only redirects read this; the harness keeps it empty unless a script sets it. */
+  headers: Record<string, string | undefined>;
+  on: (event: string, listener: Listener) => MockResponse;
+  /** The handler drains a redirect body instead of accumulating it. */
+  resume: () => void;
+  /** The body cap stops the transfer, not just the accumulation. */
+  destroy: () => void;
+};
 type MockRequest = { on: (event: string, listener: Listener) => MockRequest; destroy: () => void };
 
 const httpsGetMock = https.get as unknown as MockedFunction<
@@ -136,10 +145,18 @@ type HttpsScript = {
   streamError?: Error;
   /** Never emits anything — the connection stalls after the request is sent. */
   stall?: boolean;
+  /** Redirect target, read only when the status is a 3xx. */
+  location?: string;
 };
 
 interface HttpsStub {
   destroy: Mock;
+  /** `res.destroy()` — the body cap stops the transfer, not only the accumulation. */
+  responseDestroy: Mock;
+  /** Called by the handler to drain a redirect body; one per redirect response. */
+  resume: Mock;
+  /** URLs the handler requested, in order — the evidence a chain was walked. */
+  urls: string[];
   failRequest: (error: Error) => void;
 }
 
@@ -150,9 +167,21 @@ type PendingSettlement =
 
 // `EventEmitter` semantics without the class: listeners register inside the
 // production callback, so delivery happens on a later tick like the real stream.
-function stubHttps(script: HttpsScript): HttpsStub {
-  const resListeners = new Map<string, Listener[]>();
-  const reqListeners = new Map<string, Listener[]>();
+//
+// Accepts one script per hop and repeats the last one once the list is exhausted,
+// so a redirect loop is expressed as a single script instead of six copies of it.
+function stubHttps(...scripts: HttpsScript[]): HttpsStub {
+  if (scripts.length === 0) throw new Error('stubHttps requires at least one script');
+
+  let cursor = 0;
+  const urls: string[] = [];
+  const destroy = vi.fn();
+  const responseDestroy = vi.fn();
+  const resume = vi.fn();
+  // `failRequest` targets the most recent hop: a request-level error belongs to the
+  // connection that is open now, not to the first one in the chain.
+  let lastRequestListeners = new Map<string, Listener[]>();
+
   const add = (map: Map<string, Listener[]>, event: string, listener: Listener): void => {
     map.set(event, [...(map.get(event) ?? []), listener]);
   };
@@ -160,23 +189,35 @@ function stubHttps(script: HttpsScript): HttpsStub {
     for (const listener of map.get(event) ?? []) listener(payload);
   };
 
-  const destroy = vi.fn();
-  const request: MockRequest = {
-    on: (event, listener) => {
-      add(reqListeners, event, listener);
-      return request;
-    },
-    destroy,
-  };
-  const response: MockResponse = {
-    statusCode: script.statusCode ?? 200,
-    on: (event, listener) => {
-      add(resListeners, event, listener);
-      return response;
-    },
-  };
+  httpsGetMock.mockImplementation((url, _options, callback) => {
+    const script = scripts[Math.min(cursor, scripts.length - 1)];
+    cursor += 1;
+    urls.push(url);
 
-  httpsGetMock.mockImplementation((_url, _options, callback) => {
+    // Per hop, not shared: a chain that reused one listener map would deliver the
+    // second response's body to the first request's `end` handler as well.
+    const resListeners = new Map<string, Listener[]>();
+    const reqListeners = new Map<string, Listener[]>();
+    lastRequestListeners = reqListeners;
+
+    const request: MockRequest = {
+      on: (event, listener) => {
+        add(reqListeners, event, listener);
+        return request;
+      },
+      destroy,
+    };
+    const response: MockResponse = {
+      statusCode: script.statusCode ?? 200,
+      headers: script.location ? { location: script.location } : {},
+      on: (event, listener) => {
+        add(resListeners, event, listener);
+        return response;
+      },
+      resume,
+      destroy: responseDestroy,
+    };
+
     callback(response);
     if (!script.stall) {
       setImmediate(() => {
@@ -194,7 +235,7 @@ function stubHttps(script: HttpsScript): HttpsStub {
     return request;
   });
 
-  return { destroy, failRequest: (error) => emit(reqListeners, 'error', error) };
+  return { destroy, responseDestroy, resume, urls, failRequest: (error) => emit(lastRequestListeners, 'error', error) };
 }
 
 beforeEach(() => {
@@ -827,7 +868,11 @@ describe('IPC handlers', () => {
     // the test above: both it and the SaveFailureReason map emit the same
     // 'Content exceeds the maximum size', so mutating `iss.code === 'too_big'` to a
     // wrong string left all 56 tests green. Two violations, two classifications.
-    it('classifies a schema ceiling violation as CONTENT_TOO_LARGE and any other as VALIDATION_ERROR', async () => {
+    //
+    // SAV-01 — The two caps are now told apart in the code the renderer receives: the
+    // schema ceiling counts CODE POINTS, while store's `content_too_large` counts UTF-8
+    // BYTES. Collapsing them meant the user could not be told which limit refused them.
+    it('classifies a schema ceiling violation as CONTENT_TOO_LONG and any other as VALIDATION_ERROR', async () => {
       const handler = getHandler(CHANNELS.SAVE_DRAWER);
       const tooBig = await handler({}, VALID_UUID, 'password12345', 'Title', 'x'.repeat(MAX_CONTENT_CODE_POINTS + 1));
       // An empty password: SaveDrawerSchema holds a sanity `.min(1)` and no policy, so
@@ -839,7 +884,7 @@ describe('IPC handlers', () => {
         tooBig: { ok: tooBig.ok, code: tooBig.ok ? null : tooBig.error.code },
         tooShort: { ok: tooShort.ok, code: tooShort.ok ? null : tooShort.error.code },
       }).toEqual({
-        tooBig: { ok: false, code: ErrorCode.CONTENT_TOO_LARGE },
+        tooBig: { ok: false, code: ErrorCode.CONTENT_TOO_LONG },
         tooShort: { ok: false, code: ErrorCode.VALIDATION_ERROR },
       });
     });
@@ -1453,6 +1498,72 @@ describe('IPC handlers', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    it('follows a redirect chain and returns the tag from the final hop', async () => {
+      // Two hops: a relative Location (as GitHub sends it for renamed repos) and an
+      // absolute one. Both must be resolved against the hop that served them.
+      const stub = stubHttps(
+        { statusCode: 301, location: '/repos/ribaudequin/clavis/releases/1' },
+        { statusCode: 302, location: 'https://api.github.com/final' },
+        { body: '{"tag_name":"v9.9.9"}' }
+      );
+
+      const handler = getHandler(CHANNELS.CHECK_UPDATE);
+      const result = await handler({});
+
+      expect(result).toEqual({ tag_name: 'v9.9.9' });
+      expect(stub.urls).toEqual([
+        'https://api.github.com/repos/ribaudequin/clavis/releases/latest',
+        'https://api.github.com/repos/ribaudequin/clavis/releases/1',
+        'https://api.github.com/final',
+      ]);
+      // A redirect's body is drained, never accumulated: one resume per redirect.
+      expect(stub.resume).toHaveBeenCalledTimes(2);
+    });
+
+    it('refuses a redirect that leaves https instead of following it', async () => {
+      // The same request in clear text is the failure this prevents. The URL list is
+      // the assertion that matters: refusing after requesting would still leak it.
+      const stub = stubHttps({ statusCode: 302, location: 'http://api.github.com/latest' });
+
+      const handler = getHandler(CHANNELS.CHECK_UPDATE);
+      const result = await handler({});
+
+      expect(result).toBeNull();
+      expect(stub.urls).toEqual(['https://api.github.com/repos/ribaudequin/clavis/releases/latest']);
+    });
+
+    it('refuses a sixth redirect rather than following a loop', async () => {
+      // The last script repeats, so this is an unbounded loop as far as the handler
+      // can tell. Six requests: the initial one plus five followed redirects.
+      const stub = stubHttps({
+        statusCode: 307,
+        location: 'https://api.github.com/repos/ribaudequin/clavis/releases/latest',
+      });
+
+      const handler = getHandler(CHANNELS.CHECK_UPDATE);
+      const result = await handler({});
+
+      expect(result).toBeNull();
+      expect(stub.urls).toHaveLength(6);
+    });
+
+    it('refuses a response body over the 256 KiB cap and stops the transfer', async () => {
+      // The cap counts characters, and the payload is refused rather than truncated:
+      // a truncated body is not JSON, so parsing it would only produce a second,
+      // less truthful refusal. The destroy is the half that is easy to omit — stopping
+      // the concatenation alone leaves the peer streaming into a process that answered.
+      const stub = stubHttps({ body: 'x'.repeat(256 * 1024 + 1) });
+
+      const handler = getHandler(CHANNELS.CHECK_UPDATE);
+      const result = await handler({});
+
+      expect(result).toBeNull();
+      expect(stub.responseDestroy).toHaveBeenCalled();
+      // The connection itself is left to the response; destroying the request here would
+      // be a second teardown of a socket the cap already closed.
+      expect(stub.destroy).not.toHaveBeenCalled();
     });
   });
 

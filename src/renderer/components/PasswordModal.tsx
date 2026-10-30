@@ -156,6 +156,11 @@ function PasswordModal({
       const delayMs = await queryUnlockDelay(drawerId);
       if (delayMs > 0) startCountdown(delayMs);
       await onSubmit(password);
+    } catch {
+      // A2-deferred — `onSubmit` is `HomeScreen.handleUnlockSubmit`, which catches its own
+      // failure and sets `unlockError`, so there is no message left for this layer to add.
+      // The catch exists because a rejection from a form submit has nothing above it: left
+      // unhandled it becomes a global rejection, and the user sees a form that did nothing.
     } finally {
       // Whatever happened, the countdown goes: a stale number must not survive
       // into the next attempt.

@@ -474,9 +474,21 @@ There is **no base `Modal` component and no portal**. Each modal hand-rolls the 
 composes the same two hooks. This is the contract to follow when adding a sixth.
 
 ```
-useFocusTrap(modalRef, { isActive: true })
+useFocusTrap(modalRef, { isActive: isOpen })
 useModalKeyboard(modalRef, { onEscape })
 ```
+
+**`isActive` is the condition that has the modal on screen, not a literal `true`.** The four modals
+that are unmounted while closed pass `{ isActive: true }` because for them mount and open are one
+event. A sixth that is mounted once and opened by a prop must pass the prop, as `CreditsModal.tsx:89`
+does — `{ isActive: isOpen }`. The literal is a value that never changes, and `isActive` is in the
+effect's dependencies: the effect runs once, at mount, before the panel is in the document, and
+never again, so the trap silently does nothing. If the panel is rendered but hidden instead, the
+failure inverts — Tab stays inside a dialog nobody can see, and focus goes back to the opener on
+unmount rather than on close. `HomeScreen.tsx` renders `CreditsModal` as `{showCreditsModal && …}`,
+so there the two coincide by the shape of the call site; the prop flip is the wider contract to
+copy. This is the same distinction the `CreditsModal` paragraph below draws — "on open" is not always
+"on mount" — applied to the trap rather than to the focus call.
 
 Both hooks attach `keydown` listeners to the **container ref**, so they must share it — and because
 they share it, **each key must have exactly one owner.** Escape belongs to `useModalKeyboard`
@@ -913,12 +925,15 @@ And `src/main/ipc-handlers.ts` keeps its own `getLocale()` reading `LANG`/`LC_AL
 
 ## Known gaps
 
-These are live. They are documented here so that nobody reads this file and concludes the codebase
-is fully conformant.
+The table is **not uniform, and the Status column is what separates it**. A row with no fix entry is
+a live gap, documented here so that nobody reads this file and concludes the codebase is fully
+conformant. A row marked **Fixed** with a date records a gap that is gone: it is kept rather than
+deleted because it carries the measurement, the cause and how the fix was verified, and that record
+is the evidence the rows that remain are trustworthy.
 
 | Gap | Measured | Status |
 |---|---|---|
-| `danger.svg` (now `#f32929` only) | `red-50` (`#fff1f2`) | **4.62:1** | **Fixed 2026-10-13.** The second `fill:#131112` — an invisible near-black path painted over the red shape — has been removed from the asset. It was an export artefact, not a designed stroke: `#131112` measures 17.19:1 on `red-50`, which is why the icon was invisible. The file now carries a single path with `fill:#f32929`, the same colour as the discard-and-leave button it accompanies (`red-700` / `red-300`). |
+| `danger.svg` (now `#f32929` only) | `red-50` (`#fff1f2`) — **4.62:1** | **Fixed 2026-10-13.** The second `fill:#131112` — an invisible near-black path painted over the red shape — has been removed from the asset. It was an export artefact, not a designed stroke: `#131112` measures 17.19:1 on `red-50`, which is why the icon was invisible. The file now carries a single path with `fill:#f32929`, the same colour as the discard-and-leave button it accompanies (`red-700` / `red-300`). |
 | `CreditsModal` focused nothing | ESC did not close it until the user clicked or tabbed into the panel | **Fixed 2026-10-16.** The modal now focuses its close button and calls `window.focus()` when `isOpen` goes true (`CreditsModal.tsx:92-96`) — the same rule the other four get. See [Modals](#modals). |
 | No `prefers-reduced-motion` support | 0 occurrences in `src/` | The `animate-in`/`animate-pulse` transitions do not degrade for users who have asked for reduced motion. |
 | Residual i18n leaks in the strength meter | The meter's labels were hardcoded Portuguese — `'Muito curta (mín. 12, misto obrigatório)'`, `'Fraca'`, `'Razoável'`, `'Boa'`, `'Forte'`, `'Excelente'` — in a component where every other string goes through `t()`. The colours on those same lines were tokenised; the labels were not. | **Fixed 2026-10-20.** The labels go through `t()` in both catalogues (`src/i18n/index.ts`), and the meter's scoring moved into `src/shared/password-policy.ts` (`scorePasswordStrength()`), so the label can no longer disagree with the gate. This row was also wrong about the code it described: the labels were the Portuguese set above, not the English set it used to quote. |

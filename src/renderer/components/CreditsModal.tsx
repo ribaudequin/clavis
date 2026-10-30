@@ -53,7 +53,7 @@ function CopyButton({ text }: { text: string }): React.JSX.Element {
       aria-label={t('btn.copy_address')}
       title={t('btn.copy_address')}
     >
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
       </svg>
@@ -118,7 +118,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
         <div className="relative p-6 pb-2">
           <div className="flex items-start gap-3 mb-5">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: 'var(--heart-surface)' }}>
-              <HeartIcon className="w-5 h-5" style={{ color: 'var(--heart-on-surface)' }} />
+              <HeartIcon className="w-5 h-5" style={{ color: 'var(--heart-on-surface)' }} aria-hidden="true" />
             </div>
             <h2 id="credits-title" className="text-xl font-bold text-gray-900 text-pretty leading-tight">
               {t('label.credits_title')}
@@ -130,7 +130,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
             className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             aria-label={t('btn.close')}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
@@ -140,7 +140,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
         <div className="px-6 pb-2 space-y-3">
           <section className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
-              <ClavisIcon className="w-4 h-4 flex-shrink-0" />
+              <ClavisIcon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
               <h3 className="text-sm font-semibold text-blue-800 uppercase tracking-wide">{t('label.about')}</h3>
             </div>
             <p className="text-sm font-semibold text-gray-900 leading-relaxed">
@@ -166,7 +166,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
 
           <section className="bg-gray-50 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600" aria-hidden="true">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                 <circle cx="9" cy="7" r="4"></circle>
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
@@ -186,7 +186,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors"
                 >
-                  <XIcon className="w-4 h-4 flex-shrink-0" />
+                  <XIcon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                   @banduastudio
                 </a>
                 <a
@@ -195,7 +195,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors"
                 >
-                  <LinkedInIcon className="w-4 h-4 flex-shrink-0" />
+                  <LinkedInIcon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                   LinkedIn
                 </a>
               </li>
@@ -205,7 +205,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
           <section className="bg-amber-50/60 rounded-xl p-4 border border-amber-100">
             <div className="flex items-center gap-2 mb-3">
               <span className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--heart-surface)' }}>
-                <HeartIcon className="w-4 h-4" style={{ color: 'var(--heart-on-surface)' }} />
+                <HeartIcon className="w-4 h-4" style={{ color: 'var(--heart-on-surface)' }} aria-hidden="true" />
               </span>
               <h3 className="text-sm font-semibold text-amber-800 uppercase tracking-wide">{t('label.support_project')}</h3>
             </div>
@@ -219,7 +219,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
                 rel="noopener noreferrer"
                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white text-sm font-medium rounded-lg transition-colors"
               >
-                <KoFiIcon className="w-4 h-4 flex-shrink-0" />
+                <KoFiIcon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                 Ko-fi
               </a>
               <a
@@ -228,7 +228,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
                 rel="noopener noreferrer"
                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white text-sm font-medium rounded-lg transition-colors"
               >
-                <PatreonIcon className="w-4 h-4 flex-shrink-0" />
+                <PatreonIcon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                 Patreon
               </a>
             </div>
@@ -249,21 +249,21 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
               </ul>
               <div className="flex flex-wrap justify-between gap-2 mt-3">
                 <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                  <GithubDarkIcon className="w-4 h-4" />
+                  <GithubDarkIcon className="w-4 h-4" aria-hidden="true" />
                   GitHub
                 </a>
                 <a href="https://etherscan.io/address/0x466f0c3ee495a3dc851fafa5c4720ab2fdcd4af4" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                  <EthIcon className="w-4 h-4" />
+                  <EthIcon className="w-4 h-4" aria-hidden="true" />
                   ETH
                 </a>
                 <a href="https://solscan.io/account/Hnw5z47sk1hS6FsnCLfgX8pZhDryQVnZpzWJjSSRV5Nf" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                  <SolIcon className="w-4 h-4" />
+                  <SolIcon className="w-4 h-4" aria-hidden="true" />
                   SOL
                 </a>
               </div>
               {newVersion ? (
                 <a href={`${REPO_URL}/releases/latest`} target="_blank" rel="noopener noreferrer" className="w-full mt-3 inline-flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-green-600/20 transition-all">
-                  <GithubLightIcon className="w-5 h-5" />
+                  <GithubLightIcon className="w-5 h-5" aria-hidden="true" />
                   {t('msg.update_available', { version: newVersion })}
                 </a>
               ) : null}
@@ -271,7 +271,7 @@ function CreditsModal({ isOpen, onClose }: CreditsModalProps): React.JSX.Element
           </section>
 
           <p className="text-center italic text-xs text-gray-500 pt-3 border-t border-gray-100">
-            <HeartIcon className="w-3 h-3 inline-block mr-1" style={{ color: 'var(--heart-surface)' }} />
+            <HeartIcon className="w-3 h-3 inline-block mr-1" style={{ color: 'var(--heart-surface)' }} aria-hidden="true" />
             {t('msg.from_portugal')}
           </p>
         </div>

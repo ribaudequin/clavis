@@ -58,4 +58,27 @@ describe('PasswordModal', () => {
     render(<PasswordModal drawerId={DRAWER_ID} drawerTitle="Test" onClose={() => {}} onSubmit={async () => {}} error="Wrong password" />);
     expect(screen.getByText('Wrong password')).toBeTruthy();
   });
+
+  it('survives a rejected onSubmit and re-enables the form, without an unhandled rejection', async () => {
+    // A2-deferred — the handler used to be `try { … } finally { … }`. A rejection from
+    // `onSubmit` therefore escaped the submit handler that React cannot await, became a
+    // global unhandled rejection, and left the user looking at a form that did nothing.
+    // The message belongs to the caller (HomeScreen sets `unlockError`); this layer owes
+    // the user a form that comes back to life, and the test file owes the suite no
+    // dangling rejection — Vitest fails a file whose promise rejects unhandled, so a
+    // green run here is half the assertion.
+    const onSubmit = vi.fn(async () => {
+      throw new Error('channel closed');
+    });
+    render(<PasswordModal drawerId={DRAWER_ID} drawerTitle="Test" onClose={() => {}} onSubmit={onSubmit} error={null} />);
+    const input = screen.getByPlaceholderText(/password/i) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: /open|abrir/i }));
+
+    await act(async () => {});
+
+    expect(onSubmit).toHaveBeenCalledWith('secret');
+    expect(input.disabled).toBe(false);
+    expect((screen.getByRole('button', { name: /open|abrir/i }) as HTMLButtonElement).disabled).toBe(false);
+  });
 });

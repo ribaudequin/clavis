@@ -73,6 +73,18 @@ function HomeScreen(): React.JSX.Element {
 
   const api = (): ElectronAPI => window.electronAPI;
 
+  // A2-deferred — The call sites below start a promise from a place React cannot
+  // await: an effect, or a handler that must stay synchronous. The handlers catch
+  // their own bridge failures and toast them, so the only way one of these promises
+  // can reject is a throw from inside its own catch or finally block — rare, and
+  // silent until now, because nothing was attached to the returned promise. This
+  // keeps that last case on screen instead of letting it reach the global handler.
+  function reportFailure(promise: Promise<unknown>, message: string): void {
+    void promise.catch(() => {
+      toast.error(message);
+    });
+  }
+
   async function loadDrawers(): Promise<void> {
     setLoadingDrawers(true);
     try {
@@ -91,7 +103,7 @@ function HomeScreen(): React.JSX.Element {
   }
 
   useEffect(() => {
-    loadDrawers();
+    reportFailure(loadDrawers(), t('msg.error_load_drawers'));
   }, []);
 
   // HYG-24 — The one push the app has: the main process tells us how the export
@@ -204,6 +216,13 @@ function HomeScreen(): React.JSX.Element {
       }
       toast.success(t('msg.drawer_deleted'));
       await loadDrawers();
+    } catch {
+      // A2-deferred — `deleteDrawer` answers with a Result, so what this catches
+      // is the bridge itself failing (a closed channel, a crashed main process).
+      // The sentence is the complete one, not the `msg.error_delete` prefix, so
+      // the toast cannot end in a dangling colon. Same treatment as
+      // DeleteConfirmModal's own catch and ViewDrawer's delete.
+      toast.error(t('msg.error_delete_failed'));
     } finally {
       setDeletingId(null);
       window.focus();
@@ -310,7 +329,9 @@ if (viewState) {
           onBack={() => {
             // P0.9 — Clear password from React state after ViewDrawer unmounts
             setViewState(null);
-            loadDrawers();
+            // A2-deferred — a callback prop cannot await, so the rejection is reported
+            // here instead of escaping to the global handler.
+            reportFailure(loadDrawers(), t('msg.error_load_drawers'));
           }}
         />
       </Suspense>
@@ -411,7 +432,7 @@ if (viewState) {
            onCreated={() => {
              setShowCreateModal(false);
              window.focus();
-             loadDrawers();
+             reportFailure(loadDrawers(), t('msg.error_load_drawers'));
            }}
          />
        </Suspense>

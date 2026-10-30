@@ -8,8 +8,9 @@
       The tag was also force-moved to `30c019c` **after** publication — the assets came from `831c20a`
       (run `40236278956`) and the moved tag's run (`40334908599`) was **cancelled**, so QA-03, UX-02 and
       the e2e teardown are in `main` but in no binary. **Fixed in `v0.6.14-beta` (2026-10-27):** version
-      bumped, asar's own `package.json` verified to read `0.6.14-beta`, `config.forge` intact (5 makers,
-      ad-hoc-sign plugin, icon), shipped from the tip of `main`.
+      bumped, the asar's own `package.json` verified to read `0.6.14-beta` (that check covers the version
+      only — Forge strips `config.forge` from the copied `package.json`, so it is verified in the source:
+      5 makers, ad-hoc-sign plugin, icon), shipped from the tip of `main`.
 - [ ] **The version bump is manual, so it can be forgotten again.** `npm version` is not run by CI and
       `quality` does not compare `package.json` with the ref — a tag can be created without a bump and
       nothing fails until a user sees a phantom update. Candidate guard: a `quality` step that fails
@@ -111,11 +112,11 @@
 - [x] P1.1: Resolve dual build system (remove electron-builder, keep Forge) — DONE 2026-09-03 (consolidated to single Forge; electron-builder removed)
 - [x] P1.2: Fix ESM/CommonJS mismatch — DONE 2026-09-07 (renamed `forge.config.ts`/`vite.config.ts`/`vitest.config.ts` → `.mts`; electron-forge 7.11.2 + Vitest + Vite all support `.mts` natively; `tsconfig.json` excludes `*.config.mts`; CommonJS preserved for `src/main` runtime via Electron; `npm run make` validated Linux → deb (215M) + AppImage (244M))
 - [x] P1.3: Add IPC handler tests (8 handlers, vitest mocking) — DONE 2026-09-07 (extracted `handleIPC()` from `index.ts` → `registerIpcHandlers({ ipcMain, dialog })` in `src/main/ipc-handlers.ts`; 34 tests in `tests/ipc-handlers.test.ts`; `dialog` DI for testability; covers Zod validation, error codes, token whitelist + atomic consume)
-- [ ] P1.4: Code signing (deferred; document unsigned status in README) — SKIP
+- [x] P1.4: Code signing (deferred; document unsigned status in README) — SKIP (owner decision; the macOS bundle is ad-hoc signed since 2026-10-21, notarisation stays out of scope)
 - [x] **Released as `v0.4.3-beta`** (2026-10-03): 7 commits, tag `a739b1e`, run `37128865586` verde (5 jobs), 6 assets. Release AppImage verificado: arranca como `0.4.3-beta`, round-trip IPC OK, shutdown limpo, argon2 32-byte raw hash, `electron-updater` ausente.
 - [x] **BS-06**: update check **manual** via GitHub Releases — `checkUpdate` (`main` `https.get`) exposto no `preload`; `CreditsModal` mostra botão "Nova versão" quando `tag_name` ≠ `app.getVersion()`; `autoUpdater` removido (404 eliminado); `AppImage` `v0.4.0-beta` validado; `v0.4.1-beta` e `v0.4.2-beta` tags/releases criadas. **Limpeza 2026-10-03:** `electron-updater`, o script `scripts/generate-latest-yml.mjs`, o hook `postMake` e o `latest.yml` versionado foram removidos — o hook nunca correu (npm só dispara hooks em minúsculas, `postmake`), logo era código morto; `latest.yml` estava parado em `0.4.0-beta` a apontar para um AppImage `0.3.8-alpha` inexistente.
 - [x] Verify `npm run make` builds Linux targets (deb + AppImage) — DONE 2026-09-07
-- [ ] P1.13: CI quality gates (lint + typecheck + test before build/make) — DONE 2026-09-07 (`quality` job in `.github/workflows/release.yml`, runs in 28s; `build` job gated by `if: startsWith(github.ref, 'refs/tags/v')` + `needs: quality`; CI run `34146157247` green)
+- [x] P1.13: CI quality gates (lint + typecheck + test before build/make) — DONE 2026-09-07 (`quality` job in `.github/workflows/release.yml`, runs in 28s; `build` job gated by `if: startsWith(github.ref, 'refs/tags/v')` + `needs: quality`; CI run `34146157247` green)
 
 ## Phase 2 — UX/DX IMPROVEMENTS (Medium Priority)
 
@@ -248,7 +249,7 @@
 - [x] **i18n model change (owner decision, 2026-10-05)** → **`pt-BR` removed.** Rule: *any* lusophone system language renders **PT-PT**; everything else renders English. Two locales only (`pt-PT`, `en`), 69 keys each. `detectLocale()` now compares the **BCP-47 primary subtag** instead of a prefix: `lang.trim().replace(/_/g,'-').split('-')[0].toLowerCase() === 'pt'`, because `startsWith('pt')` was case-sensitive (`PT-br` → English) and over-matched (`ptx`, `ptt`). `t()` gained an optional `params` arg for `{token}` substitution (`msg.update_available`). New `docs/adr/ADR-009-i18n-single-lusophone-locale.md` supersedes ADR-003's fallback chain (ADR-003 kept as history with a pointer). Guards in `tests/i18n.test.ts`: `pt-PT`↔`en` key parity, `pt-BR` cannot return, routing of 8 lusophone + 8 non-lusophone + 7 malformed tags, and a quarantine scan for Brazilian-only markers in `pt-PT` values (`senhas`, `aplicativo`, `Excluir`, `Salvar`, `Arquivo`, "Me pague um café"). `SkeletonLoader`'s `aria-label` also i18n'd (it's screen-reader text). `114/114` tests, also green under `CI=true`. ⚠️ `src/main/ipc-handlers.ts` keeps an **independent** `getLocale()` reading `LANG` env vars for main-process error messages — consistent today, but a second locale decision that can drift. → **RESOLVIDO 2026-10-07 (`5269aa6`, `v0.4.7-beta`)**, e o diagnóstico estava incompleto: `getLocale()` é usado por **2** das 25 mensagens; as outras **23 nem sequer tinham locale**. O renderer expunha `result.error.message` (o texto inglês de diagnóstico do main) em **8 sítios**, cinco deles concatenando um prefixo traduzido ("Falha ao guardar Incorrect password or drawer not found"), e o `CreateDrawerModal` tinha um prefixo inglês `Error:` hardcoded num ecrã pt-PT. **Confirmado visualmente no AppImage:** senha errada mostrava "Incorrect password or drawer not found" numa UI portuguesa. **Corrigido traduzindo por `AppError.code`, que já existia** — nova `tError()` em `src/i18n/index.ts` mapeia os 7 `ErrorCode` para chaves `error.*` novas nos dois locales; `src/main/**` intocado e as **17** asserções de `tests/ipc-handlers.test.ts` sobre a string inglesa continuam a passar, porque essa mensagem passou a ser só de log. **Invariante com guarda de compilação:** `ERROR_MESSAGE_KEYS` é `Record<ErrorCode, string>`, logo um `ErrorCode` novo sem tradução é erro de build, não texto inglês em runtime; e `tError()` **rejeita um miss do dicionário** (`translated !== key`), senão mostraria a chave literal `error.decrypt_failed` ao utilizador. `HomeScreen.tsx:165` e `:180` discordavam — o `catch` buscava `t('label.incorrect_password')`, que só dispara em excepção e **nunca** em `result.ok === false`, ou seja nunca corria no caso de senha errada; ambos passam por `tError()` e a chave morta foi removida dos dois dicionários.
 - [x] **P3.27 — Fallback patterns (`ViewDrawer.tsx`)** — `|| 'Back'` e `|| 'Content'` removidos; `t()` devolve a chave se ausente, portanto o fallback nunca dispara e apenas polui o código.
 - [x] P3.28 — In-app language selector → **CANCELLED 2026-10-05 (owner decision)**: o app segue a **lingua do sistema**, sem override. Registado em `ADR-009`. Não implementar.
-- [ ] P3.29 — HomeScreen `useCallback` (`HomeScreen.tsx`) → memoize handlers. **Still an open question of whether the item survives at all:** the 2026-10-06 entry records `useCallback` tried on `ViewDrawer` and **rejected**, because `onBack` is also new on every render so it fixed nothing. Decide keep-or-drop before spending time on it.
+- [x] P3.29 — HomeScreen `useCallback` (`HomeScreen.tsx`) → memoize handlers. **DROPPED 2026-10-28 (owner decision).** The 2026-10-06 entry records `useCallback` tried on `ViewDrawer` and **rejected**, because `onBack` is also new on every render so it fixed nothing. The same argument holds here: the handlers are passed to children that re-render with the parent anyway, so memoising them alone changes no commit. Dropped rather than kept open, because an item nobody intends to do is not a plan.
 - [x] **P3.30 — POSIX permissions → documentation made honest — DONE 2026-10-16.** The TODO named the wrong file: the calls are in `src/main/store.ts`, not `ipc-handlers.ts`. The real defect was that the docs **overstated** the control. Three facts, all verified empirically (`umask-created: 600`, `after rewrite of a 644 file: 644`, `copyFile carries perms: 644`):
   - **`fs.writeFile`'s `mode` only applies at creation** — an existing `0644` drawer stays `0644` across every save. **True on Linux and macOS too, not a Windows-only gap.**
   - `fs.copyFile` carries the source's permissions, which is exactly why the old-data migration's `fs.chmod(dst, 0o600)` at `store.ts:116-117` is load-bearing. Migrated drawers are tightened; nothing else is.
@@ -309,31 +310,59 @@ negative-controlled. `184 → 277` tests.
       coincide only by accident of structure and the prop flip is the wider contract. A
       `CreditsModal` focus test was written first (4 tests), because the "already closed" behaviour
       had **no automated guard at all** and the doc edit would otherwise have been unfalsifiable.
-- [ ] **A2-deferred — 5 sibling `try/finally`-without-`catch` handlers**: `PasswordModal.tsx:29-38`,
-      `HomeScreen.tsx:44-56`, `:79-98`, `:104-127`, `:129-152`. Plus **5 un-awaited call sites** in
-      `HomeScreen` (`:59`, `:215`, `:316`, `:284`, `:234`) whose rejections reach the **global** handler —
-      a strictly larger exposure than `DeleteConfirmModal`'s own discarded return value. (`:292
-      handleDelete` is `async` with no `await`, so it cannot reject.) A separate change with its own review.
-- [ ] **13 `CreditsModal` icons have no `aria-hidden`** (`:120`, `:143`, `:189`, `:194`, `:207-208`, `:217`,
-      `:226`, `:237`, `:252`, `:256`, `:259`, `:265`, `:274`). **Owner deferred 2026-10-16** — `CreditsModal`
-      is the screen most likely to churn under the pending brand work. `grep aria-hidden src/` returns
-      5 hits, so "fixed twice already" was true of the sweeps, not of the code.
-- [ ] **`ErrorBoundary.tsx:29` discards the `restartApp` promise** — `window.electronAPI.restartApp?.()`
-      is neither awaited nor handled. Same shape as A2 and absent from its scope note.
-- [ ] **`msg.error_delete` ends in a colon** in both catalogues (`i18n/index.ts:31`, `:114`), so A2's new
-      toast renders "Error deleting:". The key is shaped as a prefix for a detail the callers own, and
-      they already surface it via `toast.error(tError(result.error))`. Options: a second key (recommended —
-      additive), an interpolation with nothing to pass, or change the key and lose the colon at its
-      existing prefix-style call sites. **Copy decision, left to the owner.**
-- [ ] **`check-update` follows no redirects** (a 3xx from a renamed repo reads as "no information") and
-      has **no response size cap** (`data` accumulates without bound; not reachable today, GitHub's
-      `/releases/latest` is ~5 KB).
-- [ ] **`DESIGN.md:474`** — the "contract to follow when adding a sixth" snippet reads
-      `useFocusTrap(modalRef, { isActive: true })`. A sixth modal mounted once and opened by prop needs
-      `{ isActive: isOpen }`; the literal `true` teaches the wrong thing, the same mount-vs-open trap D1 fixed.
-- [ ] **`DESIGN.md:826`** — "These are live." above the Known-gaps table is now wrong twice: it already
-      carried one `**Fixed 2026-10-13**` row and D1 added a second. `DESIGN.md:829` also has a malformed
-      `danger.svg` row (4 cells in a 3-column table).
+- [x] **A2-deferred — 5 sibling `try/finally`-without-`catch` handlers — DONE 2026-10-28.** All five now
+      catch: `HomeScreen.loadDrawers`, `handleExport`, `confirmDelete`, `handleImport`, and
+      `PasswordModal.handleSubmit`. Each keeps its `finally` flag reset untouched, and each message is an
+      existing key (`msg.error_load_drawers`, `msg.error_export`, `msg.error_delete_failed`,
+      `msg.error_import`); `PasswordModal` adds no message because its `onSubmit`
+      (`HomeScreen.handleUnlockSubmit`) catches its own failure and sets `unlockError` — the catch exists
+      only so the rejection cannot escape a submit handler React cannot await. The **5 un-awaited call
+      sites** go through one helper, `reportFailure(promise, message)`, which is the `void promise.catch`
+      form with one message per call site; `handleDelete` is untouched because an `async` function with no
+      `await` cannot reject. `tests/rel03-caught-rejections.test.ts` was **three
+      `expect(true).toBe(true)` placeholders** — a test that cannot fail — and now drives the real
+      `HomeScreen` through the card's Export, the header's Import, the confirm modal's Delete and the
+      initial load, plus one `PasswordModal` case for a rejected `onSubmit`; **4 + 1 tests**.
+- [x] **13 `CreditsModal` icons have no `aria-hidden` — DONE 2026-10-28.** The deferral was tied to the
+      brand work, which is finished (BR-1…BR-19), so the owner closed it. All 13 decorative graphics now
+      carry `aria-hidden="true"`; none of them was the sole content of an interactive element, so no
+      `aria-label`/`alt` was needed instead. `tests/CreditsModal-icons.test.tsx` asserts the **structure**
+      (every `svg`/`img` in the dialog is either `aria-hidden` or an `<img>` with `alt`, and every
+      `button`/`a[href]` has a name of its own) rather than a count, so a fourteenth icon cannot slip in
+      unmarked. **Mutation-verified:** removing one `aria-hidden` turns 1 of its 3 tests red.
+- [x] **`ErrorBoundary.tsx:29` discards the `restartApp` promise — DONE 2026-10-28.** `handleRestart` is now
+      `async`, awaits the bridge call, and treats **both** failure shapes the same way: a rejected call and a
+      `Result` with `ok: false` (the main process answers `WRITE_FAILED` as a value) each render
+      `error.write_failed` in a `role="alert"` inside the crash screen, and both re-enable the button. A
+      private `restartInFlight` flag closes the gap between the click and React's re-render, and the button
+      also carries `disabled`/`aria-busy`. No new i18n key was needed. Success intentionally leaves the
+      boundary alone — the main process relaunches the app. **4 tests** in `tests/ErrorBoundary.test.tsx`
+      (rejection, `WRITE_FAILED` value, double click → one call, alert placement).
+- [x] **`msg.error_delete` ends in a colon — RESOLVED 2026-10-28 (owner decision: additive key).** The key
+      stays as the documented prefix ("Error deleting:") for a caller that has a translated detail to
+      append, and the one call site with **no** detail — `ViewDrawer`'s `catch`, which only ever sees a
+      rejected bridge call — now uses the complete sentence `msg.error_delete_failed`. The dangling colon is
+      therefore unreachable, and the existing prefix call sites keep working. Both catalogues carry a
+      comment saying which shape to use when.
+- [x] **`check-update` follows no redirects and had no response cap — DONE 2026-10-28.** The handler now
+      follows up to **5** redirects (301/302/303/307/308), resolving `Location` against the hop that served
+      it, refusing any target that is not `https:` (a downgrade would send the same request in clear text),
+      and draining the redirect body with `res.resume()` instead of accumulating it. The accumulated body is
+      capped at **256 KiB**, and exceeding it destroys the **response** rather than only stopping the
+      concatenation. One 5 s deadline covers the whole chain, and every hop is tracked in a `Set` so the
+      timeout destroys them all; a `settled` guard keeps a late `error` after `destroy()` from re-settling.
+      **4 new tests** in `tests/ipc-handlers.test.ts` (chain followed with relative + absolute `Location`,
+      non-https refused before the request goes out, sixth redirect refused, oversized body refused).
+- [x] **`DESIGN.md:474` — DONE 2026-10-28.** The snippet now reads `useFocusTrap(modalRef, { isActive: isOpen })`,
+      and a paragraph states why: for the four modals unmounted while closed, mount and open are one event,
+      so `true` is correct **there**; a modal mounted once and opened by a prop must pass the prop, or the
+      effect runs before the panel is in the document and never runs again. The `CreditsModal.tsx:89`
+      precedent is named, and the paragraph points at the focus-on-open rule without restating it.
+- [x] **`DESIGN.md:826` — DONE 2026-10-28.** "These are live." is replaced by a sentence that describes the
+      table as it is: rows without a fix entry are live gaps, and rows marked **Fixed** with a date are kept
+      on purpose because they carry the measurement and the verification. The malformed `danger.svg` row had
+      its stray `Measured` value merged back into the `Measured` cell — no row deleted, no content dropped —
+      and every row in the table now counts **3 cells** against the 3-column header (counted with `awk`).
 
 - [x] **DOS-02 — export → import round trip broken above ~5.5 MB — DONE 2026-10-16.** Found while writing
       `docs/DRAWER-CAPACITY.md`, not by reading the code. `importDrawerRaw()` capped the `.clavis` **file** at
@@ -353,16 +382,23 @@ negative-controlled. `184 → 277` tests.
       Argon2id at 2^18 KiB costs ~310 ms here, so nothing had to be faked). The guard test spies on `logger.warn`
       because `unlockDrawer` returns `null` for an oversized payload **and** for garbage alike — asserting `null`
       passed under the mutation and proved nothing. `281/281`.
-- [ ] **The unlock guard allocates before it checks.** `Buffer.from(drawer.encryptedData, 'hex')` runs one line
-      *before* the size comparison, so a 500 MB `encryptedData` string is fully decoded into a 250 MB buffer before
-      anything is refused. `unlockDrawer` also has no cap on the file it reads — `fs.readFile(filePath, 'utf8')`
-      parses a JSON file of any size from the data directory first. The guard bounds the key derivation and the
-      decrypted output (what P0.12 asked for) but is not a memory guard on the path to it. Allocation-free form:
-      check `drawer.encryptedData.length / 2` before decoding. Separate hardening edit with its own edge cases
-      (odd-length hex, non-hex input).
-- [ ] **Raising the import cap doubles the worst case `importDrawerRaw` will parse**, from ~22 MB to ~40 MB of
-      JSON. Still local-only and user-initiated on a file they picked, so practical risk is small — recorded in
-      the constant's comment and in `docs/DRAWER-CAPACITY.md` rather than left implicit.
+- [x] **The unlock guard allocates before it checks — DONE 2026-10-28.** `decrypt()` compares
+      `Math.floor(encryptedDataHex.length / 2)` against `MAX_DECRYPTED_SIZE` **before** `Buffer.from(…, 'hex')`,
+      and throws the new `CiphertextTooLargeError` — hex never decodes to more than `floor(len / 2)` bytes, so
+      the comparison needs no allocation and is an exact upper bound (odd-length and non-hex input included:
+      Node's decoder stops at the first invalid pair, which can only make the real length smaller). The
+      plaintext-length check that used to follow the decode was **deleted as unreachable**: AES-GCM is a stream
+      mode with the tag returned separately, so the plaintext is exactly as long as the ciphertext, and the new
+      guard always answers first. `tests/decrypt-ciphertext-guard.test.ts` proves the guard fires **without
+      decoding** (a `Buffer.from` spy, not a timing assertion) and that a ciphertext exactly **at** the cap is
+      not refused — the `>`/`>=` mutation. The file cap on the path to it was already in place
+      (`saveDrawer`/`unlockDrawer` stat before reading). `saveDrawer` maps the error to `too_large` instead of
+      reporting a wrong password, covered end-to-end by `tests/save-drawer-too-large.test.ts` (it also asserts
+      the damaged file is left untouched).
+- [x] **Raising the import cap doubles the worst case `importDrawerRaw` will parse — DOCUMENTED 2026-10-28.**
+      ~40 MB of live JSON (source string + parsed object graph), accepted because the path is local-only and
+      user-initiated on a file they picked. Now stated in `docs/DRAWER-CAPACITY.md` rather than left implicit;
+      no code change, by decision.
 
 ## Storage limits hardening — `PLANO-STORAGE-LIMITS-2026-10-16.md`
 
@@ -608,28 +644,39 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
 
 ### Left open, from the same work
 
-- [ ] **HYG-7 — two mutations are undetectable by construction.** Detaching `MAX_DECRYPTED_SIZE` or the Zod
-      `.max()` to a hand-written `10_000_000` leaves every run green, because at equal values the wiring is
-      observationally identical. Only a lint rule (ban numeric literals equal to the ceiling in those files)
-      would close it. **Decide whether that rule is worth its cost.**
-- [ ] **HYG-8 — `[...value].length` allocates an N-element array.** At the worst case the schema admits
-      (`'ã'.repeat(10_000_000)`) that is ~10 M short strings on the UI thread, alongside the 10 MB
-      `TextEncoder` buffer. Not a regression — `Intl.Segmenter` built an array of segment objects, which is
-      worse — but a `for…of` counter allocates nothing. **Not measured.** Decide, do not silently change.
+- [x] **HYG-7 — two mutations are undetectable by construction — DECIDED 2026-10-28: documented, no rule.** A
+      lint rule banning numeric literals equal to the ceiling is a bespoke rule for two files, and it would
+      fire on every legitimate use of the same number (tests, docs, `docs/DRAWER-CAPACITY.md`). The wiring is
+      already pinned by `tests/limits.absolute.test.ts` and by the mutation tests that *are* detectable; the
+      remaining gap is documented here and in the constants' comments rather than paid for with tooling.
+- [x] **HYG-8 — `[...value].length` allocates an N-element array — ALREADY FIXED, verified 2026-10-28.** The
+      item was stale: `countCodePoints()` in `src/shared/limits.ts` walks the string with `codePointAt` and an
+      index, allocating nothing (surrogate pairs advance by two), and has been imported by
+      `ViewDrawer.tsx` and `src/shared/password-policy.ts` since `28f1928` (v0.6.0-beta). `grep` for
+      `[...` over both files finds no spread-based counter. Closed by reading, not by writing code.
 - [x] **HYG-9 — `ipc-handlers.ts:268` classifies a Zod failure by `iss.code === 'too_big' ||
       message.includes('maximum')`.** The code check makes the string sniff redundant, but the new
       `validation.ts` message keeps the word "maximum" so the fallback stays correct — so the coupling is now
       load-bearing across two files. Drop the sniff, or keep it and say why in both.
-- [ ] **HYG-10 — the counter shows two equal maxima, and the UI never says which cap refuses the save.** A
-      user stopped by the byte cap sees the character counter sitting at exactly its own limit. Correct as
-      specified, and `docs/DRAWER-CAPACITY.md` explains it — the screen does not.
-- [ ] **HYG-11 — the e2e suite is in no gate.** `tests/e2e` is excluded from both tsconfigs, so the edited
-      `appimage-validation.spec.ts` typechecks only under an ad-hoc `tsc` invocation that nothing enforces.
-      It also **now fails** against the stale binary on disk, correctly. It was **not run** in this session: a
-      real run needs `npm run make`.
-- [ ] **HYG-12 — `tests/e2e/clavis.spec.ts` launches `args: ['.']` in 11 places**, and `src/main/index.ts:41`
-      hardcodes `localhost:3000`, which this machine's WhatsApp bridge occupies — so on this box the e2e
-      suite is testing another process's page. Untouched; pre-existing.
+- [x] **HYG-10 — the counter shows two equal maxima, and the UI never says which cap refuses the save —
+      DONE 2026-10-28.** The UI now says which one: `ErrorCode.CONTENT_TOO_LONG` names the **code-point** cap
+      (Zod's `.max` on `content`) and `CONTENT_TOO_LARGE` keeps the **byte** cap and the drawer-file cap. The
+      save handler's `isTooBig` branch maps to the new code, `tError()` gained
+      `[CONTENT_TOO_LONG]: 'error.content_too_long'`, and both catalogues carry a message that names
+      characters rather than a number — the ceiling has one owner in `src/shared/limits.ts`, so no copy holds
+      a literal. `tests/i18n.test.ts` asserts the two codes resolve to **different** strings in both locales.
+      **A trap the split exposed:** `ERROR_MESSAGE_KEYS` is `Record<ErrorCode, string>`, so adding the enum
+      member without the mapping fails the typecheck — that is the guard, not an accident.
+- [x] **HYG-11 — the e2e suite is in no gate — OBSOLETE 2026-10-28.** Re-read rather than re-argued:
+      `tsconfig.test.json` includes `"tests/**/*.ts"` and `"tests/**/*.tsx"`, which covers `tests/e2e/**`, so
+      the suite **is** typechecked by `npm run typecheck:test`; and the `e2e` job has been a gate since
+      HYG-11's own closure on 2026-10-18 (see the entry above). The stale wording described the tree before
+      both fixes.
+- [x] **HYG-12 — `tests/e2e/clavis.spec.ts` launches `args: ['.']` — OBSOLETE 2026-10-28.** Verified by
+      reading the file: every spec launches through `tests/e2e/launch.ts`, which resolves the **packaged**
+      binary via `artifact.ts` and passes a throwaway `--user-data-dir`; the source-tree launch and its
+      `localhost:3000` dependency are described in the header as the thing that was removed, not as the
+      current behaviour. No `args: ['.']` remains outside those comments.
 - [x] **HYG-15 — the capacity numbers are now formatted for the active locale.** `String(n)` put
       `10000000` in front of the user in **both** locales. `formatNumber()` was added to `src/i18n/index.ts`
       **beside `detectLocale()`**, not in the component, precisely so it does not become the second locale
@@ -996,15 +1043,49 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
       Node. `README.md`, `BUILD_MANUAL.md` and `docs/clavis-ci-cd-setup.md` synced. Verified locally:
       YAML parses, all 5 action tags resolve remotely, zero stale `@v2`/`@v4` refs. Not yet exercised
       on GitHub — the first push is the real gate.
-- [ ] **e2e does not run on Windows or macOS.** The gate is Linux-only (`xvfb` + AppImage), and
-      `artifact.ts` knows how to locate the win32/darwin packager output, so the suite could run on all
-      three — at the cost of minutes per push and the Windows focus quirks this app has already been
-      bitten by. Not decided; recorded so the omission is a choice rather than an oversight. Every
-      boundary test builds its input as `'x'.repeat(MAX_DECRYPTED_SIZE + 1)`, so retargeting the constant
-      keeps them green. One absolute guard was added to `encryption.test.ts`; the rest are still relative.
+- [x] **e2e does not run on Windows or macOS — OBSOLETE 2026-10-28.** The `e2e-cross` job (matrix
+      `windows-latest` + `macos-latest`) exists and has been green on every tag since `v0.6.9-beta`; it runs
+      **only on tags** and is deliberately **informational** — it is in neither `build`'s nor `release`'s
+      `needs`, so an unavailable runner cannot block a release. The Windows focus quirks this entry worried
+      about were measured on the runner rather than assumed, and the suite passes there.
 
+
+## Small-defect sweep 2026-10-28 — closed before v1.0.0
+
+The list of leftovers that had accumulated behind the last two releases: one a11y deferral whose
+blocker was gone, three hardening items in the main process, five handlers that could fail silently,
+and four documentation statements that were no longer true. Everything here is closed, with the
+evidence in the entry that describes it.
+
+**All gates green on the final tree (2026-10-30):** `lint` 0 errors / 2 pre-existing warnings · `typecheck` 0 ·
+`typecheck:test` 0 · **568/568** vitest across **57** files (baseline before this session: 549/54) ·
+`npm run release` green (deb + AppImage; the asar's `package.json` reads `0.6.14-beta`) · e2e **14/14** against
+that AppImage with `LANGUAGE=en` and `LANGUAGE=pt`.
+
+**New test files (3):** `tests/decrypt-ciphertext-guard.test.ts` (3) ·
+`tests/save-drawer-too-large.test.ts` (2) · `tests/CreditsModal-icons.test.tsx` (3).
+**Rewritten:** `tests/rel03-caught-rejections.test.ts` — it was three `expect(true).toBe(true)`
+placeholders and is now 4 real cases driving the real components. **Extended:** `ErrorBoundary` (+4),
+`PasswordModal` (+1), `i18n` (+1), `ipc-handlers` (+4 for the redirect chain and the body cap),
+`encryption` (the old "decrypted content too large" case rewritten for the guard that now answers first).
+
+**What was deliberately not done:** P3.29 (`useCallback`) was **dropped**, not deferred again; HYG-7
+(lint rule for two undetectable mutations) was **decided against**, with the reason in the entry; the
+`~40 MB` worst case in `importDrawerRaw` was **documented** rather than reduced.
 
 ## Progress
+- **2026-10-28 — the small-defect sweep is closed; no release yet.** Five handlers gained the `catch`
+  they were missing (`HomeScreen` ×4, `PasswordModal` ×1) and the five un-awaited call sites now go
+  through one `reportFailure()` helper; `ErrorBoundary` awaits `restartApp` and shows a translated
+  message on both failure shapes (rejection and `WRITE_FAILED` value); the 13 decorative `CreditsModal`
+  icons carry `aria-hidden`; `decrypt()` refuses an oversized ciphertext **before** the hex decode and
+  `saveDrawer` reports it as `too_large` rather than a wrong password; `check-update` follows up to five
+  https redirects and caps the body at 256 KiB; the UI now names **which** content cap refused a save
+  (`CONTENT_TOO_LONG` vs `CONTENT_TOO_LARGE`); and four `DESIGN.md`/`docs` statements that had drifted
+  were corrected. **Gates:** lint 0 errors / 2 warnings · both typechecks 0 · **568/568** vitest across
+  **57** files. **The one branch deleted as dead:** `decrypt()`'s post-decode plaintext-size check —
+  AES-GCM is a stream mode with the tag returned separately, so the plaintext equals the ciphertext in
+  length and the new allocation-free guard always answers first.
 - **Released as `v0.6.14-beta` (2026-10-27): the version matches the tag again.** `main` pushed alone (`59f85f5`, run
   `40546433406`: `quality` + both `e2e` locales green, `build`/`release`/`e2e-cross` skipped), then tagged (run
   `40547229677`: **9 jobs green** — `quality`, both `e2e` locales, **both `e2e-cross` legs**, all three `build` targets

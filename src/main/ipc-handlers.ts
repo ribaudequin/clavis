@@ -48,6 +48,18 @@ const CHECK_UPDATE_TIMEOUT_MS = 5_000;
 // absent — never coerced from whatever shape the wire delivers.
 const GitHubReleaseSchema = z.object({ tag_name: z.string().optional() });
 
+const LATEST_RELEASE_URL = 'https://api.github.com/repos/ribaudequin/clavis/releases/latest';
+
+// GitHub redirects the /latest endpoint when a repository has been moved or renamed.
+// Following the chain is what keeps the check working through that; the cap is what
+// keeps a redirect loop from holding the request open until the timeout.
+const CHECK_UPDATE_MAX_REDIRECTS = 5;
+const CHECK_UPDATE_REDIRECT_STATUS = new Set([301, 302, 303, 307, 308]);
+
+// The release payload is a few kilobytes; 256 KiB is two orders of magnitude of
+// headroom and small enough that a hostile response cannot exhaust the main process.
+const CHECK_UPDATE_MAX_BODY_CHARS = 256 * 1024;
+
 function getLocale(): string {
   const lang = process.env.LANG || process.env.LC_ALL || process.env.LC_MESSAGES || 'en';
   return lang.toLowerCase().startsWith('pt') ? 'pt' : 'en';
@@ -333,13 +345,19 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         // so that is the whole test. The message used to be sniffed for the word
         // "maximum" as a fallback — dead, because the code check always fires first, and
         // actively harmful, because any validation message containing that word would be
-        // misreported as CONTENT_TOO_LARGE.
+        // misreported as a size refusal.
+        //
+        // SAV-01 — This branch is the *code-point* cap, not the byte cap: it fires on
+        // content that is too long by characters, while encrypt()'s ContentTooLargeError
+        // fires on content that is too large by UTF-8 bytes. CONTENT_TOO_LARGE is left to
+        // the byte cap and the drawer-file cap, so the user can be told which limit
+        // refused the save (see error.content_too_long in the i18n error map).
         const isTooBig = e.issues.some((iss) => iss.code === 'too_big');
         return {
           ok: false,
           error: {
-            code: isTooBig ? ErrorCode.CONTENT_TOO_LARGE : ErrorCode.VALIDATION_ERROR,
-            message: isTooBig ? 'Content exceeds the maximum size' : (e.issues[0]?.message || 'Validation failed'),
+            code: isTooBig ? ErrorCode.CONTENT_TOO_LONG : ErrorCode.VALIDATION_ERROR,
+            message: isTooBig ? 'Content exceeds the maximum length' : (e.issues[0]?.message || 'Validation failed'),
           },
         };
       }
@@ -601,9 +619,16 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 
   ipcMain.handle(CHANNELS.CHECK_UPDATE, async (): Promise<{ tag_name?: string } | null> => {
     return new Promise((resolve) => {
-      let req: ClientRequest | null = null;
+      // Every hop is tracked, not only the newest: a chain is at most six requests,
+      // and destroying one that has already completed is a no-op — whereas tracking
+      // only the last assignment would leave an earlier, still-open socket behind.
+      const inFlight = new Set<ClientRequest>();
+      let settled = false;
+
+      // One deadline for the whole chain, not per hop: a redirect loop or a chain of
+      // stalled responses must not extend the wait the renderer sees.
       const timer = setTimeout(() => {
-        req?.destroy();
+        inFlight.forEach((req) => req.destroy());
         logger.warn('check-update: request timed out', { timeoutMs: CHECK_UPDATE_TIMEOUT_MS });
         settle(null);
       }, CHECK_UPDATE_TIMEOUT_MS);
@@ -611,43 +636,109 @@ export function registerIpcHandlers(deps: IpcDeps): void {
       // Hoisted rather than a const arrow so it can close over `timer` above without
       // the two referring to each other through a temporal dead zone.
       function settle(value: { tag_name?: string } | null): void {
+        // A destroyed response can still emit `error` after the body cap refused it;
+        // settling twice would only re-resolve an already-resolved promise, but the
+        // guard keeps that path from clearing a timer that no longer exists.
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
         resolve(value);
       }
 
-      req = https.get(
-        'https://api.github.com/repos/ribaudequin/clavis/releases/latest',
-        { headers: { 'User-Agent': 'Clavis' } },
-        (res) => {
-          const status = res.statusCode ?? 0;
-          // A 403/5xx body parses into a payload with no tag, which the About card
-          // cannot tell apart from "up to date".
-          if (status < 200 || status >= 300) {
-            logger.warn('check-update: unexpected response status', { status });
-            settle(null);
-            return;
-          }
-          let data = '';
-          res.on('data', (chunk) => (data += chunk));
-          res.on('end', () => {
-            try {
-              const json: unknown = JSON.parse(data);
-              const parsed = GitHubReleaseSchema.safeParse(json);
-              if (!parsed.success) {
-                logger.warn('check-update: unexpected payload shape', { issues: parsed.error.issues.length });
+      function requestRelease(url: string, redirectsLeft: number): void {
+        const req = https.get(
+          url,
+          { headers: { 'User-Agent': 'Clavis' } },
+          (res) => {
+            const status = res.statusCode ?? 0;
+
+            if (CHECK_UPDATE_REDIRECT_STATUS.has(status)) {
+              // The redirect's body is never the payload: drain it so the socket can
+              // be reused, but do not accumulate a single byte of it.
+              res.resume();
+              const location = res.headers.location;
+              if (!location) {
+                logger.warn('check-update: redirect without a Location header', { status });
                 settle(null);
                 return;
               }
-              settle({ tag_name: parsed.data.tag_name });
-            } catch {
-              settle(null);
+              if (redirectsLeft === 0) {
+                logger.warn('check-update: too many redirects', {
+                  max: CHECK_UPDATE_MAX_REDIRECTS,
+                  status,
+                });
+                settle(null);
+                return;
+              }
+              let next: URL;
+              try {
+                // Relative to this hop, as the HTTP spec defines it.
+                next = new URL(location, url);
+              } catch {
+                logger.warn('check-update: unparseable redirect location', { status });
+                settle(null);
+                return;
+              }
+              // Downgrading to http would send the same request in clear text; any
+              // other scheme is not a release API at all.
+              if (next.protocol !== 'https:') {
+                logger.warn('check-update: refusing non-https redirect', {
+                  protocol: next.protocol,
+                });
+                settle(null);
+                return;
+              }
+              requestRelease(next.toString(), redirectsLeft - 1);
+              return;
             }
-          });
-          // A response stream can die or stall after the headers arrive, and the
-          // request-level handler below never sees it.
-          res.on('error', () => settle(null));
-        }
-      ).on('error', () => settle(null));
+
+            // A 403/5xx body parses into a payload with no tag, which the About card
+            // cannot tell apart from "up to date".
+            if (status < 200 || status >= 300) {
+              logger.warn('check-update: unexpected response status', { status });
+              settle(null);
+              return;
+            }
+
+            let data = '';
+            res.on('data', (chunk: string | Buffer) => {
+              if (settled) return;
+              data += chunk;
+              if (data.length > CHECK_UPDATE_MAX_BODY_CHARS) {
+                logger.warn('check-update: response body exceeds cap', {
+                  maxChars: CHECK_UPDATE_MAX_BODY_CHARS,
+                });
+                // Stop the transfer, not just the accumulation: without the destroy
+                // the peer would keep streaming into a process that already answered.
+                res.destroy();
+                settle(null);
+              }
+            });
+            res.on('end', () => {
+              if (settled) return;
+              try {
+                const json: unknown = JSON.parse(data);
+                const parsed = GitHubReleaseSchema.safeParse(json);
+                if (!parsed.success) {
+                  logger.warn('check-update: unexpected payload shape', { issues: parsed.error.issues.length });
+                  settle(null);
+                  return;
+                }
+                settle({ tag_name: parsed.data.tag_name });
+              } catch {
+                settle(null);
+              }
+            });
+            // A response stream can die or stall after the headers arrive, and the
+            // request-level handler below never sees it.
+            res.on('error', () => settle(null));
+          }
+        );
+        inFlight.add(req);
+        req.on('error', () => settle(null));
+      }
+
+      requestRelease(LATEST_RELEASE_URL, CHECK_UPDATE_MAX_REDIRECTS);
     });
   });
 

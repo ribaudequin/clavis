@@ -60,7 +60,11 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
       toast.success(t('msg.drawer_deleted'));
       onBack();
     } catch {
-      toast.error(t('msg.error_delete'));
+      // A thrown delete is a rejected bridge call, not a refusal the main process
+      // described, so there is no detail to append: use the complete sentence rather
+      // than the prefix-shaped `msg.error_delete`, which would render a trailing colon
+      // with nothing after it.
+      toast.error(t('msg.error_delete_failed'));
     } finally {
       setDeleting(false);
     }

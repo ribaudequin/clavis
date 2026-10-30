@@ -6,6 +6,7 @@ import {
   deriveKey,
   generateSalt,
   ContentTooLargeError,
+  CiphertextTooLargeError,
   MAX_DECRYPTED_SIZE,
 } from '../src/main/encryption';
 import { MAX_PLAINTEXT_BYTES } from '../src/shared/limits';
@@ -74,13 +75,16 @@ describe('encryption module', () => {
     expect('x'.repeat(MAX_PLAINTEXT_BYTES + 1).length).toBe(MAX_PLAINTEXT_BYTES + 1);
   });
 
-  it('should throw "Decrypted content exceeds maximum size" when content larger than MAX_DECRYPTED_SIZE', async () => {
-    // Built without encrypt(): that guard refuses an over-cap plaintext outright, and
-    // this test covers decrypt()'s own cap — the one the application never reaches,
-    // because the store refuses the same ciphertext one line earlier. The ciphertext
-    // is real GCM over a real key, so decrypt() gets past the auth tag and fails on
-    // the size check, which is the branch under test; garbage bytes would have failed
-    // the tag first and proved nothing.
+  it('refuses a real GCM ciphertext over MAX_DECRYPTED_SIZE before deriving a key', async () => {
+    // A real ciphertext, not garbage bytes: this is the case a corrupted or hand-edited
+    // drawer actually presents. `encrypt()` refuses to produce one, so the only way in is
+    // GCM applied directly — which is exactly what a drawer written by an older build or
+    // by something other than Clavis looks like.
+    //
+    // The refusal is P0.12's: the size guard runs on the hex length, before the buffer is
+    // allocated and before the KDF runs. The old assertion here expected the plaintext
+    // check *after* decryption; that branch is gone because AES-GCM's output is the same
+    // length as its input, so the guard above always answers first for this input.
     const password = 'oversized-password-123';
     const params = { timeCost: 3, memoryCost: 2 ** 16, parallelism: 1 };
     const salt = generateSalt();
@@ -95,9 +99,16 @@ describe('encryption module', () => {
     key.fill(0);
     expect(Buffer.from(encryptedData, 'hex')).toHaveLength(MAX_DECRYPTED_SIZE + 1);
 
-    await expect(
-      decrypt(encryptedData, salt.toString('hex'), iv.toString('hex'), cipher.getAuthTag().toString('hex'), password, params)
-    ).rejects.toThrow('Decrypted content exceeds maximum size');
+    const derivation = vi.spyOn(crypto, 'createDecipheriv');
+    try {
+      await expect(
+        decrypt(encryptedData, salt.toString('hex'), iv.toString('hex'), cipher.getAuthTag().toString('hex'), password, params)
+      ).rejects.toBeInstanceOf(CiphertextTooLargeError);
+      // Nothing was deciphered, so no key was derived for it either.
+      expect(derivation).not.toHaveBeenCalled();
+    } finally {
+      derivation.mockRestore();
+    }
   });
 
   it('refuses to encrypt plaintext above MAX_DECRYPTED_SIZE bytes', async () => {
