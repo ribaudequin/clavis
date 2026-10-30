@@ -1,6 +1,6 @@
 # Changelog — Clavis
 
-## Unreleased — small-defect sweep (2026-10-28)
+## v0.6.15-beta (2026-10-30)
 
 **The leftovers behind the last two releases, closed. No behaviour was redesigned; every change removes
 a way the app could fail silently, or a statement in the docs that had stopped being true.**
@@ -74,7 +74,7 @@ a way the app could fail silently, or a statement in the docs that had stopped b
   answers first.
 - **Gates:** lint 0 errors / 2 pre-existing warnings · both typechecks 0 · **568/568** vitest across **57**
   files (baseline before this work: 549/54) · `npm run release` green (deb + AppImage, asar `package.json`
-  reads `0.6.14-beta`) · e2e **14/14** against that AppImage with `LANGUAGE=en` and `LANGUAGE=pt`.
+  reads `0.6.15-beta`) · e2e **14/14** against that AppImage with `LANGUAGE=en` and `LANGUAGE=pt`.
 
 ## v0.6.14-beta (2026-10-27)
 

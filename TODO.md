@@ -1050,7 +1050,7 @@ Surfaced by reconciling `SUMMARY.md` / `MEMORY.md` / `TODO.md` with `main` after
       about were measured on the runner rather than assumed, and the suite passes there.
 
 
-## Small-defect sweep 2026-10-28 — closed before v1.0.0
+## Small-defect sweep 2026-10-28 — closed before v1.0.0, shipped as `v0.6.15-beta`
 
 The list of leftovers that had accumulated behind the last two releases: one a11y deferral whose
 blocker was gone, three hardening items in the main process, five handlers that could fail silently,
@@ -1059,7 +1059,7 @@ evidence in the entry that describes it.
 
 **All gates green on the final tree (2026-10-30):** `lint` 0 errors / 2 pre-existing warnings · `typecheck` 0 ·
 `typecheck:test` 0 · **568/568** vitest across **57** files (baseline before this session: 549/54) ·
-`npm run release` green (deb + AppImage; the asar's `package.json` reads `0.6.14-beta`) · e2e **14/14** against
+`npm run release` green (deb + AppImage; the asar's `package.json` reads `0.6.15-beta`) · e2e **14/14** against
 that AppImage with `LANGUAGE=en` and `LANGUAGE=pt`.
 
 **New test files (3):** `tests/decrypt-ciphertext-guard.test.ts` (3) ·
@@ -1074,7 +1074,17 @@ placeholders and is now 4 real cases driving the real components. **Extended:** 
 `~40 MB` worst case in `importDrawerRaw` was **documented** rather than reduced.
 
 ## Progress
-- **2026-10-28 — the small-defect sweep is closed; no release yet.** Five handlers gained the `catch`
+- **Released as `v0.6.15-beta` (2026-10-30): the small-defect sweep, with the version checked instead of assumed.**
+  `package.json` and `package-lock.json` bumped together (`npm version 0.6.15-beta --no-git-tag-version` — the
+  lockfile had been stale at `0.6.12-beta` since before `v0.6.13-beta`, which is exactly the drift this release
+  line exists to stop). Local `npm run release` green: `clavis-0.6.15-beta-x64.AppImage` and
+  `clavis_0.6.15~beta_amd64.deb`, and the asar's own `package.json` reads `0.6.15-beta`. **What the asar check
+  cannot cover, stated so it is not assumed again:** Forge deletes `config.forge` from the copied `package.json`
+  (`@electron-forge/core/dist/api/package.js:169-172`), so `config` is `{}` in every correct build — the five
+  makers, the ad-hoc-sign plugin and `packagerConfig.icon` are verified in the **source** manifest. e2e **14/14**
+  against the new AppImage. **Local gates:** lint 0 errors / 2 warnings · both typechecks 0 · **568/568** vitest
+  across 57 files.
+- **2026-10-28 — the small-defect sweep is closed (shipped in `v0.6.15-beta`).** Five handlers gained the `catch`
   they were missing (`HomeScreen` ×4, `PasswordModal` ×1) and the five un-awaited call sites now go
   through one `reportFailure()` helper; `ErrorBoundary` awaits `restartApp` and shows a translated
   message on both failure shapes (rejection and `WRITE_FAILED` value); the 13 decorative `CreditsModal`
