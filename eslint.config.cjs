@@ -70,4 +70,21 @@ module.exports = [
     },
     rules: sharedRules,
   },
+  {
+    files: ['scripts/**/*.{mjs,js,cjs}'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        node: true,
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
+    rules: {
+      ...sharedRules,
+      'no-eval': 'error',
+    },
+  },
 ];

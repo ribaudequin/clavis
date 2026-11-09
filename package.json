@@ -27,7 +27,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "lint": "eslint . --ext .ts,.tsx",
+    "lint": "eslint . --ext .ts,.tsx,.mjs,.js,.cjs --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "check:tag": "bash scripts/check-tag-version.sh",

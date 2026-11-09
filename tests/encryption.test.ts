@@ -151,7 +151,7 @@ describe('encryption module', () => {
   it('mutation guard — MAX_DECRYPTED_SIZE tracks MAX_PLAINTEXT_BYTES, not a literal', async () => {
     vi.resetModules();
     vi.doMock('../src/shared/limits.js', async (importActual) => {
-      return { ...(await importActual() as any), MAX_PLAINTEXT_BYTES: 5555 };
+      return { ...(await importActual() as Record<string, unknown>), MAX_PLAINTEXT_BYTES: 5555 };
     });
     const { MAX_DECRYPTED_SIZE: mockedSize } = await import('../src/main/encryption.js');
     expect(mockedSize).toBe(5555);
