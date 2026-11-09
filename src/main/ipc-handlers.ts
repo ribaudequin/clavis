@@ -135,7 +135,9 @@ const UNLOCK_ERRORS: Record<UnlockFailureReason, { code: ErrorCode; message: str
 // being too large must not be reported as a bad password, which is what the bare
 // boolean used to do. 'password_too_weak' used to sit in this map; saveDrawer cannot
 // produce it (see SaveFailureReason) and its presence had two tests asserting a
-// failure that does not exist.
+// failure that does not exist. DATA-02 adds 'parse_failed' and 'corrupt_metadata' —
+// both map to INVALID_JSON so the renderer shows a distinct message without
+// incrementing the rate limiter.
 const SAVE_ERRORS: Record<SaveFailureReason, { code: ErrorCode; message: string }> = {
   invalid_id: { code: ErrorCode.VALIDATION_ERROR, message: 'Invalid drawer ID' },
   wrong_password: { code: ErrorCode.WRONG_PASSWORD, message: 'Password is incorrect' },
@@ -143,6 +145,8 @@ const SAVE_ERRORS: Record<SaveFailureReason, { code: ErrorCode; message: string 
   kdf_backend_unavailable: { code: ErrorCode.KDF_UNAVAILABLE, message: 'This drawer requires a KDF backend this build does not include' },
   content_too_large: { code: ErrorCode.CONTENT_TOO_LARGE, message: 'Content exceeds the maximum size' },
   too_large: { code: ErrorCode.CONTENT_TOO_LARGE, message: 'Drawer file exceeds the maximum size' },
+  parse_failed: { code: ErrorCode.INVALID_JSON, message: 'Drawer file is not valid JSON' },
+  corrupt_metadata: { code: ErrorCode.INVALID_JSON, message: 'Drawer metadata is corrupted or malformed' },
   write_failed: { code: ErrorCode.WRITE_FAILED, message: 'Failed to save drawer' },
 };
 

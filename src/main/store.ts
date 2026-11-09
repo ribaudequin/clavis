@@ -117,6 +117,8 @@ export type SaveFailureReason =
   | 'kdf_backend_unavailable'
   | 'content_too_large'
   | 'too_large'
+  | 'parse_failed'
+  | 'corrupt_metadata'
   | 'write_failed';
 
 export type SaveResult = { ok: true } | { ok: false; reason: SaveFailureReason };
@@ -603,7 +605,23 @@ export async function saveDrawer(
       return { ok: false, reason: 'too_large' };
     }
     const fileContent = await fs.readFile(filePath, 'utf8');
-    const drawer: EncryptedDrawer = JSON.parse(fileContent);
+    // DATA-02 — Parse with schema instead of raw JSON.parse. A corrupt salt/IV/tag
+    // was previously caught by decrypt() and mapped to 'wrong_password'. Now we
+    // distinguish: malformed JSON -> 'parse_failed', valid JSON but bad metadata ->
+    // 'corrupt_metadata'. Both are non-guess failures and must not increment the
+    // unlock rate limiter.
+    let drawer: EncryptedDrawerMetadata;
+    try {
+      const parsed = EncryptedDrawerSchema.safeParse(JSON.parse(fileContent));
+      if (!parsed.success) {
+        passwordBuffer.fill(0);
+        return { ok: false, reason: 'corrupt_metadata' };
+      }
+      drawer = parsed.data;
+    } catch {
+      passwordBuffer.fill(0);
+      return { ok: false, reason: 'parse_failed' };
+    }
 
     if (drawer.keyDerivation && !isKdfWithinBounds(drawer.keyDerivation)) {
       passwordBuffer.fill(0);

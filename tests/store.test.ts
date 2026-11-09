@@ -155,6 +155,60 @@ describe('store module', () => {
     expect(result).toEqual({ ok: false, reason: 'wrong_password' });
   });
 
+  // DATA-02 — saveDrawer now validates metadata with EncryptedDrawerSchema and
+  // distinguishes parse_failed (malformed JSON) from corrupt_metadata (valid JSON
+  // but failing schema) instead of mapping both to wrong_password. These failures
+  // must not increment the rate limiter.
+  describe('saveDrawer failure reasons (DATA-02)', () => {
+    const PASSWORD = 'Correct-123!';
+    const SAVE_ID = '123e4567-e89b-12d3-a456-426614174050';
+
+    async function writeFile(id: string, body: string): Promise<void> {
+      await fs.mkdir(path.dirname(getDrawerFilePath(id)), { recursive: true });
+      await fs.writeFile(getDrawerFilePath(id), body, { mode: 0o600 });
+    }
+
+    it('reports malformed JSON as parse_failed, not wrong_password', async () => {
+      await writeFile(SAVE_ID, 'this is not json at all');
+
+      expect(await saveDrawer(SAVE_ID, PASSWORD, 'Title', 'content')).toEqual({
+        ok: false,
+        reason: 'parse_failed',
+      });
+    });
+
+    it('reports valid JSON with bad crypto fields as corrupt_metadata, not wrong_password', async () => {
+      // Valid JSON but IV is wrong length (should be 32 hex chars)
+      const badDrawer = {
+        id: SAVE_ID,
+        title: 'Bad',
+        iconData: '[]',
+        createdAt: 1,
+        updatedAt: 1,
+        encryptedData: '00',
+        salt: '00'.repeat(16),
+        iv: '00'.repeat(8), // wrong: 16 chars instead of 32
+        authTag: '00'.repeat(16),
+        keyDerivation: { algorithm: 'argon2id', iterations: 3, memory: 2 ** 18, parallelism: 4 },
+      };
+      await writeFile(SAVE_ID, JSON.stringify(badDrawer));
+
+      expect(await saveDrawer(SAVE_ID, PASSWORD, 'Title', 'content')).toEqual({
+        ok: false,
+        reason: 'corrupt_metadata',
+      });
+    });
+
+    it('never reports wrong_password when the failure happened before decryption', async () => {
+      const failures = await Promise.all([
+        saveDrawer('not-a-uuid', PASSWORD, 't', 'c'),
+        saveDrawer(SAVE_ID, PASSWORD, 'Title', 'content'), // after parse_failed test above
+      ]);
+      // The second one will be parse_failed since the file is still malformed JSON
+      expect(failures).not.toContainEqual({ ok: false, reason: 'wrong_password' });
+    });
+  });
+
   // SAV-02 — These four used to be indistinguishable from a wrong password: all six
   // returned a bare null, and the IPC layer reported them as DECRYPT_FAILED while
   // counting them against the rate limiter. A user whose drawer is oversized or
