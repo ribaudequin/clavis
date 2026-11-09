@@ -25,6 +25,7 @@
     "release": "npm run clean && npm run build && npm run make",
     "start": "electron .",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",

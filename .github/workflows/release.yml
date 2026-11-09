@@ -52,6 +52,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Coverage (thresholds: 80/70/75/80)
+        run: npm run test:coverage
+
       - name: Tag/version guard (CI)
         run: bash scripts/check-tag-version.sh
         env:
