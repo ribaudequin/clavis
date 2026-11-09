@@ -136,12 +136,12 @@ describe('the packaged executable carries the app icon on every platform', () =>
 });
 
 describe('the window icon resolves at runtime', () => {
-  const MAIN_SOURCE = path.resolve(APP_ROOT, 'src', 'main', 'index.ts');
+  const WINDOW_OPTIONS_SOURCE = path.resolve(APP_ROOT, 'src', 'main', 'window-options.ts');
 
-  /** The `path.join(__dirname, …)` calls in the main process, as written. */
+  /** The `path.join(__dirname, …)` calls in window-options.ts, as written. */
   function iconPathsInSource(): string[][] {
-    const source = fs.readFileSync(MAIN_SOURCE, 'utf8');
-    const joins = [...source.matchAll(/path\.join\(__dirname[^)]*\)/g)].map((match) => match[0]);
+    const source = fs.readFileSync(WINDOW_OPTIONS_SOURCE, 'utf8');
+    const joins = [...source.matchAll(/path\.join\(dirname[^)]*\)/g)].map((match) => match[0]);
     return joins
       .filter((join) => join.includes("'icons'"))
       .map((join) => [...join.matchAll(/'([^']+)'/g)].map((segment) => segment[1]));

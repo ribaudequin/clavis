@@ -6,6 +6,7 @@ import { registerIpcHandlers, clearImportTimers } from './ipc-handlers.js';
 import { observeDownloads } from './downloads.js';
 import { logger, initializeLogger } from './logger.js';
 import { acquireSingleInstanceLock } from './single-instance.js';
+import { windowOptions, windowLoadTarget } from './window-options.js';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -62,51 +63,10 @@ const isPrimaryInstance = acquireSingleInstanceLock({
 
 
 function createWindow(): void {
-  mainWindow = new BrowserWindow({
-    width: 900,
-    height: 600,
-    minWidth: 600,
-    minHeight: 500,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: true,
-      devTools: !app.isPackaged,
-      preload: path.join(__dirname, 'preload.js'),
-    },
-    titleBarStyle: 'default',
-    // The window icon, from the same trio the packager uses: `icons/clavis.png`,
-    // `icons/clavis.ico` and `icons/clavis.icns` sit side by side with the same
-    // basename because the packager resolves the platform's format by rewriting
-    // the extension in place (see tests/packaging-icon.test.ts).
-    //
-    // TWO levels up, not one. The main process runs from `<app root>/dist/main`
-    // — in development and inside the packaged app alike — and the icons sit at
-    // `<app root>/icons`, a sibling of `dist`, because the packager's `ignore`
-    // rule keeps `icons` at the app root rather than under `dist`. One `..`
-    // resolved to `<app root>/dist/icons`, which does not exist: the path was
-    // wrong in development and in the packaged app, and the option was silently
-    // ignored, leaving the window with Electron's default icon. Measured, not
-    // assumed: a PNG loaded from inside the asar returns a 512×512 image, and
-    // the same load from the wrong path returns an empty one.
-    icon: (() => {
-      const platform = process.platform;
-      if (platform === 'win32') {
-        return path.join(__dirname, '..', '..', 'icons', 'clavis.ico');
-      }
-      if (platform === 'darwin') {
-        return path.join(__dirname, '..', '..', 'icons', 'clavis.icns');
-      }
-      return path.join(__dirname, '..', '..', 'icons', 'clavis.png');
-    })(),
-    resizable: true,
-  });
+  const opts = windowOptions(app.isPackaged, __dirname, process.platform);
+  mainWindow = new BrowserWindow(opts);
 
-  if (app.isPackaged) {
-    mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
-  } else {
-    mainWindow.loadURL('http://localhost:3000');
-  }
+  mainWindow.loadFile(windowLoadTarget(app.isPackaged, __dirname));
 
   mainWindow.webContents.on('will-navigate', (e) => e.preventDefault());
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
