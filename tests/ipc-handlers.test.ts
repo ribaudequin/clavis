@@ -54,6 +54,8 @@ vi.mock('fs/promises', () => {
     default: actual,
     readFile: vi.fn(),
     lstat: vi.fn(),
+    open: vi.fn(),
+    constants: actual.constants,
   };
 });
 
@@ -113,6 +115,15 @@ const lstatMock = fsPromises.lstat as unknown as MockedFunction<
 const readFileMock = fsPromises.readFile as unknown as MockedFunction<
   (path: string, encoding: 'utf8') => Promise<string>
 >;
+const openMock = fsPromises.open as unknown as MockedFunction<
+  (path: string, flags: number) => Promise<FileHandleMock>
+>;
+
+type FileHandleMock = {
+  stat: () => Promise<MockStats>;
+  readFile: (encoding: 'utf8') => Promise<string>;
+  close: () => Promise<void>;
+};
 
 // `https.get` is overloaded too; the alias below pins the single overload the
 // check-update handler uses, and the fake request/response objects implement
@@ -1116,7 +1127,8 @@ describe('IPC handlers', () => {
         ipcMain: { handle: (channel, listener) => { handlers.set(channel, listener); } },
         dialog: { showOpenDialog },
       });
-      lstatMock.mockResolvedValue({ isSymbolicLink: () => false });
+      // Reset file handle mock
+      openMock.mockReset();
     });
 
     it('returns VALIDATION_ERROR for non-uuid token', async () => {
@@ -1138,7 +1150,7 @@ describe('IPC handlers', () => {
         expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
         expect(result.error.message).toBe('Invalid or expired import token');
       }
-      expect(readFileMock).not.toHaveBeenCalled();
+      expect(openMock).not.toHaveBeenCalled();
     });
 
     it('returns ok after successful import and consumes token (one-shot)', async () => {
@@ -1153,14 +1165,22 @@ describe('IPC handlers', () => {
       if (!dialogResult.ok) throw new Error('expected ok');
       const token = dialogResult.data!.token;
 
-      readFileMock.mockResolvedValue('{"id":"x","title":"t","iconData":"i","createdAt":0,"updatedAt":0,"encryptedData":"e","salt":"s","iv":"i","authTag":"a","keyDerivation":{"algorithm":"x","iterations":1,"memory":1,"parallelism":1}}');
+      const fileHandleMock = {
+        stat: vi.fn().mockResolvedValue({ isSymbolicLink: () => false, size: 100 }),
+        readFile: vi.fn().mockResolvedValue('{"id":"x","title":"t","iconData":"i","createdAt":0,"updatedAt":0,"encryptedData":"e","salt":"s","iv":"i","authTag":"a","keyDerivation":{"algorithm":"x","iterations":1,"memory":1,"parallelism":1}}'),
+        close: vi.fn().mockResolvedValue(undefined),
+      };
+      openMock.mockResolvedValue(fileHandleMock);
       vi.mocked(store.importDrawerRaw).mockResolvedValue(true);
 
       const handler = getHandler(CHANNELS.IMPORT_DRAWER);
       const result = await handler({}, token);
 
       expect(result).toEqual({ ok: true, data: undefined });
-      expect(readFileMock).toHaveBeenCalledWith('/tmp/import.clavis', 'utf8');
+      expect(openMock).toHaveBeenCalledWith('/tmp/import.clavis', fsPromises.constants.O_RDONLY | fsPromises.constants.O_NOFOLLOW);
+      expect(fileHandleMock.stat).toHaveBeenCalled();
+      expect(fileHandleMock.readFile).toHaveBeenCalledWith('utf8');
+      expect(fileHandleMock.close).toHaveBeenCalled();
       expect(store.importDrawerRaw).toHaveBeenCalledOnce();
 
       const replay = await handler({}, token);
@@ -1181,7 +1201,12 @@ describe('IPC handlers', () => {
       if (!dialogResult.ok) throw new Error('expected ok');
       const token = dialogResult.data!.token;
 
-      readFileMock.mockResolvedValue('garbage');
+      const fileHandleMock = {
+        stat: vi.fn().mockResolvedValue({ isSymbolicLink: () => false, size: 100 }),
+        readFile: vi.fn().mockResolvedValue('garbage'),
+        close: vi.fn().mockResolvedValue(undefined),
+      };
+      openMock.mockResolvedValue(fileHandleMock);
       vi.mocked(store.importDrawerRaw).mockResolvedValue(false);
 
       const handler = getHandler(CHANNELS.IMPORT_DRAWER);
@@ -1194,7 +1219,7 @@ describe('IPC handlers', () => {
       }
     });
 
-    it('returns FILE_NOT_FOUND when fs.readFile throws', async () => {
+    it('returns FILE_NOT_FOUND when fs.open throws', async () => {
       const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/missing.clavis'] });
       handlers.clear();
       registerIpcHandlers({
@@ -1205,7 +1230,7 @@ describe('IPC handlers', () => {
       if (!dialogResult.ok) throw new Error('expected ok');
       const token = dialogResult.data!.token;
 
-      readFileMock.mockRejectedValue(new Error('ENOENT'));
+      openMock.mockRejectedValue(new Error('ENOENT'));
 
       const handler = getHandler(CHANNELS.IMPORT_DRAWER);
       const result = await handler({}, token);
@@ -1228,7 +1253,7 @@ describe('IPC handlers', () => {
       if (!dialogResult.ok) throw new Error('expected ok');
       const token = dialogResult.data!.token;
 
-      readFileMock.mockRejectedValue(new Error('read failed: file contents leaked into message'));
+      openMock.mockRejectedValue(new Error('read failed: file contents leaked into message'));
 
       const handler = getHandler(CHANNELS.IMPORT_DRAWER);
       const result = await handler({}, token);
@@ -1251,7 +1276,12 @@ describe('IPC handlers', () => {
       if (!dialogResult.ok) throw new Error('expected ok');
       const token = dialogResult.data!.token;
 
-      lstatMock.mockResolvedValue({ isSymbolicLink: () => true });
+      const fileHandleMock = {
+        stat: vi.fn().mockResolvedValue({ isSymbolicLink: () => true }),
+        readFile: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
+      };
+      openMock.mockResolvedValue(fileHandleMock);
 
       const handler = getHandler(CHANNELS.IMPORT_DRAWER);
       const result = await handler({}, token);
@@ -1261,7 +1291,7 @@ describe('IPC handlers', () => {
         expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
         expect(result.error.message).toBe('Refusing to import a symbolic link');
       }
-      expect(readFileMock).not.toHaveBeenCalled();
+      expect(fileHandleMock.readFile).not.toHaveBeenCalled();
       expect(store.importDrawerRaw).not.toHaveBeenCalled();
     });
 
@@ -1271,7 +1301,7 @@ describe('IPC handlers', () => {
     // defect: stat resolves over the cap, readFile would throw if called, and
     // the handler must refuse — a call-shape assertion ("stat was consulted")
     // stays green if the comparison uses the wrong constant or the wrong branch.
-    it('refuses an over-cap file before reading it, using the lstat size', async () => {
+    it('refuses an over-cap file before reading it, using the stat size', async () => {
       const showOpenDialog = vi.fn().mockResolvedValue({ filePaths: ['/tmp/huge.clavis'] });
       handlers.clear();
       registerIpcHandlers({
@@ -1282,10 +1312,12 @@ describe('IPC handlers', () => {
       if (!dialogResult.ok) throw new Error('expected ok');
       const token = dialogResult.data!.token;
 
-      // The handler holds this lstat result and reads stat.size off it — the
-      // size the real code discarded.
-      lstatMock.mockResolvedValue({ isSymbolicLink: () => false, size: store.MAX_DRAWER_FILE_SIZE + 1 });
-      readFileMock.mockRejectedValue(new Error('must not read an over-cap file'));
+      const fileHandleMock = {
+        stat: vi.fn().mockResolvedValue({ isSymbolicLink: () => false, size: store.MAX_DRAWER_FILE_SIZE + 1 }),
+        readFile: vi.fn().mockRejectedValue(new Error('must not read an over-cap file')),
+        close: vi.fn().mockResolvedValue(undefined),
+      };
+      openMock.mockResolvedValue(fileHandleMock);
       vi.mocked(store.importDrawerRaw).mockResolvedValue(true);
 
       const handler = getHandler(CHANNELS.IMPORT_DRAWER);
@@ -1298,7 +1330,7 @@ describe('IPC handlers', () => {
         // so the assertion pins *which* message, not which language.
         expect(result.error.message).toMatch(/too large|demasiado grande/i);
       }
-      expect(readFileMock).not.toHaveBeenCalled();
+      expect(fileHandleMock.readFile).not.toHaveBeenCalled();
       expect(store.importDrawerRaw).not.toHaveBeenCalled();
     });
 
@@ -1328,7 +1360,12 @@ describe('IPC handlers', () => {
       if (!dialogResult.ok) throw new Error('expected ok');
       const token = dialogResult.data!.token;
 
-      readFileMock.mockResolvedValue('{"id":"x"}');
+      const fileHandleMock = {
+        stat: vi.fn().mockResolvedValue({ isSymbolicLink: () => false, size: 100 }),
+        readFile: vi.fn().mockResolvedValue('{"id":"x"}'),
+        close: vi.fn().mockResolvedValue(undefined),
+      };
+      openMock.mockResolvedValue(fileHandleMock);
       const thrown = build();
       thrown.message = 'a wording this handler has never seen';
       vi.mocked(store.importDrawerRaw).mockRejectedValue(thrown);

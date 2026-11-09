@@ -38,6 +38,8 @@ export type IpcListener = (event: unknown, ...args: string[]) => unknown;
 
 const allowedImportPaths = new Map<string, string>();
 const importTimers: NodeJS.Timeout[] = [];
+// SEC-04 — cap the token map to prevent unbounded growth from cancelled/stuck dialogs
+const MAX_IMPORT_TOKENS = 8;
 
 // Without a deadline a stalled GitHub request leaves the check-update promise
 // unsettled forever: CreditsModal awaits it inside Promise.allSettled, so the
@@ -469,6 +471,11 @@ export function registerIpcHandlers(deps: IpcDeps): void {
       }
 
       const token = randomUUID();
+      // SEC-04 — cap the map (oldest-out is fine: a token is single-use)
+      if (allowedImportPaths.size >= MAX_IMPORT_TOKENS) {
+        const oldest = allowedImportPaths.keys().next().value;
+        if (oldest) allowedImportPaths.delete(oldest);
+      }
       allowedImportPaths.set(token, filePath);
 
       const timer = setTimeout(() => {
@@ -512,46 +519,49 @@ export function registerIpcHandlers(deps: IpcDeps): void {
       allowedImportPaths.delete(validated.token);
 
       try {
-        const stat = await fs.lstat(filePath);
-        if (stat.isSymbolicLink()) {
-          logger.warn('import-drawer: refusing symlink', { fileName: path.basename(filePath) });
-          return {
-            ok: false,
-            error: {
-              code: ErrorCode.VALIDATION_ERROR,
-              message: 'Refusing to import a symbolic link',
-            },
-          };
-        }
-        // Block B — The lstat above already measured the file and the size was
-        // discarded; the cap in importDrawerRaw below runs on a string this
-        // handler has already read into memory, so the read itself stayed
-        // unbounded. One stat syscall closes it before the allocation, and the
-        // cap is the same MAX_DRAWER_FILE_SIZE every other read path refuses on.
-        if (stat.size > MAX_DRAWER_FILE_SIZE) {
-          logger.warn('import-drawer: file too large', {
-            fileName: path.basename(filePath),
-            size: stat.size,
-          });
-          return {
-            ok: false,
-            error: {
-              code: ErrorCode.WRITE_FAILED,
-              message: getLocale() === 'pt' ? 'Ficheiro demasiado grande.' : 'File too large.',
-            },
-          };
-        }
-        const fileContent = await fs.readFile(filePath, 'utf8');
-        const success = await importDrawerRaw(fileContent);
-        if (!success) {
-          logger.warn('import-drawer: invalid file format', {});
-          return {
-            ok: false,
-            error: {
-              code: ErrorCode.INVALID_JSON,
-              message: 'Failed to import drawer (invalid file format)',
-            },
-          };
+        // SEC-04 — open once with O_NOFOLLOW to avoid TOCTOU between lstat and readFile
+        const flags = fs.constants.O_RDONLY | (process.platform === 'win32' ? 0 : fs.constants.O_NOFOLLOW);
+        const handle = await fs.open(filePath, flags);
+        try {
+          const stat = await handle.stat();
+          if (stat.isSymbolicLink()) {
+            logger.warn('import-drawer: refusing symlink', { fileName: path.basename(filePath) });
+            return {
+              ok: false,
+              error: {
+                code: ErrorCode.VALIDATION_ERROR,
+                message: 'Refusing to import a symbolic link',
+              },
+            };
+          }
+          // Size check on the opened handle — no TOCTOU window
+          if (stat.size > MAX_DRAWER_FILE_SIZE) {
+            logger.warn('import-drawer: file too large', {
+              fileName: path.basename(filePath),
+              size: stat.size,
+            });
+            return {
+              ok: false,
+              error: {
+                code: ErrorCode.WRITE_FAILED,
+                message: getLocale() === 'pt' ? 'Ficheiro demasiado grande.' : 'File too large.',
+              },
+            };
+          }
+          const fileContent = await handle.readFile('utf8');
+          const success = await importDrawerRaw(fileContent);
+          if (!success) {
+            logger.warn('import-drawer: invalid file format', {});
+            return {
+              ok: false,
+              error: {
+                code: ErrorCode.INVALID_JSON,
+                message: 'Failed to import drawer (invalid file format)',
+              },
+            };
+          }
+        } finally {
+          await handle.close();
         }
         logger.info('Drawer imported', { fileName: path.basename(filePath) });
         return { ok: true, data: undefined };

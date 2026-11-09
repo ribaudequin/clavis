@@ -276,7 +276,13 @@ export async function ensureDataDir(): Promise<void> {
   try {
     await fs.mkdir(getDrawersPath(), { recursive: true, mode: 0o700 });
     // SEC-03 — Tighten existing directory (mkdir with mode only applies to creation)
-    try { await fs.chmod(getDrawersPath(), 0o700); } catch {}
+    if (process.platform !== 'win32') {
+      await fs.chmod(getDrawersPath(), 0o700).catch((e) =>
+        logger.warn('Could not tighten drawers directory mode', {
+          error: e instanceof Error ? e.message : String(e),
+        })
+      );
+    }
     logger.debug('Data directory ensured', { path: getDrawersPath() });
   } catch (e) {
     logger.error('ensureDataDir mkdir failed', { error: e instanceof Error ? e.message : String(e) });
@@ -349,52 +355,50 @@ export async function createDrawer(
   password: string | Buffer
 ): Promise<EncryptedDrawer> {
   const passwordBuffer = Buffer.isBuffer(password) ? Buffer.from(password) : Buffer.from(password, 'utf8');
-  await ensureDataDir();
-
-  // Defence in depth, not the enforcement point: CreateDrawerSchema already applies the
-  // policy, so on the IPC path this is unreachable. It is kept because store.ts is
-  // exported and callable directly — a caller with no schema in front of it (a future
-  // channel, a script, a test) would otherwise create a drawer the create schema would
-  // have refused. The wording is the policy module's, so the log cannot disagree with
-  // the schema.
-  if (!isPasswordCompliant(password)) {
-    passwordBuffer.fill(0);
-    throw new Error(describePasswordPolicy());
-  }
-
-  const id = uuidv4();
-  const now = Date.now();
-  const iconData = generateIconData(id);
-  const placeholderContent = '';
-
-  let encrypted: Awaited<ReturnType<typeof encrypt>>;
   try {
-    encrypted = await encrypt(placeholderContent, passwordBuffer);
+    await ensureDataDir();
+
+    // Defence in depth, not the enforcement point: CreateDrawerSchema already applies the
+    // policy, so on the IPC path this is unreachable. It is kept because store.ts is
+    // exported and callable directly — a caller with no schema in front of it (a future
+    // channel, a script, a test) would otherwise create a drawer the create schema would
+    // have refused. The wording is the policy module's, so the log cannot disagree with
+    // the schema.
+    if (!isPasswordCompliant(password)) {
+      throw new Error(describePasswordPolicy());
+    }
+
+    const id = uuidv4();
+    const now = Date.now();
+    const iconData = generateIconData(id);
+    const placeholderContent = '';
+
+    const encrypted = await encrypt(placeholderContent, passwordBuffer);
+
+    const drawer: EncryptedDrawer = {
+      id,
+      title,
+      iconData,
+      createdAt: now,
+      updatedAt: now,
+      encryptedData: encrypted.encryptedData,
+      salt: encrypted.salt,
+      iv: encrypted.iv,
+      authTag: encrypted.authTag,
+      keyDerivation: {
+        algorithm: encrypted.algorithm,
+        iterations: 3,
+        memory: DEFAULT_MEMORY_COST,
+        parallelism: 4,
+      },
+    };
+
+    await atomicWrite(getDrawerFilePath(id), JSON.stringify(drawer, null, 2));
+    logger.info('Drawer created', { id, titleLength: title?.length || 0 });
+    return drawer;
   } finally {
     passwordBuffer.fill(0);
   }
-
-  const drawer: EncryptedDrawer = {
-    id,
-    title,
-    iconData,
-    createdAt: now,
-    updatedAt: now,
-    encryptedData: encrypted.encryptedData,
-    salt: encrypted.salt,
-    iv: encrypted.iv,
-    authTag: encrypted.authTag,
-    keyDerivation: {
-      algorithm: encrypted.algorithm,
-      iterations: 3,
-      memory: DEFAULT_MEMORY_COST,
-      parallelism: 4,
-    },
-  };
-
-  await atomicWrite(getDrawerFilePath(id), JSON.stringify(drawer, null, 2));
-  logger.info('Drawer created', { id, titleLength: title?.length || 0 });
-  return drawer;
 }
 
 // P0.11 — Constant-time comparison: dummy derivation to prevent timing leaks
