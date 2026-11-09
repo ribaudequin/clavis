@@ -1,5 +1,21 @@
 # Changelog — Clavis
 
+## v1.0.1 (2026-11-09)
+
+### Fixed
+
+- **`saveDrawer` validates metadata with `EncryptedDrawerSchema` instead of raw `JSON.parse`.** A corrupted IV/tag/salt is now reported as `corrupt_metadata` (or `parse_failed` for malformed JSON) instead of being misreported as `wrong_password`. Both new reasons map to `INVALID_JSON` so the renderer shows a distinct message without incrementing the unlock rate limiter.
+- **Store errors are now discriminated.** `listDrawers` returns `{ok:false,reason:'unreadable'}` instead of `[]` when the drawers directory cannot be read; `readDrawerRaw` distinguishes `not_found`, `too_large`, and `unreadable`; `deleteDrawer` distinguishes `not_found` from `permission_denied`. Three new `ErrorCode` values (`DIRECTORY_UNREADABLE`, `DRAWER_UNREADABLE`, `PERMISSION_DENIED`) with translations.
+- **Import uses `O_RDONLY|O_NOFOLLOW` to eliminate the `lstat`→`readFile` TOCTOU.** The file is opened once, `stat` and `readFile` run on the same handle. The token whitelist (`allowedImportPaths`) is capped at 8 entries (oldest-out) to prevent unbounded growth from cancelled dialogs.
+- **`createDrawer` zeros the password buffer on every throw path.** A `try/finally` wrapping the entire function body ensures the buffer is cleared even if `ensureDataDir`, `uuidv4`, `generateIconData`, `encrypt`, or `atomicWrite` throw.
+- **`ensureDataDir` tightens existing drawers directory to `0o700` on POSIX.** Profiles created by older builds no longer keep `0o755`. `SECURITY.md` updated with corrected line references and the fact that `atomicWrite` creates a new `0o600` inode on every save.
+
+### Quality
+
+- **`windowOptions()` extracted to `src/main/window-options.ts`** — pure, testable factory for the security-critical `webPreferences` (`sandbox`, `contextIsolation`, `nodeIntegration`). 5 new unit tests.
+- **Coverage thresholds enforced in CI:** statements ≥80%, branches ≥70%, functions ≥75%, lines ≥80% (just below current 82.6/72.0/80.3/83.9). `test:coverage` script added.
+- **`scripts/**` now linted with `--max-warnings 0`**; two pre-existing `any` warnings in tests replaced with `Record<string, unknown>`.
+
 ## v1.0.0 (2026-10-30)
 
 **The first production release.** It is the `v0.6.15-beta` tree with the four High findings of the
