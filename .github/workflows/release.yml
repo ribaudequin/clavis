@@ -52,7 +52,7 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Coverage (thresholds: 80/70/75/80)
+      - name: "Coverage (thresholds: 80/70/75/80)"
         run: npm run test:coverage
 
       - name: Tag/version guard (CI)
