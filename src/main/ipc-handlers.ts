@@ -18,6 +18,9 @@ import {
   DrawerAlreadyExistsError,
   FileTooLargeError,
   MAX_DRAWER_FILE_SIZE,
+  ListDrawersResult,
+  ReadDrawerRawResult,
+  DeleteDrawerResult,
 } from './store.js';
 import type { UnlockFailureReason, SaveFailureReason } from './store.js';
 import {
@@ -167,22 +170,21 @@ export function registerIpcHandlers(deps: IpcDeps): void {
   const unlockDelayFor = deps.getUnlockDelay ?? getUnlockDelay;
 
   ipcMain.handle(CHANNELS.LIST_DRAWERS, async (): Promise<Result<DrawerListItem[]>> => {
-    try {
-      logger.debug('IPC handler called', { handler: 'list-drawers' });
-      const data = await listDrawers();
-      logger.info('Drawers listed', { count: data.length });
-      return { ok: true, data };
-    } catch (e) {
-      logger.error('list-drawers failed', { error: e instanceof Error ? e.message : String(e) });
+    logger.debug('IPC handler called', { handler: 'list-drawers' });
+    const result = await listDrawers();
+    if (!result.ok) {
+      logger.error('list-drawers failed: directory unreadable', {});
       return {
         ok: false,
         error: {
-          code: ErrorCode.FILE_NOT_FOUND,
-          message: 'Failed to list drawers',
+          code: ErrorCode.DIRECTORY_UNREADABLE,
+          message: 'The drawer folder could not be read — check permissions',
           // details: undefined (ERR-01 fixed),
         },
       };
     }
+    logger.info('Drawers listed', { count: result.drawers.length });
+    return { ok: true, data: result.drawers };
   });
 
   ipcMain.handle(CHANNELS.CREATE_DRAWER, async (_e, title: string, password: string): Promise<Result<EncryptedDrawer>> => {
@@ -383,14 +385,25 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     try {
       logger.debug('IPC handler called', { handler: 'delete-drawer', id });
       const validated = DeleteDrawerSchema.parse({ id });
-      const success = await deleteDrawer(validated.id);
-      if (!success) {
-        logger.warn('Delete failed: invalid ID or drawer not found', { id });
+      const result = await deleteDrawer(validated.id);
+      if (!result.ok) {
+        if (result.reason === 'not_found') {
+          logger.warn('Delete failed: drawer not found', { id });
+          return {
+            ok: false,
+            error: {
+              code: ErrorCode.FILE_NOT_FOUND,
+              message: 'Drawer not found',
+            },
+          };
+        }
+        // permission_denied
+        logger.error('Delete failed: permission denied', { id });
         return {
           ok: false,
           error: {
-            code: ErrorCode.FILE_NOT_FOUND,
-            message: 'Failed to delete drawer (invalid ID or drawer not found)',
+            code: ErrorCode.PERMISSION_DENIED,
+            message: 'Permission denied — cannot delete drawer',
           },
         };
       }
@@ -424,19 +437,40 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     try {
       logger.debug('IPC handler called', { handler: 'export-drawer', id });
       const validated = ExportDrawerSchema.parse({ id });
-      const data = await readDrawerRaw(validated.id);
-      if (!data) {
-        logger.warn('Export failed: drawer not found', { id });
+      const result = await readDrawerRaw(validated.id);
+      if (!result.ok) {
+        if (result.reason === 'not_found') {
+          logger.warn('Export failed: drawer not found', { id });
+          return {
+            ok: false,
+            error: {
+              code: ErrorCode.FILE_NOT_FOUND,
+              message: 'Drawer not found',
+            },
+          };
+        }
+        if (result.reason === 'too_large') {
+          logger.warn('Export failed: drawer too large', { id });
+          return {
+            ok: false,
+            error: {
+              code: ErrorCode.CONTENT_TOO_LARGE,
+              message: 'Drawer file exceeds the maximum size',
+            },
+          };
+        }
+        // unreadable
+        logger.error('Export failed: drawer unreadable', { id });
         return {
           ok: false,
           error: {
-            code: ErrorCode.FILE_NOT_FOUND,
-            message: 'Drawer not found',
+            code: ErrorCode.DRAWER_UNREADABLE,
+            message: 'Drawer file could not be read — check permissions',
           },
         };
       }
       logger.info('Drawer exported', { id });
-      return { ok: true, data };
+      return { ok: true, data: result.data };
     } catch (e) {
       if (e instanceof z.ZodError) {
         logger.warn('export-drawer validation failed', { issues: e.issues.length });

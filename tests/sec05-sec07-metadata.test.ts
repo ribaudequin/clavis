@@ -137,7 +137,10 @@ describe('SEC-07 — bounded metadata', () => {
     await writeDrawer(ID_1, validDrawer(ID_2));
     await writeDrawer(ID_3, validDrawer(ID_3));
 
-    const drawers = await listDrawers();
+    const result = await listDrawers();
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    const drawers = result.drawers;
 
     // ID_2 is a perfectly valid drawer, but it lives in ID_1.clavis: listing it under
     // ID_2 would produce an entry getDrawerFilePath() can never open.
@@ -154,7 +157,10 @@ describe('SEC-07 — bounded metadata', () => {
     await writeDrawer(ID_1, validDrawer(ID_1, { title: { evil: true } }));
     await writeDrawer(ID_3, validDrawer(ID_3));
 
-    const drawers = await listDrawers();
+    const result = await listDrawers();
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    const drawers = result.drawers;
 
     expect(drawers.map((d) => d.id)).toEqual([ID_3]);
     expect(warn).toHaveBeenCalledWith(

@@ -20,6 +20,13 @@ export enum ErrorCode {
   // argon2 module failed to load. Reporting that as DECRYPT_FAILED would tell the user
   // their correct password is wrong and feed the unlock rate limiter.
   KDF_UNAVAILABLE = 'KDF_UNAVAILABLE',
+  // DATA-03 — Store layer errors that were previously swallowed.
+  // The drawers directory could not be read (permissions, I/O error, corrupted profile).
+  DIRECTORY_UNREADABLE = 'DIRECTORY_UNREADABLE',
+  // A specific drawer file could not be read (permissions, I/O error).
+  DRAWER_UNREADABLE = 'DRAWER_UNREADABLE',
+  // A drawer could not be deleted due to permission denied (distinct from not found).
+  PERMISSION_DENIED = 'PERMISSION_DENIED',
 }
 
 export interface AppError {

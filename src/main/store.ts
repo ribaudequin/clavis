@@ -9,6 +9,19 @@ import { EncryptedDrawer, DrawerListItem } from '../shared/types.js';
 import { EncryptedDrawerSchema, type EncryptedDrawerMetadata } from './validation.js';
 import { isPasswordCompliant, describePasswordPolicy } from '../shared/password-policy.js';
 
+// DATA-03 — Discriminated store results so callers can distinguish "empty" from "unreadable".
+export type ListDrawersResult =
+  | { ok: true; drawers: DrawerListItem[] }
+  | { ok: false; reason: 'unreadable' };
+
+export type ReadDrawerRawResult =
+  | { ok: true; data: string }
+  | { ok: false; reason: 'not_found' | 'too_large' | 'unreadable' };
+
+export type DeleteDrawerResult =
+  | { ok: true }
+  | { ok: false; reason: 'not_found' | 'permission_denied' };
+
 const DRAWER_EXT = '.clavis';
 
 // DATA-01 — Per-drawer write lock: prevents concurrent saves/deletes/imports
@@ -291,7 +304,7 @@ export async function ensureDataDir(): Promise<void> {
   }
 }
 
-export async function listDrawers(): Promise<DrawerListItem[]> {
+export async function listDrawers(): Promise<ListDrawersResult> {
   await ensureDataDir();
 
   try {
@@ -345,10 +358,10 @@ export async function listDrawers(): Promise<DrawerListItem[]> {
       }
     }
     logger.debug('Drawers listed', { count: drawers.length });
-    return drawers;
+    return { ok: true, drawers };
   } catch (e) {
     logger.error('listDrawers readdir failed', { error: e instanceof Error ? e.message : String(e) });
-    return [];
+    return { ok: false, reason: 'unreadable' };
   }
 }
 
@@ -710,35 +723,50 @@ export async function saveDrawer(
   });
 }
 
-export async function deleteDrawer(id: string): Promise<boolean> {
-  if (!isValidId(id)) return false;
+export async function deleteDrawer(id: string): Promise<DeleteDrawerResult> {
+  if (!isValidId(id)) return { ok: false, reason: 'not_found' };
   // DATA-01 — Same critical section as saveDrawer/import: a delete that lands between a
   // save's read and its rename would otherwise be undone by the save (the drawer reappears).
   return withDrawerLock(id, async () => {
     try {
       await fs.unlink(getDrawerFilePath(id));
       logger.info('Drawer deleted', { id });
-      return true;
+      return { ok: true };
     } catch (e) {
+      const err = e as NodeJS.ErrnoException;
+      if (err.code === 'ENOENT') {
+        logger.warn('Delete: drawer not found', { id });
+        return { ok: false, reason: 'not_found' };
+      }
+      if (err.code === 'EACCES' || err.code === 'EPERM') {
+        logger.error('Delete: permission denied', { id });
+        return { ok: false, reason: 'permission_denied' };
+      }
       logger.error('Delete failed', { id, error: e instanceof Error ? e.message : String(e) });
-      return false;
+      return { ok: false, reason: 'not_found' };
     }
   });
 }
 
-export async function readDrawerRaw(id: string): Promise<string | null> {
-  if (!isValidId(id)) return null;
+export async function readDrawerRaw(id: string): Promise<ReadDrawerRawResult> {
+  if (!isValidId(id)) return { ok: false, reason: 'not_found' };
   try {
     const filePath = getDrawerFilePath(id);
     const stat = await fs.stat(filePath);
     if (stat.size > MAX_DRAWER_FILE_SIZE) {
       logger.error('readDrawerRaw skipped file above max size', { id, size: stat.size });
-      return null;
+      return { ok: false, reason: 'too_large' };
     }
-    return await fs.readFile(filePath, 'utf8');
+    const content = await fs.readFile(filePath, 'utf8');
+    return { ok: true, data: content };
   } catch (e) {
+    const err = e as NodeJS.ErrnoException;
+    if (err.code === 'ENOENT') {
+      logger.warn('readDrawerRaw: drawer not found', { id });
+      return { ok: false, reason: 'not_found' };
+    }
     logger.error('readDrawerRaw failed', { id, error: e instanceof Error ? e.message : String(e) });
-    return null;
+    return { ok: false, reason: 'unreadable' };
   }
 }
 

@@ -289,7 +289,7 @@ describe('IPC handlers', () => {
   describe('list-drawers', () => {
     it('returns ok with data on success', async () => {
       const items = [{ id: VALID_UUID, title: 't', iconData: 'rgb(0,0,0)' }];
-      vi.mocked(store.listDrawers).mockResolvedValue(items);
+      vi.mocked(store.listDrawers).mockResolvedValue({ ok: true, drawers: items });
 
       const handler = getHandler(CHANNELS.LIST_DRAWERS);
       const result = await handler({});
@@ -298,16 +298,16 @@ describe('IPC handlers', () => {
       expect(store.listDrawers).toHaveBeenCalledOnce();
     });
 
-    it('returns FILE_NOT_FOUND error when store throws', async () => {
-      vi.mocked(store.listDrawers).mockRejectedValue(new Error('boom'));
+    it('returns DIRECTORY_UNREADABLE error when store returns unreadable', async () => {
+      vi.mocked(store.listDrawers).mockResolvedValue({ ok: false, reason: 'unreadable' });
 
       const handler = getHandler(CHANNELS.LIST_DRAWERS);
       const result = await handler({});
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error.code).toBe(ErrorCode.FILE_NOT_FOUND);
-        expect(result.error.message).toBe('Failed to list drawers');
+        expect(result.error.code).toBe(ErrorCode.DIRECTORY_UNREADABLE);
+        expect(result.error.message).toBe('The drawer folder could not be read — check permissions');
       }
     });
   });
@@ -972,7 +972,7 @@ describe('IPC handlers', () => {
 
   describe('delete-drawer', () => {
     it('returns ok on success', async () => {
-      vi.mocked(store.deleteDrawer).mockResolvedValue(true);
+      vi.mocked(store.deleteDrawer).mockResolvedValue({ ok: true });
 
       const handler = getHandler(CHANNELS.DELETE_DRAWER);
       const result = await handler({}, VALID_UUID);
@@ -980,8 +980,8 @@ describe('IPC handlers', () => {
       expect(result).toEqual({ ok: true, data: undefined });
     });
 
-    it('returns FILE_NOT_FOUND when store returns false', async () => {
-      vi.mocked(store.deleteDrawer).mockResolvedValue(false);
+    it('returns FILE_NOT_FOUND when store returns not_found', async () => {
+      vi.mocked(store.deleteDrawer).mockResolvedValue({ ok: false, reason: 'not_found' });
 
       const handler = getHandler(CHANNELS.DELETE_DRAWER);
       const result = await handler({}, VALID_UUID);
@@ -989,7 +989,20 @@ describe('IPC handlers', () => {
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.error.code).toBe(ErrorCode.FILE_NOT_FOUND);
-        expect(result.error.message).toBe('Failed to delete drawer (invalid ID or drawer not found)');
+        expect(result.error.message).toBe('Drawer not found');
+      }
+    });
+
+    it('returns PERMISSION_DENIED when store returns permission_denied', async () => {
+      vi.mocked(store.deleteDrawer).mockResolvedValue({ ok: false, reason: 'permission_denied' });
+
+      const handler = getHandler(CHANNELS.DELETE_DRAWER);
+      const result = await handler({}, VALID_UUID);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.PERMISSION_DENIED);
+        expect(result.error.message).toBe('Permission denied — cannot delete drawer');
       }
     });
 
@@ -1020,7 +1033,7 @@ describe('IPC handlers', () => {
   describe('export-drawer', () => {
     it('returns ok with raw json string on success', async () => {
       const raw = '{"id":"x","title":"t"}';
-      vi.mocked(store.readDrawerRaw).mockResolvedValue(raw);
+      vi.mocked(store.readDrawerRaw).mockResolvedValue({ ok: true, data: raw });
 
       const handler = getHandler(CHANNELS.EXPORT_DRAWER);
       const result = await handler({}, VALID_UUID);
@@ -1028,8 +1041,8 @@ describe('IPC handlers', () => {
       expect(result).toEqual({ ok: true, data: raw });
     });
 
-    it('returns FILE_NOT_FOUND when store returns null', async () => {
-      vi.mocked(store.readDrawerRaw).mockResolvedValue(null);
+    it('returns FILE_NOT_FOUND when store returns not_found', async () => {
+      vi.mocked(store.readDrawerRaw).mockResolvedValue({ ok: false, reason: 'not_found' });
 
       const handler = getHandler(CHANNELS.EXPORT_DRAWER);
       const result = await handler({}, VALID_UUID);
@@ -1038,6 +1051,32 @@ describe('IPC handlers', () => {
       if (!result.ok) {
         expect(result.error.code).toBe(ErrorCode.FILE_NOT_FOUND);
         expect(result.error.message).toBe('Drawer not found');
+      }
+    });
+
+    it('returns CONTENT_TOO_LARGE when store returns too_large', async () => {
+      vi.mocked(store.readDrawerRaw).mockResolvedValue({ ok: false, reason: 'too_large' });
+
+      const handler = getHandler(CHANNELS.EXPORT_DRAWER);
+      const result = await handler({}, VALID_UUID);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.CONTENT_TOO_LARGE);
+        expect(result.error.message).toBe('Drawer file exceeds the maximum size');
+      }
+    });
+
+    it('returns DRAWER_UNREADABLE when store returns unreadable', async () => {
+      vi.mocked(store.readDrawerRaw).mockResolvedValue({ ok: false, reason: 'unreadable' });
+
+      const handler = getHandler(CHANNELS.EXPORT_DRAWER);
+      const result = await handler({}, VALID_UUID);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(ErrorCode.DRAWER_UNREADABLE);
+        expect(result.error.message).toBe('Drawer file could not be read — check permissions');
       }
     });
 
@@ -1629,7 +1668,7 @@ describe('IPC handlers', () => {
 
   describe('Result envelope', () => {
     it('always returns either ok:true with data or ok:false with structured error', async () => {
-      vi.mocked(store.listDrawers).mockRejectedValue(new Error('x'));
+      vi.mocked(store.listDrawers).mockResolvedValue({ ok: false, reason: 'unreadable' });
       const handler = getHandler(CHANNELS.LIST_DRAWERS);
       const result = await handler({});
       expect('ok' in result).toBe(true);

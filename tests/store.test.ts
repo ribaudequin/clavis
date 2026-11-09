@@ -75,7 +75,10 @@ describe('store module', () => {
     const a = await createDrawer('Gaveta A', 'Passw0rdAAA!');
     const b = await createDrawer('Gaveta B', 'Passw0rdBBB!');
 
-    const drawers = await listDrawers();
+    const result = await listDrawers();
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    const drawers = result.drawers;
 
     expect(drawers).toHaveLength(2);
     const ids = drawers.map((d) => d.id);
@@ -120,15 +123,18 @@ describe('store module', () => {
     await expect(fs.stat(filePath)).resolves.toBeDefined();
 
     const deleted = await deleteDrawer(drawer.id);
-    expect(deleted).toBe(true);
+    expect(deleted).toEqual({ ok: true });
 
     await expect(fs.stat(filePath)).rejects.toThrow();
-    expect(await listDrawers()).toHaveLength(0);
+    const listResult = await listDrawers();
+    expect(listResult.ok).toBe(true);
+    if (!listResult.ok) throw new Error('expected ok');
+    expect(listResult.drawers).toHaveLength(0);
   });
 
   it('saveDrawer and deleteDrawer reject invalid ids', async () => {
     expect(await saveDrawer('not-a-uuid', 'pw', 't', 'c')).toEqual({ ok: false, reason: 'invalid_id' });
-    expect(await deleteDrawer('not-a-uuid')).toBe(false);
+    expect(await deleteDrawer('not-a-uuid')).toEqual({ ok: false, reason: 'not_found' });
   });
 
   it('isValidId rejects path traversal', async () => {
@@ -410,18 +416,22 @@ describe('store module', () => {
       const drawer = await createDrawer('Capacidade', PASSWORD);
       expect(await saveDrawer(drawer.id, PASSWORD, 'Capacidade', content)).toEqual({ ok: true });
 
-      const exported = await readDrawerRaw(drawer.id);
-      expect(exported).not.toBeNull();
-      // Hex doubles the payload, so this file is past the 11 MB the old cap allowed.
-      expect(exported!.length).toBeGreaterThan(2 * MAX_DECRYPTED_SIZE);
+      const exportedResult = await readDrawerRaw(drawer.id);
+      expect(exportedResult.ok).toBe(true);
+      if (!exportedResult.ok) throw new Error('expected ok');
+      const exported = exportedResult.data;
+      expect(exported.length).toBeGreaterThan(2 * MAX_DECRYPTED_SIZE);
       // HYG-13b — the ceiling is read from the store rather than restated as
       // "2 x the byte cap plus the envelope allowance": that arithmetic was a third
       // copy of a number the store already owns.
-      expect(exported!.length).toBeLessThanOrEqual(MAX_DRAWER_FILE_SIZE);
+      expect(exported.length).toBeLessThanOrEqual(MAX_DRAWER_FILE_SIZE);
 
-      expect(await deleteDrawer(drawer.id)).toBe(true);
-      expect(await importDrawerRaw(exported!)).toBe(true);
-      expect(await readDrawerRaw(drawer.id)).toBe(exported);
+      expect(await deleteDrawer(drawer.id)).toEqual({ ok: true });
+      expect(await importDrawerRaw(exported)).toBe(true);
+      const reimportedResult = await readDrawerRaw(drawer.id);
+      expect(reimportedResult.ok).toBe(true);
+      if (!reimportedResult.ok) throw new Error('expected ok');
+      expect(reimportedResult.data).toBe(exported);
 
       const unlocked = await unlockDrawer(drawer.id, PASSWORD);
       expect(unlocked.ok).toBe(true);
@@ -603,7 +613,10 @@ describe('store module', () => {
       const overCapId = '123e4567-e89b-12d3-a456-426614174099';
       await writeOverCapFile(overCapId);
 
-      const drawers = await listDrawers();
+      const result = await listDrawers();
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('expected ok');
+      const drawers = result.drawers;
 
       const ids = drawers.map((d) => d.id);
       expect(ids).toContain(normal.id);
@@ -632,12 +645,12 @@ describe('store module', () => {
       });
     });
 
-    it('readDrawerRaw returns null for a file above the ceiling', async () => {
+    it('readDrawerRaw returns too_large for a file above the ceiling', async () => {
       // This is the export path that crosses IPC into a renderer Blob.
       const drawer = await createDrawer('Exportable', PASSWORD);
       await fs.writeFile(getDrawerFilePath(drawer.id), buildOverCapDrawer(drawer.id), { mode: 0o600 });
 
-      expect(await readDrawerRaw(drawer.id)).toBeNull();
+      expect(await readDrawerRaw(drawer.id)).toEqual({ ok: false, reason: 'too_large' });
     });
   });
 

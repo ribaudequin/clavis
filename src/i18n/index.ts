@@ -120,6 +120,9 @@ export const translations: Record<string, TranslationDict> = {
     'error.content_too_large': 'Esta gaveta é demasiado grande para a aplicação abrir ou guardar.',
     'error.content_too_long': 'O texto tem demasiados caracteres para ser guardado.',
     'error.kdf_unavailable': 'Esta gaveta usa Argon2, que não está incluído nesta versão da aplicação.',
+    'error.directory_unreadable': 'A pasta das gavetas não pôde ser lida — verifique as permissões.',
+    'error.drawer_unreadable': 'O ficheiro da gaveta não pôde ser lido — verifique as permissões.',
+    'error.permission_denied': 'Permissão negada — não é possível eliminar a gaveta.',
   },
   'en': {
     'app.title': 'Clavis',
@@ -232,6 +235,9 @@ export const translations: Record<string, TranslationDict> = {
     'error.content_too_large': 'This drawer is too large for the app to open or save.',
     'error.content_too_long': 'The text has too many characters to be saved.',
     'error.kdf_unavailable': 'This drawer uses Argon2, which is not included in this build.',
+    'error.directory_unreadable': 'The drawer folder could not be read — check permissions.',
+    'error.drawer_unreadable': 'Drawer file could not be read — check permissions.',
+    'error.permission_denied': 'Permission denied — cannot delete drawer.',
   },
 };
 
@@ -301,6 +307,10 @@ const ERROR_MESSAGE_KEYS: Record<ErrorCode, string> = {
   // number written into them: the ceiling has one owner in `src/shared/limits.ts`.
   [ErrorCode.CONTENT_TOO_LONG]: 'error.content_too_long',
   [ErrorCode.KDF_UNAVAILABLE]: 'error.kdf_unavailable',
+  // DATA-03 — Store layer errors that were previously swallowed.
+  [ErrorCode.DIRECTORY_UNREADABLE]: 'error.directory_unreadable',
+  [ErrorCode.DRAWER_UNREADABLE]: 'error.drawer_unreadable',
+  [ErrorCode.PERMISSION_DENIED]: 'error.permission_denied',
 };
 
 export function tError(error: AppError): string {
