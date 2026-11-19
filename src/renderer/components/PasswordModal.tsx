@@ -41,11 +41,15 @@ function PasswordModal({
 
   useModalKeyboard(modalRef, { onEscape: onClose });
 
+  // UX-02 — Must be declared BEFORE the input-focus effect so it captures the
+  // element that had focus BEFORE the modal opened (e.g. the "Open" button on
+  // HomeScreen). If declared after, it captures the input (which is unmounted
+  // on close), and the cleanup restores focus to a dead element → falls to <body>.
+  useFocusTrap(modalRef, { isActive: true });
+
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-
-  useFocusTrap(modalRef, { isActive: true });
 
   // The focus has to stay inside the modal while the unlock is in flight, or the
   // Escape listener never fires: `useModalKeyboard` attaches it to the modal

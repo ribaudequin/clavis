@@ -126,6 +126,7 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      if (saving || deleting || showDeleteConfirm || showDiscardConfirm) return;
       e.preventDefault();
       void handleSave();
     }
@@ -186,9 +187,9 @@ function ViewDrawer({ drawerId, password, initialTitle, initialContent, onSave, 
           </div>
           <span className="shrink-0 tabular-nums">{t('label.percent', { pct: String(pct) })}</span>
           <span aria-hidden="true">·</span>
-          <span className={atRisk ? 'shrink-0 text-amber-600 font-medium tabular-nums' : 'shrink-0 tabular-nums'}>{t('label.bytes', { b: formatNumber(bytes), max: maxBytes })}</span>
+          <span className={atRisk ? 'shrink-0 text-amber-700 font-medium tabular-nums' : 'shrink-0 tabular-nums'}>{t('label.bytes', { b: formatNumber(bytes), max: maxBytes })}</span>
           {bytePct >= 1 && <span className="text-red-600 font-semibold ml-2">{t('label.at_limit', { b: formatNumber(bytes), max: maxBytes })}</span>}
-          {bytePct < 1 && codePoints >= Math.round(MAX_CONTENT_CODE_POINTS * 0.9) && <span className="text-amber-600 font-medium ml-2">{t('label.near_code_points')}</span>}
+          {bytePct < 1 && codePoints >= Math.round(MAX_CONTENT_CODE_POINTS * 0.9) && <span className="text-amber-700 font-medium ml-2">{t('label.near_code_points')}</span>}
         </div>
       </main>
 

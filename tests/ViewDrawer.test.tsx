@@ -278,14 +278,14 @@ describe('ViewDrawer', () => {
     // carry the risk colouring that the byte count does.
     it('escalates the byte count but never the character count', () => {
       const { unmount } = renderDrawer({ initialContent: 'x'.repeat(10) });
-      expect(screen.getByText(/^10 characters$/).className).not.toContain('text-amber-600');
-      expect(screen.getByText(/bytes$/).className).not.toContain('text-amber-600');
+      expect(screen.getByText(/^10 characters$/).className).not.toContain('text-amber-700');
+      expect(screen.getByText(/bytes$/).className).not.toContain('text-amber-700');
 
       for (const n of [900, MAX_PLAINTEXT_BYTES]) {
         unmount();
         renderDrawer({ initialContent: 'x'.repeat(n) });
-        expect(screen.getByText(new RegExp(`^${en(n)} characters$`)).className).not.toContain('text-amber-600');
-        expect(screen.getByText(new RegExp(`^${en(n)} / ${en(MAX_PLAINTEXT_BYTES)} bytes$`)).className).toContain('text-amber-600');
+        expect(screen.getByText(new RegExp(`^${en(n)} characters$`)).className).not.toContain('text-amber-700');
+        expect(screen.getByText(new RegExp(`^${en(n)} / ${en(MAX_PLAINTEXT_BYTES)} bytes$`)).className).toContain('text-amber-700');
       }
     });
 
@@ -315,14 +315,14 @@ describe('ViewDrawer', () => {
       expect(capacityBar(container).className).toContain('bg-green-500');
       expect(capacityBar(container).style.width).toBe('89%');
       expect(screen.queryByText(atLimitText('en', 890, MAX_PLAINTEXT_BYTES))).toBeNull();
-      expect(screen.getByText(new RegExp(`^${en(890)} / ${en(MAX_PLAINTEXT_BYTES)} bytes$`)).className).not.toContain('text-amber-600');
+      expect(screen.getByText(new RegExp(`^${en(890)} / ${en(MAX_PLAINTEXT_BYTES)} bytes$`)).className).not.toContain('text-amber-700');
     });
 
     it('turns the bar and the counters amber at 90% of the byte ceiling', () => {
       const { container } = renderDrawer({ initialContent: 'x'.repeat(900) });
       expect(capacityBar(container).className).toContain('bg-amber-500');
       expect(capacityBar(container).style.width).toBe('90%');
-      expect(screen.getByText(new RegExp(`^${en(900)} / ${en(MAX_PLAINTEXT_BYTES)} bytes$`)).className).toContain('text-amber-600');
+      expect(screen.getByText(new RegExp(`^${en(900)} / ${en(MAX_PLAINTEXT_BYTES)} bytes$`)).className).toContain('text-amber-700');
       expect(screen.queryByText(atLimitText('en', 900, MAX_PLAINTEXT_BYTES))).toBeNull();
     });
 

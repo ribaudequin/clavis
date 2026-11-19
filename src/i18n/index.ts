@@ -28,15 +28,15 @@ export const translations: Record<string, TranslationDict> = {
     'msg.drawer_export_failed': 'A exportação não foi concluída. O ficheiro não foi escrito.',
     'msg.drawer_deleted': 'Gaveta eliminada com sucesso.',
     'msg.imported': 'Importada com sucesso.',
-    'msg.error_export': 'Erro ao exportar:',
+    'msg.error_export': 'Erro ao exportar a gaveta.',
     // Prefix-shaped on purpose: a caller that has a translated detail appends it
     // (`msg.error_delete` + "…"). When there is no detail — a rejected bridge call is the
     // only such case today — use `msg.error_delete_failed`, the complete sentence, so the
     // user never sees the colon with nothing after it.
     'msg.error_delete': 'Erro ao eliminar:',
     'msg.error_delete_failed': 'Não foi possível eliminar a gaveta.',
-    'msg.error_import': 'Erro ao importar:',
-    'msg.error_load_drawers': 'Erro ao carregar gavetas:',
+    'msg.error_import': 'Erro ao importar a gaveta.',
+    'msg.error_load_drawers': 'Erro ao carregar as gavetas.',
     // UX-08 — The too-many-failed-attempts wait: the message that is seen
     // counting down and the static sentence a screen reader announces once.
     // Both exist because the number changes every second, and a live region
@@ -147,11 +147,11 @@ export const translations: Record<string, TranslationDict> = {
     'msg.drawer_export_failed': 'The export did not finish. The file was not written.',
     'msg.drawer_deleted': 'Drawer deleted successfully.',
     'msg.imported': 'Imported successfully',
-    'msg.error_export': 'Error exporting:',
+    'msg.error_export': 'Error exporting the drawer.',
     'msg.error_delete': 'Error deleting:',
     'msg.error_delete_failed': 'Could not delete the drawer.',
-    'msg.error_import': 'Error importing:',
-    'msg.error_load_drawers': 'Error loading drawers:',
+    'msg.error_import': 'Error importing the drawer.',
+    'msg.error_load_drawers': 'Error loading drawers.',
     // UX-08 — The too-many-failed-attempts wait: the message that is seen
     // counting down and the static sentence a screen reader announces once.
     // Both exist because the number changes every second, and a live region

@@ -1,5 +1,17 @@
 # TODO — Clavis
 
+## v1.0.1 (2026-11-09) — Medium audit sweep + release
+
+- [x] **SEC-02/03/04** — password buffer zeroing, dir permissions, import TOCTOU+token cap (`5ef85d0`)
+- [x] **DATA-02/03** — saveDrawer schema validation, discriminated store errors (`4c66d41`, `d4ea93a`)
+- [x] **QA-02/03/04** — windowOptions factory, coverage thresholds, lint scripts+max-warnings (`85f066d`, `db4430d`, `de3688f`)
+- [x] **YAML fix** — quote Coverage step name (`ec3044d`)
+- [x] **Release** — `v1.0.1` tagged/pushed/published (6 assets, 9/9 green) (`9fab766` → `ec3044d`)
+
+**Gates:** 588/588 vitest, 14/14 e2e (Linux), e2e-cross macOS/Windows ✅, lint 0, typecheck clean.
+
+---
+
 ## Release hygiene — version drift (2026-10-27)
 
 - [x] **The published `v0.6.13-beta` is not `0.6.13`.** Measured: `git show v0.6.13-beta:package.json` reads
@@ -65,26 +77,35 @@ e2e **14/14** · `npm audit --omit=dev` **1 high** · `npm audit` **43** (4 crit
 
 ### Medium — close before the 1.0 tag (evidence + snippets in the report)
 
-- [ ] **SEC-02** — `createDrawer` does not zero the password buffer on the policy-throw and encrypt-throw
+- [x] **SEC-02** — `createDrawer` does not zero the password buffer on the policy-throw and encrypt-throw
       paths; wrap the body in `try/finally { passwordBuffer.fill(0) }`.
-- [ ] **SEC-03** — `ensureDataDir` never tightens an existing `drawers/` directory; `chmod 0o700` on POSIX and
+      **DONE 2026-11-09** (`5ef85d0`): entire body wrapped in `try/finally`; buffer zeroed on any throw.
+- [x] **SEC-03** — `ensureDataDir` never tightens an existing `drawers/` directory; `chmod 0o700` on POSIX and
       correct the SECURITY.md claim. (Ties into DOC-01.)
-- [ ] **SEC-04** — Import has an `lstat`→`readFile` symlink TOCTOU, an uncapped `allowedImportPaths` map, and an
+      **DONE 2026-11-09** (`5ef85d0`): `chmod 0o700` on POSIX after mkdir; `SECURITY.md` line refs corrected, `atomicWrite` creates new `0o600` inode on every save.
+- [x] **SEC-04** — Import has an `lstat`→`readFile` symlink TOCTOU, an uncapped `allowedImportPaths` map, and an
       `access`→write race; open once with `O_NOFOLLOW`, cap the map, move the existence check under the lock.
-- [ ] **DATA-02** — `saveDrawer` casts `JSON.parse` (no `EncryptedDrawerSchema`) and reports a corrupt IV/tag as
+      **DONE 2026-11-09** (`5ef85d0`): `fs.open(O_RDONLY|O_NOFOLLOW)` + `handle.stat()` + `handle.readFile()`; `MAX_IMPORT_TOKENS=8` oldest-out; `withDrawerLock` already serializes concurrent imports.
+- [x] **DATA-02** — `saveDrawer` casts `JSON.parse` (no `EncryptedDrawerSchema`) and reports a corrupt IV/tag as
       `wrong_password`; parse with the schema, add `parse_failed`/`corrupt_metadata` to `SaveFailureReason`.
-- [ ] **DATA-03** — Store errors are swallowed (`listDrawers` → `[]`, `readDrawerRaw` → `null` for three causes),
+      **DONE 2026-11-09** (`4c66d41`): `EncryptedDrawerSchema.safeParse`; `parse_failed`/`corrupt_metadata` added to `SaveFailureReason`, mapped to `INVALID_JSON` in `SAVE_ERRORS`; 3 new tests.
+- [x] **DATA-03** — Store errors are swallowed (`listDrawers` → `[]`, `readDrawerRaw` → `null` for three causes),
       so an unreadable vault renders empty; return discriminated results and map them to distinct messages.
+      **DONE 2026-11-09** (`d4ea93a`): `ListDrawersResult`/`ReadDrawerRawResult`/`DeleteDrawerResult` discriminated unions; new `ErrorCode` values `DIRECTORY_UNREADABLE`, `DRAWER_UNREADABLE`, `PERMISSION_DENIED`; IPC handlers map reasons; i18n keys added.
 - [ ] **DATA-04** — No drawer backup/versioning and no main-process crash hooks; add `uncaughtException` /
       `unhandledRejection` / `render-process-gone` logging and decide the `.bak` policy.
-- [ ] **QA-02** — `src/main/index.ts` is 26.78 % covered and its window security options are untested; extract
+- [x] **QA-02** — `src/main/index.ts` is 26.78 % covered and its window security options are untested; extract
       `windowOptions()` and assert `sandbox` / `contextIsolation` / `nodeIntegration`.
-- [ ] **QA-03** — No coverage block or thresholds in `vitest.config.mts`; add `test:coverage` + thresholds
+      **DONE 2026-11-09** (`85f066d`): `src/main/window-options.ts` pure factory; 5 new tests in `tests/window-options.test.ts`; coverage for `sandbox`/`contextIsolation`/`nodeIntegration`/`devTools`/icon paths.
+- [x] **QA-03** — No coverage block or thresholds in `vitest.config.mts`; add `test:coverage` + thresholds
       (80/70/75/80, just below today's numbers) and a CI step.
-- [ ] **QA-04** — `scripts/**` is not linted and `lint` cannot fail on warnings; add the config block and
+      **DONE 2026-11-09** (`db4430d`): `coverage` block in `vitest.config.mts` (provider v8, thresholds 80/70/75/80); `test:coverage` script; CI step in `quality` job.
+- [x] **QA-04** — `scripts/**` is not linted and `lint` cannot fail on warnings; add the config block and
       `--max-warnings 0`, then clear the 2 existing `any` warnings.
-- [ ] **REL-01** — `scripts/release-phase.sh` does not parse (`bash -n` exit 2) and would bump only
+      **DONE 2026-11-09** (`de3688f`): `eslint.config.cjs` block for `scripts/**/*.{mjs,js,cjs}` + `no-eval: error`; `lint` script `--ext .ts,.tsx,.mjs,.js,.cjs --max-warnings 0`; 2 `as any` → `as Record<string, unknown>`.
+- [x] **REL-01** — `scripts/release-phase.sh` does not parse (`bash -n` exit 2) and would bump only
       `package.json`; delete it (not referenced by any doc) or rewrite around `npm version` and stop before push.
+      **DONE 2026-11-19:** script already deleted; not referenced in CI workflow (uses `check-tag-version.sh` instead).
 - [ ] **REL-02** — Windows/macOS legs are informational; add `windows-latest` to `quality` and gate the 1.0 tag
       on a green cross run (or record a manual green run in the release notes).
 - [ ] **REL-03** — Dev supply chain: remove the dead Storybook stack (7 packages, 4 critical advisories, no
@@ -95,13 +116,17 @@ e2e **14/14** · `npm audit --omit=dev` **1 high** · `npm audit` **43** (4 crit
       `handleValidated()` and delete the dead bilingual strings (`ipc-handlers.ts:540,568,578`).
 - [ ] **ARCH-02** — `getUnlockDelay` / `getAppVersion` / `checkUpdate` bypass `Result<T>`; wrap them so the
       renderer can tell "no update" from "GitHub unreachable".
-- [ ] **UX-02** — `PasswordModal` declares the focus trap after the input-focus effect, so it snapshots the
+- [x] **UX-02** — `PasswordModal` declares the focus trap after the input-focus effect, so it snapshots the
       input and restores focus to `<body>`; move `useFocusTrap` first. Test focus return.
-- [ ] **UX-03** — Four failure toasts end in a dangling colon (`msg.error_save`, `msg.error_load_drawers`,
+      **DONE 2026-11-19:** moved `useFocusTrap` before the input-focus effect in `PasswordModal.tsx:42-48`; all 588 unit + 14 e2e pass.
+- [x] **UX-03** — Four failure toasts end in a dangling colon (`msg.error_save`, `msg.error_load_drawers`,
       `msg.error_export`, `msg.error_import`); add complete-sentence keys where no detail follows.
-- [ ] **UX-04** — `text-amber-600` near-limit warning is 3.05:1 on `gray-50`; use `amber-700` (4.65:1).
-- [ ] **UX-05** — Ctrl+S fires through open delete/discard dialogs and repeated Ctrl+S starts concurrent saves;
+      **DONE 2026-11-19:** all four keys rewritten to full sentences in both locales (`src/i18n/index.ts`).
+- [x] **UX-04** — `text-amber-600` near-limit warning is 3.05:1 on `gray-50`; use `amber-700` (4.65:1).
+      **DONE 2026-11-19:** both occurrences in `ViewDrawer.tsx` updated; tests updated to assert `text-amber-700`.
+- [x] **UX-05** — Ctrl+S fires through open delete/discard dialogs and repeated Ctrl+S starts concurrent saves;
       guard on `saving || deleting || showDeleteConfirm || showDiscardConfirm`.
+      **DONE 2026-11-19:** guard added in `ViewDrawer.tsx:handleKeyDown` before `handleSave()` call.
 - [ ] **UX-06** — Export: `cancelled` is shown as a failure; a second export overwrites the pending map and
       leaks a blob; a duplicate filename (`x (1).clavis`) makes a successful export report failure. Key the
       pending entry on a token returned by main, and refuse a second export while one is pending.
