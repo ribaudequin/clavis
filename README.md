@@ -13,7 +13,7 @@
 
 ---
 
-**Clavis v1.0.0** — released 2026-10-30 (tag `v1.0.0`, 6 assets, [`/releases/latest`](https://github.com/ribaudequin/clavis/releases/latest)). All four audit High findings closed; CI 9/9 green on the tag (577 unit tests in 60 files, 14/14 e2e on Linux, Windows and macOS). Flatpak dropped; arm64-only `.dmg` accepted gap.
+**Clavis v1.1.0** — released 2026-11-19 (tag `v1.1.0`, 6 assets, [`/releases/latest`](https://github.com/ribaudequin/clavis/releases/latest)). Seven Medium audit items closed (UX-02/03/04/05/06/07, REL-01); CI 9/9 green (588 unit tests, 14/14 e2e on Linux, Windows and macOS). Flatpak dropped; arm64-only `.dmg` accepted gap.
 
 Encrypted notes for passwords, PINs, bank details and safe codes.
 
@@ -51,9 +51,9 @@ Each release publishes 6 files:
 
 > **Unsigned builds.** Clavis is not signed with a certificate (see [SECURITY.md](SECURITY.md)). On Windows, SmartScreen shows "unknown publisher" — choose *More info → Run anyway*. On macOS, the `.app` is ad-hoc signed (free, no certificate) but the `.dmg` is **unnotarized**, so right-click the app and choose **Open**, or run `xattr -d com.apple.quarantine /Applications/Clavis.app`.
 
-> **Architectures, and what has actually been run.** The macOS build is **arm64 only** — the `.dmg` has no Intel (x86-64) or universal variant, and there is no arm64 build for Linux or Windows. The `.dmg` file name carries the version (`clavis-1.0.0.dmg`) but not the architecture, unlike the other two platforms, so the gap is not visible from the release page. **All three platforms are executed by the end-to-end suite** — Linux on every push, and Windows and macOS on every release tag (measured on `v1.0.0`, 2026-10-30: **14/14** on Linux and **14/14** on each of `windows-latest` and `macos-latest`, against the packaged build; 14 rather than 15 because `functional-flow.spec.ts` was deleted as redundant in QA-05). The **published** files themselves — the `.zip`, the `Setup.exe`, the `.dmg` — are still not the ones the suite runs, because it drives the packager output rather than the maker output. See [SECURITY.md](SECURITY.md) for the full list of known limitations.
+> **Architectures, and what has actually been run.** The macOS build is **arm64 only** — the `.dmg` has no Intel (x86-64) or universal variant, and there is no arm64 build for Linux or Windows. The `.dmg` file name carries the version (`clavis-1.1.0.dmg`) but not the architecture, unlike the other two platforms, so the gap is not visible from the release page. **All three platforms are executed by the end-to-end suite** — Linux on every push, and Windows and macOS on every release tag (measured on `v1.0.0`, 2026-10-30 and `v1.1.0`, 2026-11-19: **14/14** on Linux and **14/14** on each of `windows-latest` and `macos-latest`, against the packaged build). The **published** files themselves — the `.zip`, the `Setup.exe`, the `.dmg` — are still not the ones the suite runs, because it drives the packager output rather than the maker output. See [SECURITY.md](SECURITY.md) for the full list of known limitations.
 
-> **Flatpak**: dropped (2026-10-30). The manifest (`flatpak/com.github.marcelosalvador.Clavis.yaml`) is pinned to `0.3.4-alpha`, never builds (`npm run clean` deletes its source path), and was never published to Flathub; it is not a v1.0.0 blocker. See `docs/MILESTONES.md`.
+> **Flatpak**: dropped (2026-10-30). The manifest (`flatpak/com.github.marcelosalvador.Clavis.yaml`) is pinned to `0.3.4-alpha`, never builds (`npm run clean` deletes its source path), and was never published to Flathub; it is not a v1.1.0 blocker. See `docs/MILESTONES.md`.
 
 ### From Source
 

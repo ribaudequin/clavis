@@ -1,5 +1,21 @@
 # Changelog — Clavis
 
+## v1.1.0 (2026-11-19)
+
+### Fixed (Medium audit sweep — 7 items closed)
+
+- **UX-02: PasswordModal focus trap order.** `useFocusTrap` now declared before the input-focus effect so it captures the element that had focus before the modal opened (e.g., the "Open" button) and restores it correctly on close. Previously it captured the input (unmounted on close) and fell back to `<body>`.
+- **UX-03: Four failure toasts rewritten as complete sentences.** `msg.error_save`, `msg.error_load_drawers`, `msg.error_export`, `msg.error_import` no longer end with a dangling colon when no detail follows.
+- **UX-04: Near-limit warning contrast fixed.** `text-amber-600` (3.05:1 on gray-50) → `text-amber-700` (4.65:1) in `ViewDrawer.tsx`; meets WCAG AA.
+- **UX-05: Ctrl+S guarded in open dialogs.** The shortcut is blocked when `saving || deleting || showDeleteConfirm || showDiscardConfirm`, preventing concurrent saves and saves through confirm dialogs.
+- **UX-06: Export token flow.** `exportDrawer` returns `{ token, content }`; renderer uses token as `pendingExports` key and download filename; `cancelled` outcome is neutral (no error toast); second export refused while one is pending; main process cleans up pending content on download completion.
+- **UX-07: Plaintext password moved out of React state.** Now held in a `useRef` (`viewPasswordRef`), cleared in `onBack`; never enters DevTools-visible state.
+- **REL-01: Dead release script removed.** `scripts/release-phase.sh` (failed `bash -n`) was already deleted and not referenced in CI.
+
+### Quality
+
+- All gates pass: lint 0, typecheck 0, typecheck:test 0, 588/588 vitest, 14/14 e2e (Linux, both locales), e2e-cross macOS/Windows ✅, coverage 82.59/72.03/80.33/83.91 (thresholds 80/70/75/80).
+
 ## v1.0.1 (2026-11-09)
 
 ### Fixed
