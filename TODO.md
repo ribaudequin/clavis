@@ -130,8 +130,9 @@ e2e **14/14** · `npm audit --omit=dev` **1 high** · `npm audit` **43** (4 crit
 - [ ] **UX-06** — Export: `cancelled` is shown as a failure; a second export overwrites the pending map and
       leaks a blob; a duplicate filename (`x (1).clavis`) makes a successful export report failure. Key the
       pending entry on a token returned by main, and refuse a second export while one is pending.
-- [ ] **UX-07** — The plaintext password lives in `HomeScreen.viewState` until Back; move it to a ref cleared
+- [x] **UX-07** — The plaintext password lives in `HomeScreen.viewState` until Back; move it to a ref cleared
       on unmount (or a main-process session handle post-1.0).
+      **DONE 2026-11-19:** `ViewState` no longer contains password; `viewPasswordRef` holds it only during ViewDrawer lifetime, cleared in `onBack` (`HomeScreen.tsx:52-53, 285, 329-330`).
 
 ### Low — post-1.0 polish (full table in report §6)
 

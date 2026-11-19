@@ -28,7 +28,6 @@ const EXPORT_DOWNLOAD_FALLBACK_MS = 30_000;
 
 interface ViewState {
   drawerId: string;
-  password: string;
   title: string;
   content: string;
 }
@@ -47,6 +46,12 @@ function HomeScreen(): React.JSX.Element {
   const [importing, setImporting] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmDeleteTitle, setConfirmDeleteTitle] = useState('');
+
+  // UX-07 — The plaintext password lives only in a ref, cleared on unmount.
+  // It never enters React state, so it cannot be inspected via DevTools or
+  // leaked through a state snapshot. The ref is passed to ViewDrawer for the
+  // save operation and zeroed when the drawer closes.
+  const viewPasswordRef = useRef<string | null>(null);
 
   // A pending unlock outlives the modal that asked for it: the main process keeps
   // deriving the key after the prompt is gone (the rate limiter can sleep up to
@@ -283,9 +288,9 @@ function HomeScreen(): React.JSX.Element {
         return;
       }
       setUnlockDrawerId(null);
+      viewPasswordRef.current = password;
       setViewState({
         drawerId,
-        password,
         title: result.data.title,
         content: result.data.content,
       });
@@ -317,17 +322,19 @@ function HomeScreen(): React.JSX.Element {
   }
 
 if (viewState) {
+    const password = viewPasswordRef.current;
     return (
       <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center">{t('label.loading')}</div>}>
         <ViewDrawer
           drawerId={viewState.drawerId}
-          password={viewState.password}
+          password={password ?? ''}
           initialTitle={viewState.title}
           initialContent={viewState.content}
           onSave={handleSaveDrawer}
           onDelete={handleDeleteDrawer}
           onBack={() => {
-            // P0.9 — Clear password from React state after ViewDrawer unmounts
+            // UX-07 — Clear password ref on unmount; it never lived in React state.
+            viewPasswordRef.current = null;
             setViewState(null);
             // A2-deferred — a callback prop cannot await, so the rejection is reported
             // here instead of escaping to the global handler.
