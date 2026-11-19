@@ -15,6 +15,22 @@
 
 **Clavis v1.1.0** — released 2026-11-19 (tag `v1.1.0`, 6 assets, [`/releases/latest`](https://github.com/ribaudequin/clavis/releases/latest)). Seven Medium audit items closed (UX-02/03/04/05/06/07, REL-01); CI 9/9 green (588 unit tests, 14/14 e2e on Linux, Windows and macOS). Flatpak dropped; arm64-only `.dmg` accepted gap.
 
+---
+
+### ⚠️ IMPORTANT: Unsigned Builds — Not a Virus
+
+**Clavis is not code-signed with a paid certificate.** This is a **deliberate choice** (see [SECURITY.md](SECURITY.md) for rationale), not a security issue. The binaries are built transparently on GitHub Actions and you can verify them yourself.
+
+| Platform | What you'll see | How to run it |
+|----------|-----------------|---------------|
+| **Windows** | SmartScreen: *"Windows protected your PC — unknown publisher"* | Click **More info** → **Run anyway** |
+| **macOS** | Gatekeeper: *"cannot be opened because the developer cannot be verified"* | Right-click the app → **Open**, or run `xattr -d com.apple.quarantine /Applications/Clavis.app` |
+| **Linux** | No warning (unsigned `.deb`/`.AppImage` work normally) | Install `.deb` or run `.AppImage` directly |
+
+> **This does NOT mean Clavis has a virus.** It means we don't pay $100–$600/year for a code-signing certificate. The source is open, the build is reproducible on GitHub Actions, and every release publishes SHA-256 checksums.
+
+---
+
 Encrypted notes for passwords, PINs, bank details and safe codes.
 
 Everything stays on your machine. Drawers are encrypted with AES-256-GCM, each one has its own password, and there is no account, no sync, and no analytics.
@@ -48,8 +64,6 @@ Each release publishes 6 files:
 | Linux    | `.deb`, `.AppImage` | x86-64 |
 | Windows  | `Setup.exe`, `.nupkg`, portable `.zip` | x86-64 |
 | macOS    | `.dmg` | **arm64 only** |
-
-> **Unsigned builds.** Clavis is not signed with a certificate (see [SECURITY.md](SECURITY.md)). On Windows, SmartScreen shows "unknown publisher" — choose *More info → Run anyway*. On macOS, the `.app` is ad-hoc signed (free, no certificate) but the `.dmg` is **unnotarized**, so right-click the app and choose **Open**, or run `xattr -d com.apple.quarantine /Applications/Clavis.app`.
 
 > **Architectures, and what has actually been run.** The macOS build is **arm64 only** — the `.dmg` has no Intel (x86-64) or universal variant, and there is no arm64 build for Linux or Windows. The `.dmg` file name carries the version (`clavis-1.1.0.dmg`) but not the architecture, unlike the other two platforms, so the gap is not visible from the release page. **All three platforms are executed by the end-to-end suite** — Linux on every push, and Windows and macOS on every release tag (measured on `v1.0.0`, 2026-10-30 and `v1.1.0`, 2026-11-19: **14/14** on Linux and **14/14** on each of `windows-latest` and `macos-latest`, against the packaged build). The **published** files themselves — the `.zip`, the `Setup.exe`, the `.dmg` — are still not the ones the suite runs, because it drives the packager output rather than the maker output. See [SECURITY.md](SECURITY.md) for the full list of known limitations.
 
