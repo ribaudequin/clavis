@@ -44,6 +44,10 @@ const importTimers: NodeJS.Timeout[] = [];
 // SEC-04 — cap the token map to prevent unbounded growth from cancelled/stuck dialogs
 const MAX_IMPORT_TOKENS = 8;
 
+// UX-06 — Export tokens -> content. Populated by export-drawer handler; cleaned up
+// by downloads.ts when the download completes (so the blob URL can be revoked).
+export const pendingExports = new Map<string, string>(); // token -> content
+
 // Without a deadline a stalled GitHub request leaves the check-update promise
 // unsettled forever: CreditsModal awaits it inside Promise.allSettled, so the
 // About card silently loses its version line for the rest of the session.
@@ -433,7 +437,12 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     }
   });
 
-  ipcMain.handle(CHANNELS.EXPORT_DRAWER, async (_e, id: string): Promise<Result<string>> => {
+  // UX-06 — Export returns a token; renderer uses it to key the pending export
+  // and refuses a second export while one is pending. The token is also used as
+  // the download filename so the main process can correlate the download outcome.
+  // pendingExports is exported at module top level.
+
+  ipcMain.handle(CHANNELS.EXPORT_DRAWER, async (_e, id: string): Promise<Result<{ token: string; content: string }>> => {
     try {
       logger.debug('IPC handler called', { handler: 'export-drawer', id });
       const validated = ExportDrawerSchema.parse({ id });
@@ -469,8 +478,10 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           },
         };
       }
-      logger.info('Drawer exported', { id });
-      return { ok: true, data: result.data };
+      const token = randomUUID();
+      pendingExports.set(token, result.data);
+      logger.info('Drawer exported', { id, token });
+      return { ok: true, data: { token, content: result.data } };
     } catch (e) {
       if (e instanceof z.ZodError) {
         logger.warn('export-drawer validation failed', { issues: e.issues.length });

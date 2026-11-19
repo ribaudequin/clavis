@@ -73,7 +73,7 @@ function HomeScreen(): React.JSX.Element {
   // export did not finish, because a false failure costs the user one more export
   // and a false success costs them the file they thought they had.
   const pendingExports = useRef(
-    new Map<string, { url: string; timer: ReturnType<typeof setTimeout> }>()
+    new Map<string, { url: string; fileName: string; timer: ReturnType<typeof setTimeout> }>()
   );
 
   const api = (): ElectronAPI => window.electronAPI;
@@ -116,20 +116,27 @@ function HomeScreen(): React.JSX.Element {
   // blob URL may only be revoked once the browser is done with it. The listener is
   // released on unmount, so a window that goes away does not leave a callback
   // pointing at a component that is no longer there.
+  // UX-06 — Now keyed by token (returned by export-drawer). The outcome 'cancelled'
+  // means the user closed the save dialog — not an error, so no toast.
   useEffect(() => {
-    const unsubscribe = api().onExportDownloadDone(({ fileName, outcome }) => {
-      const pending = pendingExports.current.get(fileName);
+    const unsubscribe = api().onExportDownloadDone(({ token, outcome }) => {
+      if (!token) {
+        console.warn('[Export] download done without token', { outcome });
+        return;
+      }
+      const pending = pendingExports.current.get(token);
       if (!pending) return;
-      pendingExports.current.delete(fileName);
+      pendingExports.current.delete(token);
       clearTimeout(pending.timer);
       URL.revokeObjectURL(pending.url);
       if (outcome === 'completed') {
         toast.success(t('msg.drawer_exported'));
-      } else {
-        // The download did not write the file. Saying so is the point of waiting:
-        // the toast used to claim success the moment the click was dispatched, which
-        // is exactly the moment nothing had been written yet.
+      } else if (outcome === 'interrupted') {
+        // Disk error, blob gone, etc. — genuine failure.
         toast.error(t('msg.drawer_export_failed'));
+      } else {
+        // outcome === 'cancelled' — user closed the save dialog. Neutral, no toast.
+        console.info('[Export] cancelled by user', { token });
       }
     });
     return () => {
@@ -138,10 +145,10 @@ function HomeScreen(): React.JSX.Element {
       // will not arrive any more — the listener is gone — so the fallback timer
       // would be the only thing left holding the blob, and it would fire a toast
       // into a screen that is no longer there.
-      for (const [fileName, pending] of pendingExports.current) {
+      for (const [token, pending] of pendingExports.current) {
         clearTimeout(pending.timer);
         URL.revokeObjectURL(pending.url);
-        pendingExports.current.delete(fileName);
+        pendingExports.current.delete(token);
       }
     };
   }, []);
@@ -163,7 +170,15 @@ function HomeScreen(): React.JSX.Element {
     );
   }
 
+  // UX-06 — Only one export at a time. The main process returns a token that we
+  // use as the key for pendingExports and as the download filename. If another
+  // export is attempted while one is pending, we refuse it.
   async function handleExport(id: string): Promise<void> {
+    // Refuse if there's already a pending export (any token in the map).
+    if (pendingExports.current.size > 0) {
+      toast.error(t('msg.export_pending'));
+      return;
+    }
     setExportingId(id);
     try {
       const result = await api().exportDrawer(id);
@@ -171,9 +186,11 @@ function HomeScreen(): React.JSX.Element {
         toast.error(tError(result.error));
         return;
       }
-      const blob = new Blob([result.data], { type: 'application/json' });
+      const { token, content } = result.data;
+      const blob = new Blob([content], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
-      const fileName = `${id}.clavis`;
+      // Use token as filename so main process can correlate download outcome.
+      const fileName = `${token}.clavis`;
       const a = document.createElement('a');
       a.href = url;
       a.download = fileName;
@@ -183,12 +200,13 @@ function HomeScreen(): React.JSX.Element {
       // action, and a revoke that lands before that resolution kills the download
       // outright: measured, the item sits at 'progressing' forever, no file is
       // written, and the app says "exported successfully" anyway.
-      pendingExports.current.set(fileName, {
+      pendingExports.current.set(token, {
         url,
+        fileName,
         timer: setTimeout(() => {
-          const pending = pendingExports.current.get(fileName);
+          const pending = pendingExports.current.get(token);
           if (!pending) return;
-          pendingExports.current.delete(fileName);
+          pendingExports.current.delete(token);
           URL.revokeObjectURL(pending.url);
           toast.error(t('msg.drawer_export_failed'));
         }, EXPORT_DOWNLOAD_FALLBACK_MS),

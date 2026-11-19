@@ -127,9 +127,10 @@ e2e **14/14** · `npm audit --omit=dev` **1 high** · `npm audit` **43** (4 crit
 - [x] **UX-05** — Ctrl+S fires through open delete/discard dialogs and repeated Ctrl+S starts concurrent saves;
       guard on `saving || deleting || showDeleteConfirm || showDiscardConfirm`.
       **DONE 2026-11-19:** guard added in `ViewDrawer.tsx:handleKeyDown` before `handleSave()` call.
-- [ ] **UX-06** — Export: `cancelled` is shown as a failure; a second export overwrites the pending map and
+- [x] **UX-06** — Export: `cancelled` is shown as a failure; a second export overwrites the pending map and
       leaks a blob; a duplicate filename (`x (1).clavis`) makes a successful export report failure. Key the
       pending entry on a token returned by main, and refuse a second export while one is pending.
+      **DONE 2026-11-19:** `exportDrawer` returns `{ token, content }`; renderer uses token as pendingExports key and download filename; `cancelled` outcome is neutral (no toast); second export refused while pending; tests updated — `src/main/ipc-handlers.ts`, `src/main/downloads.ts`, `src/renderer/pages/HomeScreen.tsx`, `src/shared/types.ts`, `src/i18n/index.ts`.
 - [x] **UX-07** — The plaintext password lives in `HomeScreen.viewState` until Back; move it to a ref cleared
       on unmount (or a main-process session handle post-1.0).
       **DONE 2026-11-19:** `ViewState` no longer contains password; `viewPasswordRef` holds it only during ViewDrawer lifetime, cleared in `onBack` (`HomeScreen.tsx:52-53, 285, 329-330`).

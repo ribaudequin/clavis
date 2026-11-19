@@ -87,6 +87,7 @@ describe('the download observer', () => {
     expect(send).toHaveBeenCalledExactlyOnceWith(CHANNELS.EXPORT_DOWNLOAD_DONE, {
       fileName: 'drawer.clavis',
       outcome: 'completed',
+      token: 'drawer',
     });
   });
 
@@ -103,6 +104,7 @@ describe('the download observer', () => {
     expect(send).toHaveBeenCalledExactlyOnceWith(CHANNELS.EXPORT_DOWNLOAD_DONE, {
       fileName: 'drawer.clavis',
       outcome: 'interrupted',
+      token: 'drawer',
     });
   });
 

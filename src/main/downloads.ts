@@ -2,6 +2,7 @@ import { session } from 'electron';
 import { CHANNELS } from '../shared/channels.js';
 import { logger } from './logger.js';
 import type { DownloadOutcome, DownloadResult } from '../shared/types.js';
+import { pendingExports } from './ipc-handlers.js';
 
 /**
  * The part of the window this module needs — it only ever sends to it.
@@ -44,8 +45,14 @@ export function observeDownloads(getWindow: () => DownloadTarget | null): void {
         logger.warn('Download finished with no window to tell', { fileName, outcome: state });
         return;
       }
-      const result: DownloadResult = { fileName, outcome: state };
-      logger.info('Download finished', { fileName, outcome: state });
+      // UX-06 — Extract token from filename (format: token.clavis) and include
+      // it in the notification so the renderer can match the pending export.
+      // Also clean up the main-process content map so the exported ciphertext
+      // is not held in memory after the download ends.
+      const token = fileName.endsWith('.clavis') ? fileName.slice(0, -7) : fileName;
+      pendingExports.delete(token);
+      const result: DownloadResult & { token?: string } = { fileName, outcome: state, token };
+      logger.info('Download finished', { fileName, outcome: state, token });
       window.webContents.send(CHANNELS.EXPORT_DOWNLOAD_DONE, result);
     });
   });

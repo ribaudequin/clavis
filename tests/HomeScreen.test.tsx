@@ -21,7 +21,7 @@ function buildStub(): Window['electronAPI'] {
     getUnlockDelay: async (): Promise<number> => 0,
     saveDrawer: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
     deleteDrawer: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
-    exportDrawer: async (): Promise<Result<string>> => ({ ok: true, data: '' }),
+    exportDrawer: async (): Promise<Result<{ token: string; content: string }>> => ({ ok: true, data: { token: 'test-token', content: '' } }),
     importDrawer: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
     openFile: async (): Promise<Result<{ token: string; fileName: string } | null>> => ({ ok: true, data: null }),
     restartApp: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
@@ -134,7 +134,7 @@ describe('the export', () => {
 
     window.electronAPI = {
       ...buildStub(),
-      exportDrawer: async (): Promise<Result<string>> => ({ ok: true, data: '{"id":"x"}' }),
+      exportDrawer: async (): Promise<Result<{ token: string; content: string }>> => ({ ok: true, data: { token: 'test-token', content: '{"id":"x"}' } }),
       onExportDownloadDone: (listener: (result: DownloadResult) => void) => {
         downloadListener = listener;
         return () => {
@@ -170,11 +170,11 @@ describe('the export', () => {
     await waitFor(() => expect(clickedAnchors.length).toBe(1));
   }
 
-  it('hands Chromium a blob URL and the file name the drawer is stored under', async () => {
+  it('hands Chromium a blob URL and the file name based on the export token', async () => {
     await exportTheDrawer();
 
     expect(createdUrls).toHaveLength(1);
-    expect(clickedAnchors[0].getAttribute('download')).toBe(EXPORT_FILE);
+    expect(clickedAnchors[0].getAttribute('download')).toBe('test-token.clavis');
     expect(clickedAnchors[0].getAttribute('href')).toBe(createdUrls[0]);
   });
 
@@ -190,7 +190,7 @@ describe('the export', () => {
     await exportTheDrawer();
 
     expect(downloadListener).not.toBeNull();
-    downloadListener?.({ fileName: EXPORT_FILE, outcome: 'completed' });
+    downloadListener?.({ fileName: 'test-token.clavis', token: 'test-token', outcome: 'completed' });
 
     expect(revokedUrls).toEqual(createdUrls);
     expect(toast.success).toHaveBeenCalledWith('Drawer exported successfully.');
@@ -199,25 +199,26 @@ describe('the export', () => {
   it('revokes the blob and reports the failure when the download did not write the file', async () => {
     await exportTheDrawer();
 
-    downloadListener?.({ fileName: EXPORT_FILE, outcome: 'interrupted' });
+    downloadListener?.({ fileName: 'test-token.clavis', token: 'test-token', outcome: 'interrupted' });
 
     expect(revokedUrls).toEqual(createdUrls);
     expect(toast.success).not.toHaveBeenCalled();
     expect(toast.error).toHaveBeenCalledWith('The export did not finish. The file was not written.');
   });
 
-  it('reports a cancelled download as a failure too', async () => {
+  it('treats a cancelled download as neutral — no toast', async () => {
     await exportTheDrawer();
 
-    downloadListener?.({ fileName: EXPORT_FILE, outcome: 'cancelled' });
+    downloadListener?.({ fileName: 'test-token.clavis', token: 'test-token', outcome: 'cancelled' });
 
-    expect(toast.error).toHaveBeenCalledWith('The export did not finish. The file was not written.');
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it('ignores an outcome for a download it is not waiting for', async () => {
     await exportTheDrawer();
 
-    downloadListener?.({ fileName: 'someone-elses.clavis', outcome: 'completed' });
+    downloadListener?.({ fileName: 'unknown-token.clavis', token: 'unknown-token', outcome: 'completed' });
 
     expect(revokedUrls).toEqual([]);
     expect(toast.success).not.toHaveBeenCalled();

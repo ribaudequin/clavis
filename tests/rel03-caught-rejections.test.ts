@@ -51,7 +51,7 @@ function buildStub(): Window['electronAPI'] {
     getUnlockDelay: async (): Promise<number> => 0,
     saveDrawer: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
     deleteDrawer: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
-    exportDrawer: async (): Promise<Result<string>> => ({ ok: true, data: '' }),
+    exportDrawer: async (): Promise<Result<{ token: string; content: string }>> => ({ ok: true, data: { token: 'test-token', content: '' } }),
     importDrawer: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),
     openFile: async (): Promise<Result<{ token: string; fileName: string } | null>> => ({ ok: true, data: null }),
     restartApp: async (): Promise<Result<void>> => ({ ok: true, data: undefined }),

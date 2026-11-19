@@ -1031,14 +1031,19 @@ describe('IPC handlers', () => {
   });
 
   describe('export-drawer', () => {
-    it('returns ok with raw json string on success', async () => {
+    it('returns ok with token and content on success', async () => {
       const raw = '{"id":"x","title":"t"}';
       vi.mocked(store.readDrawerRaw).mockResolvedValue({ ok: true, data: raw });
 
       const handler = getHandler(CHANNELS.EXPORT_DRAWER);
       const result = await handler({}, VALID_UUID);
 
-      expect(result).toEqual({ ok: true, data: raw });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data).toHaveProperty('token');
+        expect(typeof result.data.token).toBe('string');
+        expect(result.data.content).toBe(raw);
+      }
     });
 
     it('returns FILE_NOT_FOUND when store returns not_found', async () => {

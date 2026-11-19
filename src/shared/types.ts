@@ -83,6 +83,8 @@ export interface DownloadResult {
   /** The file name Chromium gave it — the renderer matches the pending export by it. */
   fileName: string;
   outcome: DownloadOutcome;
+  /** UX-06 — Token returned by export-drawer; matches the renderer's pendingExports key. */
+  token?: string;
 }
 
 export interface ElectronAPI {
@@ -100,7 +102,8 @@ export interface ElectronAPI {
   getUnlockDelay: (id: string) => Promise<number>;
   saveDrawer: (id: string, password: string, title: string, content: string) => Promise<Result<void>>;
   deleteDrawer: (id: string) => Promise<Result<void>>;
-  exportDrawer: (id: string) => Promise<Result<string>>;
+  // UX-06 — Returns token + content; renderer uses token as pendingExports key.
+  exportDrawer: (id: string) => Promise<Result<{ token: string; content: string }>>;
   /**
    * How the export download ended.
    *
