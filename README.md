@@ -17,7 +17,7 @@
 
 ---
 
-### ⚠️ IMPORTANT: Unsigned Builds — Not a Virus
+### ⚠️ IMPORTANT: Unsigned Builds — Not Unsafe
 
 **Clavis is not code-signed with a paid certificate.** This is a **deliberate choice** (see [SECURITY.md](SECURITY.md) for rationale), not a security issue. The binaries are built transparently on GitHub Actions and you can verify them yourself.
 
@@ -27,7 +27,7 @@
 | **macOS** | Gatekeeper: *"cannot be opened because the developer cannot be verified"* | Right-click the app → **Open**, or run `xattr -d com.apple.quarantine /Applications/Clavis.app` |
 | **Linux** | No warning (unsigned `.deb`/`.AppImage` work normally) | Install `.deb` or run `.AppImage` directly |
 
-> **This does NOT mean Clavis has a virus.** It means we don't pay $100–$600/year for a code-signing certificate. The source is open, the build is reproducible on GitHub Actions, and every release publishes SHA-256 checksums.
+> **This does NOT mean Clavis is unsafe.** It means we don't pay $100–$600/year for a code-signing certificate. The source is open, the build is reproducible on GitHub Actions, and every release publishes SHA-256 checksums.
 
 ---
 
