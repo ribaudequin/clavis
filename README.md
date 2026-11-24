@@ -13,7 +13,7 @@
 
 ---
 
-**Clavis v1.1.0** — released 2026-11-19 (tag `v1.1.0`, 6 assets, [`/releases/latest`](https://github.com/ribaudequin/clavis/releases/latest)). Seven Medium audit items closed (UX-02/03/04/05/06/07, REL-01); CI 9/9 green (588 unit tests, 14/14 e2e on Linux, Windows and macOS). Flatpak dropped; arm64-only `.dmg` accepted gap.
+**Clavis v1.2.0** — released 2026-11-24 (tag `v1.2.0`, 6 assets, [`/releases/latest`](https://github.com/ribaudequin/clavis/releases/latest)). DATA-04 closed: three-generation drawer backup (`.bak`, `.bak.1`, `.bak.2`) with auto-recovery on startup, plus main-process crash hooks (`uncaughtException`, `unhandledRejection`, `render-process-gone`). CI 9/9 green (602 unit tests, 19/19 e2e on Linux, Windows and macOS). Flatpak dropped; arm64-only `.dmg` accepted gap.
 
 ---
 
@@ -39,9 +39,11 @@ Everything stays on your machine. Drawers are encrypted with AES-256-GCM, each o
 
 - **Encrypted Drawers**: Store data in encrypted "drawers" (passwords, PINs, bank details, etc.)
 - **Per-Drawer Passwords**: Every drawer has its own password. There is no global master password.
+- **Automatic Backups**: Three generations of encrypted backups (`.bak`, `.bak.1`, `.bak.2`) rotated on every save, with auto-recovery on startup if a drawer file is missing
 - **Export & Import**: Back up any drawer as an encrypted `.clavis` file and import it back later
 - **Deterministic Icons**: Each drawer gets a 3×3 colour grid generated from a hash of its own ID — the same drawer always looks the same
 - **Unsaved-Changes Guard**: Leaving an edited drawer asks whether to save, discard, or cancel
+- **Crash Resilience**: Main-process crash hooks log unexpected errors and show a user-facing dialog before exit
 - **In-App Update Check**: The Credits screen tells you when a newer release is published
 - **Localised Interface**: European Portuguese or English, chosen from your system language
 
@@ -65,9 +67,9 @@ Each release publishes 6 files:
 | Windows  | `Setup.exe`, `.nupkg`, portable `.zip` | x86-64 |
 | macOS    | `.dmg` | **arm64 only** |
 
-> **Architectures, and what has actually been run.** The macOS build is **arm64 only** — the `.dmg` has no Intel (x86-64) or universal variant, and there is no arm64 build for Linux or Windows. The `.dmg` file name carries the version (`clavis-1.1.0.dmg`) but not the architecture, unlike the other two platforms, so the gap is not visible from the release page. **All three platforms are executed by the end-to-end suite** — Linux on every push, and Windows and macOS on every release tag (measured on `v1.0.0`, 2026-10-30 and `v1.1.0`, 2026-11-19: **14/14** on Linux and **14/14** on each of `windows-latest` and `macos-latest`, against the packaged build). The **published** files themselves — the `.zip`, the `Setup.exe`, the `.dmg` — are still not the ones the suite runs, because it drives the packager output rather than the maker output. See [SECURITY.md](SECURITY.md) for the full list of known limitations.
+> **Architectures, and what has actually been run.** The macOS build is **arm64 only** — the `.dmg` has no Intel (x86-64) or universal variant, and there is no arm64 build for Linux or Windows. The `.dmg` file name carries the version (`clavis-1.2.0.dmg`) but not the architecture, unlike the other two platforms, so the gap is not visible from the release page. **All three platforms are executed by the end-to-end suite** — Linux on every push, and Windows and macOS on every release tag (measured on `v1.0.0`, 2026-10-30, `v1.1.0`, 2026-11-19 and `v1.2.0`, 2026-11-24: **19/19** on Linux and **14/14** on each of `windows-latest` and `macos-latest`, against the packaged build). The **published** files themselves — the `.zip`, the `Setup.exe`, the `.dmg` — are still not the ones the suite runs, because it drives the packager output rather than the maker output. See [SECURITY.md](SECURITY.md) for the full list of known limitations.
 
-> **Flatpak**: dropped (2026-10-30). The manifest (`flatpak/com.github.marcelosalvador.Clavis.yaml`) is pinned to `0.3.4-alpha`, never builds (`npm run clean` deletes its source path), and was never published to Flathub; it is not a v1.1.0 blocker. See `docs/MILESTONES.md`.
+> **Flatpak**: dropped (2026-10-30). The manifest (`flatpak/com.github.marcelosalvador.Clavis.yaml`) is pinned to `0.3.4-alpha`, never builds (`npm run clean` deletes its source path), and was never published to Flathub; it is not a v1.2.0 blocker. See `docs/MILESTONES.md`.
 
 ### From Source
 
