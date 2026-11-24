@@ -818,7 +818,17 @@ export async function deleteDrawer(id: string): Promise<DeleteDrawerResult> {
   // save's read and its rename would otherwise be undone by the save (the drawer reappears).
   return withDrawerLock(id, async () => {
     try {
-      await fs.unlink(getDrawerFilePath(id));
+      const filePath = getDrawerFilePath(id);
+      await fs.unlink(filePath);
+      // DATA-04 — Also remove backup files (.bak, .bak.1, .bak.2) so the drawer
+      // is completely gone. A missing backup (ENOENT) is not an error.
+      for (const suffix of ['.bak', '.bak.1', '.bak.2']) {
+        await fs.unlink(`${filePath}${suffix}`).catch((e: NodeJS.ErrnoException) => {
+          if (e.code !== 'ENOENT') {
+            logger.warn('Delete: could not remove backup file', { id, suffix, error: e.message });
+          }
+        });
+      }
       logger.info('Drawer deleted', { id });
       return { ok: true };
     } catch (e) {
