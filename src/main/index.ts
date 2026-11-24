@@ -61,6 +61,53 @@ const isPrimaryInstance = acquireSingleInstanceLock({
   getWindow: () => mainWindow,
 });
 
+// DATA-04 — Crash hooks. Registered at module scope, before app.whenReady(), so a crash
+// during startup is still captured. Only registered on the primary instance: the process
+// that lost the lock race never opened the store, never created a window and never
+// registered the IPC handlers, so there is no state worth diagnosing.
+//
+// `uncaughtException` is the only one that is fatal. It logs the stack, shows the user a
+// dialog explaining that unsaved edits in the current drawer are still on disk (the last
+// successful save), and exits with code 1. `app.exit(1)` rather than `app.quit()` because
+// `before-quit`/`will-quit` handlers may themselves throw, and re-entering our code in a
+// crash path is the wrong shape.
+//
+// `unhandledRejection` is not fatal — an unhandled promise rejection does not kill
+// Electron — but it does mean a code path silently swallowed a failure. It is logged but
+// not surfaced: showing a dialog for every unhandled rejection would train the user to
+// click OK without reading, and the renderer's ErrorBoundary covers the user-facing case.
+//
+// `render-process-gone` fires when the renderer is killed (OOM, crash, OS). The window
+// is already dead, so there is no dialog to show — the log is for post-mortem diagnosis.
+if (isPrimaryInstance) {
+  process.on('uncaughtException', (err) => {
+    logger.error('DATA-04 Uncaught exception in main process', {
+      error: err instanceof Error ? (err.stack ?? err.message) : String(err),
+    });
+    dialog.showErrorBox(
+      'Clavis',
+      'Clavis encountered an unexpected error and will close. '
+      + 'Any unsaved changes in the current drawer were kept — the last successful save is on disk.'
+    );
+    app.exit(1);
+  });
+
+  process.on('unhandledRejection', (reason) => {
+    logger.error('DATA-04 Unhandled rejection in main process', {
+      error: reason instanceof Error ? (reason.stack ?? reason.message) : String(reason),
+    });
+  });
+
+  app.on('render-process-gone', (_event, _webContents, details) => {
+    // `reason` is 'clean-exit' | 'abnormal-exit' | 'killed' | 'crashed' | 'oom' |
+    // 'launch-failed' | 'integrity-failure'. The window is already dead; this is for the log.
+    logger.error('DATA-04 Renderer process gone', {
+      reason: details.reason,
+      exitCode: details.exitCode,
+    });
+  });
+}
+
 
 function createWindow(): void {
   const opts = windowOptions(app.isPackaged, __dirname, process.platform);

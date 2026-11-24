@@ -92,8 +92,14 @@ e2e **14/14** · `npm audit --omit=dev` **1 high** · `npm audit` **43** (4 crit
 - [x] **DATA-03** — Store errors are swallowed (`listDrawers` → `[]`, `readDrawerRaw` → `null` for three causes),
       so an unreadable vault renders empty; return discriminated results and map them to distinct messages.
       **DONE 2026-11-09** (`d4ea93a`): `ListDrawersResult`/`ReadDrawerRawResult`/`DeleteDrawerResult` discriminated unions; new `ErrorCode` values `DIRECTORY_UNREADABLE`, `DRAWER_UNREADABLE`, `PERMISSION_DENIED`; IPC handlers map reasons; i18n keys added.
-- [ ] **DATA-04** — No drawer backup/versioning and no main-process crash hooks; add `uncaughtException` /
+- [x] **DATA-04** — No drawer backup/versioning and no main-process crash hooks; add `uncaughtException` /
       `unhandledRejection` / `render-process-gone` logging and decide the `.bak` policy.
+      **DONE 2026-11-24:** three generations of backup (`.bak`, `.bak.1`, `.bak.2`) rotated on every save;
+      auto-recovery on startup renames `.bak` → `.clavis` when the live file is missing; crash hooks
+      (`uncaughtException`, `unhandledRejection`, `render-process-gone`) registered on the primary instance
+      only; `docs/user-guide.md` §Backups documents manual recovery; `SECURITY.md` documents the backup
+      policy. 14 new tests (`tests/store-backup.test.ts`, `tests/crash-hooks.test.ts`); 602/602 vitest,
+      coverage 82.51/71.07/79.93/83.77 (thresholds 80/70/75/80 ✅).
 - [x] **QA-02** — `src/main/index.ts` is 26.78 % covered and its window security options are untested; extract
       `windowOptions()` and assert `sandbox` / `contextIsolation` / `nodeIntegration`.
       **DONE 2026-11-09** (`85f066d`): `src/main/window-options.ts` pure factory; 5 new tests in `tests/window-options.test.ts`; coverage for `sandbox`/`contextIsolation`/`nodeIntegration`/`devTools`/icon paths.

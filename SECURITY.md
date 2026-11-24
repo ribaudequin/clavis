@@ -98,6 +98,34 @@ Drawers are stored in a `drawers` subdirectory of Electron's `userData` path. Th
 - **Windows:** `mode` is ignored. Node.js documents `fs.mkdir()`'s `mode` as "not supported on Windows", and file modes do not apply there either. Protection comes instead from the ACL inherited from the per-user `%APPDATA%` directory that `userData` resolves to, which Windows restricts to that user by default. The practical outcome is comparable, but **the control is the operating system's, not Clavis's**.
 - **Exports get none of this** — see [3. Exported `.clavis` files do not inherit the app's file permissions](#3-exported-clavis-files-do-not-inherit-the-apps-file-permissions).
 
+### Backups (DATA-04)
+
+Clavis keeps **three generations of backup** for every drawer, written alongside the live `.clavis` file:
+
+| File | Contents |
+|---|---|
+| `<id>.clavis` | Live drawer (current state) |
+| `<id>.clavis.bak` | Previous save (one generation back) |
+| `<id>.clavis.bak.1` | Two saves ago |
+| `<id>.clavis.bak.2` | Three saves ago (oldest kept) |
+
+- **Backups are encrypted** — same cipher, same password, same metadata envelope as the live file. They carry no
+  additional confidentiality surface.
+- **Rotation is atomic:** on every save, the live file is renamed to `.bak`, the previous `.bak` to `.bak.1`,
+  the previous `.bak.1` to `.bak.2`, and the previous `.bak.2` is overwritten. Each step is a single rename; a
+  missing link (ENOENT) is skipped.
+- **Auto-recovery on startup:** if the live `.clavis` is missing but a `.bak` exists (the crash window between
+  the two renames in `atomicWrite`), `ensureDataDir` renames the `.bak` back into place before the drawer list
+  is served. The user sees the drawer as if nothing happened.
+- **Manual recovery:** if the live file exists but its content is wrong, the user can restore a previous
+  generation by renaming `.clavis.bak` → `.clavis` while Clavis is stopped. Documented in
+  `docs/user-guide.md` §Backups.
+- **Deletion:** `deleteDrawer` removes the live `.clavis` but **not** the `.bak` files — the backups survive for
+  manual recovery. They are not listed by `listDrawers` (which filters on the `.clavis` suffix), so they are
+  invisible to the UI.
+- **Rotation failure is non-fatal:** if a rotation rename fails (EIO, EACCES), the save still proceeds — the
+  user loses the backup net for that save, not the data. The failure is logged.
+
 ### Content-Security-Policy
 
 The renderer ships a CSP via an HTML `<meta>` tag (`src/renderer/index.html`):

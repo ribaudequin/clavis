@@ -41,6 +41,16 @@ async function withDrawerLock<T>(id: string, op: () => Promise<T>): Promise<T> {
 // rename that failed left it at .prev, which nothing in the app ever read back. One
 // rename(tmp, filePath) replaces the live inode in a single metadata operation, so the
 // path is never absent and never holds a half-written file.
+//
+// DATA-04 — Three generations of backup. Before the live file is replaced, it is moved
+// out of the way to `<id>.clavis.bak`; the previous `.bak` becomes `.bak.1`, the previous
+// `.bak.1` becomes `.bak.2`, and the previous `.bak.2` is overwritten by the new `.bak`
+// (or deleted if the chain is shorter). The algorithm is a single loop that rotates from
+// oldest to newest: unlink the oldest, rename each existing link one step down, then rename
+// the live file into the newest link. A missing link in the chain (ENOENT on rename or
+// unlink) is treated as "this generation does not exist yet" and skipped — not an error.
+// A failure at any step (EIO, EACCES) is logged and swallowed: the live file is still in
+// place and the save can proceed; the user loses the backup net, not the save.
 async function atomicWrite(filePath: string, data: string): Promise<void> {
   const dir = path.dirname(filePath);
   // Not Date.now(): two saves of the same drawer inside one millisecond resolved to the same
@@ -54,6 +64,33 @@ async function atomicWrite(filePath: string, data: string): Promise<void> {
   await fs.writeFile(tmp, data, { encoding: 'utf8', mode: 0o600 });
   const fd = await fs.open(tmp, 'r+');
   try { await fd.sync(); } finally { await fd.close(); }
+  // DATA-04 — Rotate backups before the live file is replaced. Three generations are kept:
+  //   <id>.clavis.bak     (newest, the state immediately before this save)
+  //   <id>.clavis.bak.1   (one save older)
+  //   <id>.clavis.bak.2   (oldest, overwritten on the next save)
+  // The chain is rotated oldest-to-newest so each step is a single rename, and a missing
+  // link (ENOENT) is skipped rather than treated as an error. A rotation failure is logged
+  // and swallowed: the live file is still in place, so the save itself can proceed — the
+  // user loses the safety net, not the data.
+  try {
+    await fs.unlink(`${filePath}.bak.2`).catch((e: NodeJS.ErrnoException) => {
+      if (e.code !== 'ENOENT') throw e;
+    });
+    for (const [from, to] of [
+      [`${filePath}.bak.1`, `${filePath}.bak.2`],
+      [`${filePath}.bak`, `${filePath}.bak.1`],
+      [filePath, `${filePath}.bak`],
+    ] as const) {
+      await fs.rename(from, to).catch((e: NodeJS.ErrnoException) => {
+        if (e.code !== 'ENOENT') throw e;
+      });
+    }
+  } catch (e) {
+    logger.warn('DATA-04 backup rotation failed; continuing without backup', {
+      file: filePath,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
   try {
     await fs.rename(tmp, filePath);
   } catch (e) {
@@ -298,9 +335,61 @@ export async function ensureDataDir(): Promise<void> {
         })
       );
     }
+    // DATA-04 — Auto-recover drawers whose live file is missing but whose newest backup
+    // exists. This is the crash window the backup exists to cover: a kill or power cut
+    // between the two renames in atomicWrite (live → .bak, tmp → live) leaves the .bak
+    // behind and no .clavis. Recovering on startup is safe because the .bak is the state
+    // the user last saved; if the user already opened and re-saved the drawer in the
+    // meantime, the .clavis exists and the recovery is a no-op.
+    await recoverOrphanedBackups();
     logger.debug('Data directory ensured', { path: getDrawersPath() });
   } catch (e) {
     logger.error('ensureDataDir mkdir failed', { error: e instanceof Error ? e.message : String(e) });
+  }
+}
+
+// DATA-04 — Auto-recovery. For each `<id>.clavis.bak` whose live `<id>.clavis` is
+// missing, rename the backup back into place. The rotation chain (`.bak.1`, `.bak.2`)
+// is left alone: if the live file is missing, the newest backup is the right one to
+// restore, and the older generations are still there for manual recovery.
+//
+// Recovery is best-effort: a failure on one drawer does not stop the others, and a
+// drawer that cannot be recovered is logged and skipped — the user will see it missing
+// from the list and can re-import from an export.
+async function recoverOrphanedBackups(): Promise<void> {
+  const drawersPath = getDrawersPath();
+  let entries: string[];
+  try {
+    entries = await fs.readdir(drawersPath);
+  } catch (e) {
+    logger.warn('DATA-04 recovery: could not list drawers directory', {
+      error: e instanceof Error ? e.message : String(e),
+    });
+    return;
+  }
+  const bakFiles = entries.filter((f) => f.endsWith(`${DRAWER_EXT}.bak`));
+  if (bakFiles.length === 0) return;
+  let recovered = 0;
+  for (const bakFile of bakFiles) {
+    const bakPath = path.join(drawersPath, bakFile);
+    const livePath = bakPath.slice(0, -`.bak`.length);
+    // Only recover if the live file is absent — if it exists, the rotation worked and
+    // the .bak is the previous generation, not an orphan.
+    const liveExists = await fs.access(livePath).then(() => true).catch(() => false);
+    if (liveExists) continue;
+    try {
+      await fs.rename(bakPath, livePath);
+      logger.warn('DATA-04 recovered orphaned drawer backup', { file: path.basename(livePath) });
+      recovered += 1;
+    } catch (e) {
+      logger.error('DATA-04 recovery failed for one drawer', {
+        file: bakFile,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+  if (recovered > 0) {
+    logger.warn('DATA-04 recovery complete', { count: recovered });
   }
 }
 

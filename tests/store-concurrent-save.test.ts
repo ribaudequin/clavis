@@ -52,6 +52,9 @@ describe('DATA-01 — concurrent saves are serialized per drawer', () => {
 
     vi.spyOn(fs, 'rename').mockImplementation(async (from, to) => {
       await realRename(from, to);
+      // DATA-04 — The rotation renames (live → .bak, .bak → .bak.1, etc.) and the
+      // final staging rename (tmp → live) all land on `to === livePath` only for the
+      // final one. We track every rename that lands on the live path.
       if (String(to) === livePath) events.push('rename');
     });
 
@@ -62,6 +65,9 @@ describe('DATA-01 — concurrent saves are serialized per drawer', () => {
 
     expect(results).toEqual([{ ok: true }, { ok: true }]);
     // Serialized: read, rename, read, rename. The racy shape is read, read, rename, rename.
+    // DATA-04 adds rotation renames (live → .bak) before each staging rename, but the
+    // critical ordering is preserved: the second save's read happens after the first
+    // save's final rename (tmp → live).
     expect(events).toEqual(['read', 'rename', 'read', 'rename']);
 
     const unlocked = await unlockDrawer(drawer.id, PASSWORD);

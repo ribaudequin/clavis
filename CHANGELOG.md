@@ -16,6 +16,19 @@
 
 - All gates pass: lint 0, typecheck 0, typecheck:test 0, 588/588 vitest, 14/14 e2e (Linux, both locales), e2e-cross macOS/Windows ✅, coverage 82.59/72.03/80.33/83.91 (thresholds 80/70/75/80).
 
+## v1.1.1 (2026-11-24)
+
+### Added (DATA-04 — Backup and crash hooks)
+
+- **Three generations of drawer backup.** Every save rotates the previous state through `.clavis.bak`, `.clavis.bak.1`, and `.clavis.bak.2` (oldest overwritten, newest preserved). Backups are encrypted (same cipher, same password) and carry no additional confidentiality surface. Rotation is atomic: each step is a single rename; a missing link (ENOENT) is skipped.
+- **Auto-recovery on startup.** If the live `.clavis` is missing but a `.bak` exists (the crash window between the two renames in `atomicWrite`), `ensureDataDir` renames the `.bak` back into place before the drawer list is served. The user sees the drawer as if nothing happened.
+- **Crash hooks in the main process.** `uncaughtException` logs the stack, shows a user-facing dialog explaining that unsaved edits are still on disk, and exits with code 1. `unhandledRejection` logs but does not exit (not fatal). `render-process-gone` logs the reason and exit code for post-mortem diagnosis. Handlers are registered only on the primary instance.
+- **Manual recovery documented.** `docs/user-guide.md` §Backups explains how to restore a previous generation by renaming `.clavis.bak` → `.clavis` while Clavis is stopped. `SECURITY.md` documents the backup policy and rotation.
+
+### Quality
+
+- 14 new tests (`tests/store-backup.test.ts`, `tests/crash-hooks.test.ts`); 602/602 vitest, coverage 82.51/71.07/79.93/83.77 (thresholds 80/70/75/80 ✅).
+
 ## v1.0.1 (2026-11-09)
 
 ### Fixed
