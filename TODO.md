@@ -112,8 +112,11 @@ e2e **14/14** · `npm audit --omit=dev` **1 high** · `npm audit` **43** (4 crit
 - [x] **REL-01** — `scripts/release-phase.sh` does not parse (`bash -n` exit 2) and would bump only
       `package.json`; delete it (not referenced by any doc) or rewrite around `npm version` and stop before push.
       **DONE 2026-11-19:** script already deleted; not referenced in CI workflow (uses `check-tag-version.sh` instead).
-- [ ] **REL-02** — Windows/macOS legs are informational; add `windows-latest` to `quality` and gate the 1.0 tag
+- [x] **REL-02** — Windows/macOS legs are informational; add `windows-latest` to `quality` and gate the 1.0 tag
       on a green cross run (or record a manual green run in the release notes).
+      **DONE 2026-11-27:** `release` job now has `needs: [build, e2e-cross]` — a tag whose Windows or macOS
+      e2e leg is red (or skipped) does not publish. On a push to `main`/PR both `e2e-cross` and `release`
+      are skipped, so the gate never blocks a non-release run. Comments updated in `release.yml`.
 - [ ] **REL-03** — Dev supply chain: remove the dead Storybook stack (7 packages, 4 critical advisories, no
       `.storybook/`), pin `latest`, add `engines.node >= 22.12`, add Dependabot, document the Forge 6.4.2 risk.
 - [ ] **REL-04** — Release trust boundary: per-job `permissions`, SHA-pinned actions, drop the

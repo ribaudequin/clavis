@@ -138,11 +138,12 @@ jobs:
   # The published Windows zip, the Squirrel Setup.exe and the .dmg had never been
   # launched by a single process — they were downloaded by users and believed to work.
   #
-  # THIS JOB IS INFORMATIONAL. It does not gate the release: neither `build` nor
-  # `release` names it in its `needs`. The legs run only on tags (owner decision,
-  # 2026-10-21) plus the manual trigger above, so they measure rather than block —
-  # a cross-platform leg that failed would be a finding to write down, not a reason
-  # for the release to stop shipping.
+  # REL-02 — THIS JOB NOW GATES THE RELEASE. `release` names `e2e-cross` in its `needs`,
+  # so a tag whose Windows or macOS leg is red does not publish. The legs run on tags
+  # (and on `workflow_dispatch`), which is exactly when `release` runs, so the gate is
+  # structural: a skipped or failed cross leg skips the release. On a push to `main` or
+  # a pull request this job is skipped, but so is `release` — the skipped dependency
+  # never blocks a non-release run.
   #
   # The macOS leg is EXPECTED TO BE GREEN. The `.app` is now AD-HOC SIGNED: a local
   # Forge plugin (`scripts/forge-plugin-adhoc-sign.js`) signs the bundle in the
@@ -287,10 +288,10 @@ jobs:
     # The release gate: `quality` (lint, both typechecks, the unit suite) and `e2e` (the
     # Linux suite, both locales, on every push and pull request).
     #
-    # The cross-platform legs are NOT in here on purpose: they are informational (see
-    # `e2e-cross` above). They run only on tags, so a release must not depend on
-    # whether a Windows or macOS runner happened to be available when the tag was
-    # pushed.
+    # The cross-platform legs are NOT in here — they gate `release` directly (REL-02),
+    # not `build`. They run only on tags, so a release must not depend on whether a
+    # Windows or macOS runner happened to be available when the tag was pushed — but
+    # `release` does, because a tag that cannot run cross-platform must not publish.
     needs: [quality, e2e]
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/test/downgrade-forge-6.4.2'
     # THE GATE RESTS ON THIS CONDITION NOT NAMING A STATUS-CHECK FUNCTION.
@@ -404,12 +405,15 @@ jobs:
           if-no-files-found: error
 
   release:
-    # `build` only. `e2e-cross` is deliberately NOT named here: on a push to `main` and
-    # on a pull request that job is skipped, and a skipped dependency skips the
-    # dependent — so naming it would silently stop every release. The cross-platform
-    # legs are informational (see `e2e-cross` above); the release gate is `quality` and
-    # the Linux `e2e`, carried by `build`.
-    needs: build
+    # `build` and `e2e-cross` (REL-02). The release is gated on a green cross-platform
+    # run: a tag that pushes Windows or macOS e2e red no longer publishes. `e2e-cross`
+    # runs on tags (and on `workflow_dispatch`), so on a tag push both the cross legs
+    # and the release are triggered; if either cross leg fails, `release` is skipped.
+    #
+    # On a push to `main` or a pull request, `e2e-cross` is skipped — but `release` is
+    # also skipped there (its own `if` requires a tag push), so the skipped dependency
+    # never blocks a non-release run.
+    needs: [build, e2e-cross]
     # `github.event_name == 'push'` is what makes the manual trigger safe. The "Run
     # workflow" dropdown lets you pick a *tag*, and a dispatch made from a tag has
     # github.ref = refs/tags/v… — the tag test alone would pass and the release would

@@ -1,5 +1,11 @@
 # Changelog — Clavis
 
+## v1.2.1 (2026-11-27)
+
+### Fixed (REL-02 — Release gated on green cross-platform run)
+
+- **The `release` job now needs `e2e-cross`.** A tag whose Windows or macOS e2e leg is red (or skipped) no longer publishes. Previously the cross-platform legs were informational — they measured but did not block — so a release could ship with Windows/macOS tests failing. The gate is structural: `e2e-cross` runs on tags (and `workflow_dispatch`), which is exactly when `release` runs; on a push to `main` or a PR both jobs are skipped, so the gate never blocks a non-release run.
+
 ## v1.2.0 (2026-11-24)
 
 ### Added (DATA-04 — Backup and crash hooks)
