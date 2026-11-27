@@ -61,7 +61,7 @@
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "filenamify": "^4.3.0",
-    "jsdom": "^30.0.1",
+    "jsdom": "^31.0.1",
     "playwright": "1.65.1",
     "postcss": "^8.5.26",
     "prettier": "^3.9.6",
