@@ -1,5 +1,19 @@
 # Changelog — Clavis
 
+## v1.3.0 (2026-11-27)
+
+### Changed (REL-03 — Dev supply chain cleanup)
+
+- **Dead Storybook stack removed.** 7 packages (`@chromatic-com/storybook`, `@storybook/addon-a11y`, `@storybook/addon-docs`, `@storybook/addon-mcp`, `@storybook/addon-vitest`, `@storybook/react-vite`, `storybook`), the `storybook`/`build-storybook` scripts, and `eslint-plugin-storybook` are gone. There was no `.storybook/` directory and no `*.stories.*` file — the stack contributed 4 critical advisories to `npm audit` while being imported by nothing.
+- **`latest` replaced with pinned versions.** `@playwright/test` and `playwright` → `1.65.1`, `@vitejs/plugin-react` → `6.1.1`, `vite` → `8.2.2`. A `latest` tag makes the build non-reproducible: two runs on the same commit can resolve different dependency trees.
+- **`engines.node >= 22.12` declared.** Electron 44 requires it; it was implicit.
+- **Dependabot added** (`.github/dependabot.yml`). Weekly PRs for npm and github-actions, with `@electron-forge/*` major/minor bumps ignored (the 6.4.2 pin — see `SECURITY.md`).
+- **Forge 6.4.2 pin documented** in `SECURITY.md` §"Electron Forge 6.4.2 pin" — why it is pinned, what the risk is (dev-only, not runtime), and how to unpin.
+
+### Quality
+
+- 602/602 vitest, `npm audit --omit=dev` 0, lint 0, typecheck 0, typecheck:test 0.
+
 ## v1.2.1 (2026-11-27)
 
 ### Fixed (REL-02 — Release gated on green cross-platform run)

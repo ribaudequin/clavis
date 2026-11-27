@@ -159,6 +159,16 @@ There are no EV certificates and no Apple notarization credentials.
 - **Windows**: the release workflow passes two optional, unset secrets (`WINDOWS_CERT_FILE`, `WINDOWS_CERT_PASSWORD`). Because no signing happens, the `.exe` shows **"unknown publisher"** in SmartScreen and requires an explicit *More info → Run anyway*.
 - **macOS**: the `.app` bundle is **ad-hoc signed** — `codesign --force --deep --sign -`, which needs no certificate, no Apple account and no money, and is what makes the bundle launchable on arm64 (an invalid signature is a SIGKILL at launch). It is **not notarized**, because notarization needs the paid Apple Developer ID certificate, which this project does not have. So the `.dmg` is still built with `format: "ULFO"` and Gatekeeper still blocks the first launch: right-click the app → **Open**, or `xattr -d com.apple.quarantine /Applications/Clavis.app`.
 
+### Electron Forge 6.4.2 pin (REL-03)
+
+`@electron-forge/cli` and the four makers are pinned at **`6.4.2`**, not `^6.4.2`. Dependabot is configured to ignore major and minor bumps for `@electron-forge/*` (`.github/dependabot.yml`).
+
+**Why it is pinned.** Forge 7.x changed the config resolution (`forge.config.mts` is no longer read — see `BUILD_MANUAL.md`), the packager API, and the maker plugin interface. A minor bump lands a new major's behaviour in a project that was written against 6.4.2's, and the failure is silent: the makers are not found, the build produces no artifacts, and the CI `build` job fails at the upload step rather than at the bump. The pin is the smallest diff that keeps the build reproducible.
+
+**What the risk is.** 6.4.2 is from 2024 and does not receive security patches. The advisories that `npm audit` reports against it are dev-only (the build toolchain), not runtime — the shipped asar contains no Forge code. The risk is a compromised build runner, not a compromised user.
+
+**How to unpin.** Upgrade to Forge 7.x (or 8.x when stable) in a dedicated branch: update `package.json`, rename `forge.config.mts` back if needed, run `npm run make` on Linux, and verify the asar's `package.json` still reads the correct version. The CI tag guard (`scripts/check-tag-version.sh`) catches a version mismatch; the e2e suite catches a broken build.
+
 ## Known Limitations
 
 Five items are documented honestly rather than presented as working controls.

@@ -1,0 +1,38 @@
+# Dependabot — REL-03.
+#
+# Weekly PRs for npm dependencies and GitHub Actions updates. The limit keeps the
+# PR queue manageable; reviewers are the maintainer. Storybook was removed (REL-03)
+# because it had no .storybook/ directory, no *.stories.* files, and contributed 4
+# critical advisories to `npm audit` while being imported by nothing.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    reviewers:
+      - ribaudequin
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "chore(deps)"
+    ignore:
+      # Electron Forge is pinned at 6.4.2 — see SECURITY.md §"Electron Forge 6.4.2 pin".
+      # A Dependabot bump would break the makers and the ad-hoc-sign plugin.
+      - dependency-name: "@electron-forge/*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    reviewers:
+      - ribaudequin
+    labels:
+      - ci
+    commit-message:
+      prefix: "chore(ci)"

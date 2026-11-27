@@ -117,8 +117,12 @@ e2e **14/14** · `npm audit --omit=dev` **1 high** · `npm audit` **43** (4 crit
       **DONE 2026-11-27:** `release` job now has `needs: [build, e2e-cross]` — a tag whose Windows or macOS
       e2e leg is red (or skipped) does not publish. On a push to `main`/PR both `e2e-cross` and `release`
       are skipped, so the gate never blocks a non-release run. Comments updated in `release.yml`.
-- [ ] **REL-03** — Dev supply chain: remove the dead Storybook stack (7 packages, 4 critical advisories, no
+- [x] **REL-03** — Dev supply chain: remove the dead Storybook stack (7 packages, 4 critical advisories, no
       `.storybook/`), pin `latest`, add `engines.node >= 22.12`, add Dependabot, document the Forge 6.4.2 risk.
+      **DONE 2026-11-27:** removed 7 Storybook packages + `storybook`/`build-storybook` scripts + `eslint-plugin-storybook`;
+      pinned `@playwright/test`/`playwright` → `1.65.1`, `@vitejs/plugin-react` → `6.1.1`, `vite` → `8.2.2`;
+      added `engines.node >= 22.12`; added `.github/dependabot.yml` (npm + github-actions, weekly, ignores Forge major/minor);
+      documented the Forge 6.4.2 pin in `SECURITY.md` §"Electron Forge 6.4.2 pin". 602/602 vitest, `npm audit --omit=dev` 0.
 - [ ] **REL-04** — Release trust boundary: per-job `permissions`, SHA-pinned actions, drop the
       `test/downgrade-forge-6.4.2` clauses, publish `SHA256SUMS`, remove or implement the Windows cert env vars.
 - [ ] **ARCH-01** — `registerIpcHandlers` is 604 lines of duplicated try/catch/Zod branches; extract

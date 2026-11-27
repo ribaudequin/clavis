@@ -13,7 +13,7 @@
 
 ---
 
-**Clavis v1.2.1** — released 2026-11-27 (tag `v1.2.1`, 6 assets, [`/releases/latest`](https://github.com/ribaudequin/clavis/releases/latest)). REL-02 closed: the `release` job now gates on a green `e2e-cross` run — a tag whose Windows or macOS e2e leg is red does not publish. Previous: `v1.2.0` (DATA-04: three-generation backup + crash hooks).
+**Clavis v1.3.0** — released 2026-11-27 (tag `v1.3.0`, 6 assets, [`/releases/latest`](https://github.com/ribaudequin/clavis/releases/latest)). REL-03 closed: dead Storybook stack removed (7 packages, 4 critical advisories), `latest` pinned, `engines.node >= 22.12`, Dependabot added, Forge 6.4.2 pin documented. Previous: `v1.2.1` (REL-02: release gated on green e2e-cross).
 
 ---
 
@@ -69,7 +69,7 @@ Each release publishes 6 files:
 
 > **Architectures, and what has actually been run.** The macOS build is **arm64 only** — the `.dmg` has no Intel (x86-64) or universal variant, and there is no arm64 build for Linux or Windows. The `.dmg` file name carries the version (`clavis-1.2.1.dmg`) but not the architecture, unlike the other two platforms, so the gap is not visible from the release page. **All three platforms are executed by the end-to-end suite** — Linux on every push, and Windows and macOS on every release tag (measured on `v1.0.0`, 2026-10-30, `v1.1.0`, 2026-11-19 and `v1.2.0`, 2026-11-24: **19/19** on Linux and **14/14** on each of `windows-latest` and `macos-latest`, against the packaged build). Since `v1.2.1` the cross-platform legs **gate the release** (REL-02): a tag whose Windows or macOS e2e is red does not publish. The **published** files themselves — the `.zip`, the `Setup.exe`, the `.dmg` — are still not the ones the suite runs, because it drives the packager output rather than the maker output. See [SECURITY.md](SECURITY.md) for the full list of known limitations.
 
-> **Flatpak**: dropped (2026-10-30). The manifest (`flatpak/com.github.marcelosalvador.Clavis.yaml`) is pinned to `0.3.4-alpha`, never builds (`npm run clean` deletes its source path), and was never published to Flathub; it is not a v1.2.1 blocker. See `docs/MILESTONES.md`.
+> **Flatpak**: dropped (2026-10-30). The manifest (`flatpak/com.github.marcelosalvador.Clavis.yaml`) is pinned to `0.3.4-alpha`, never builds (`npm run clean` deletes its source path), and was never published to Flathub; it is not a v1.3.0 blocker. See `docs/MILESTONES.md`.
 
 ### From Source
 
