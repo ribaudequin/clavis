@@ -392,7 +392,7 @@ jobs:
         run: echo "ref=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: clavis-${{ matrix.os }}-${{ steps.artifact.outputs.ref }}
           path: |
