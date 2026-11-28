@@ -13,7 +13,7 @@
 
 ---
 
-**Clavis v1.3.0** — released 2026-11-27 (tag `v1.3.0`, 6 assets, [`/releases/latest`](https://github.com/ribaudequin/clavis/releases/latest)). REL-03 closed: dead Storybook stack removed (7 packages, 4 critical advisories), `latest` pinned, `engines.node >= 22.12`, Dependabot added, Forge 6.4.2 pin documented. Previous: `v1.2.1` (REL-02: release gated on green e2e-cross).
+**Clavis v1.3.1** — released 2026-11-28 (tag `v1.3.1`, 6 assets, [`/releases/latest`](https://github.com/ribaudequin/clavis/releases/latest)). Eight Dependabot PRs merged (argon2, prettier, testing-library, vite-plugin-react, jsdom, checkout, upload-artifact, setup-node). Previous: `v1.3.0` (REL-03: dev supply chain cleanup).
 
 ---
 

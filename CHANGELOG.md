@@ -1,5 +1,22 @@
 # Changelog — Clavis
 
+## v1.3.1 (2026-11-28)
+
+### Changed (Dependabot — 8 PRs merged)
+
+- `argon2` `0.45.1` → `0.45.2` (patch)
+- `prettier` `3.9.6` → `3.10.1` (minor)
+- `@testing-library/dom` `10.4.1` → `10.4.2` (patch)
+- `@vitejs/plugin-react` `6.1.1` → `6.3.0` (minor)
+- `jsdom` `30.0.1` → `31.0.1` (major)
+- `actions/checkout` `5` → `7` (major)
+- `actions/upload-artifact` `6` → `7` (major)
+- `actions/setup-node` `5` → `7` (major)
+
+### Quality
+
+- 602/602 vitest, lint 0, typecheck 0, typecheck:test 0, `npm audit --omit=dev` 0.
+
 ## v1.3.0 (2026-11-27)
 
 ### Changed (REL-03 — Dev supply chain cleanup)
